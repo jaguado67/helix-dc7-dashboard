@@ -57,6 +57,15 @@ py -m streamlit run app.py
 
 All application paths are repository-relative; no local Windows path is required.
 
+## Cloud data packaging
+
+For Streamlit Community Cloud, the two official XER files are stored in the repository as
+gzip-compressed Base64 text chunks under `data/DC7/`. At runtime `app.py` reconstructs the
+original XER files into a temporary directory and passes that directory to the existing DC7
+model. This changes only storage/transport; the dashboard still parses the same official XER
+bytes and the same main-project scope.
+
+
 ## Security
 
 The XER files contain detailed schedule information. Keep the GitHub repository private unless the schedule is approved for public distribution.
