@@ -282,7 +282,7 @@ def render_progress_detail(m: DC7Model):
         for _, r in df.iterrows():
             label = _safe(r.Area)
             if str(r.Area) == "Other HELIX Electrical Scope":
-                label = '<span style="color:#b36b00;font-weight:800">Electrical Infrastructure &amp; Equipment</span>'
+                label = '<span style="color:#b36b00;font-weight:800">Other HELIX Electrical Scope</span>'
             h += f'<tr><td>{label}</td><td>{int(r.Tasks)}</td><td>{r["Activity Completion %"]:.1f}%</td><td>{int(r["Not Started"])} </td><td>{int(r["In Progress"])} </td><td>{int(r.Completed)}</td></tr>'
         st.markdown(h + '</tbody></table></div>', unsafe_allow_html=True)
     with c2:
