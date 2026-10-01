@@ -424,12 +424,32 @@ class DC7Model:
         return out.sort_values(["_rank", "Area"]).drop(columns="_rank").reset_index(drop=True)
 
     def lineup_stats(self, area: str) -> pd.DataFrame:
-        """Activity-count status by Equipment Line-Up for the selected Data Hall."""
+        """Activity-count status by TFO electrical line-up for the selected Data Hall.
+
+        TFO activities identify the line-up directly in the activity name/code
+        (A110, B110 ... K110 and R110 Reserve Line), rather than using the
+        '/ Line-Ups' wording found in the main DC7 schedule.
+        """
         g = self.current_tasks[self.current_tasks["Area"].eq(area)].copy()
         if g.empty:
             return pd.DataFrame()
+
         names = g.get("task_name", pd.Series("", index=g.index)).fillna("").astype(str)
-        g["Line-Up"] = names.str.extract(r"([A-Z]\d{3})\s*/\s*Line[- ]?Ups?", expand=False, flags=re.I).str.upper()
+        codes = g.get("task_code", pd.Series("", index=g.index)).fillna("").astype(str)
+
+        # Primary TFO convention: line-up identifier appears as a standalone
+        # A-H/J/K/R + three digits token, e.g. A110, K140, R160.
+        from_name = names.str.extract(r"\b([A-HJKR]\d{3})\b", expand=False, flags=re.I)
+        from_code = codes.str.extract(r"(?:^|[-_.])([A-HJKR]\d{3})(?:[-_.]|$)", expand=False, flags=re.I)
+        g["Line-Up"] = from_name.fillna(from_code).str.upper()
+
+        # Keep only the line-up family belonging to the selected Data Hall.
+        # DH1100 -> xx110, DH1200 -> xx120, ... DH1600 -> xx160.
+        m = re.search(r"DH(\d{2})00", str(area).upper())
+        if m:
+            suffix = m.group(1) + "0"
+            g = g[g["Line-Up"].fillna("").str.endswith(suffix)]
+
         g = g[g["Line-Up"].notna()].copy()
         if g.empty:
             return pd.DataFrame()
