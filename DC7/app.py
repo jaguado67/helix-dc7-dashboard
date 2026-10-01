@@ -18,7 +18,7 @@ st.set_page_config(
 
 def _materialize_cloud_xers(data_root: Path) -> Path:
     data_root = Path(data_root)
-    dc7 = data_root / "DC7"
+    dc7 = data_root
     official = (
         "226021.005.MO-BL.xer",
         "226021.010.MO-UP.xer",
@@ -53,7 +53,7 @@ source_data_dir = Path(os.environ.get("HELIX_PROJECT_DATA_DIR", str(DATA_DIR)))
 if not source_data_dir.exists():
     st.error(f"HELIX Project data directory was not found: {source_data_dir}")
     st.info(
-        "Expected repository folder: data/DC7 with the official DC7 Baseline "
+        "Expected application folder: DC7/data with the official DC7 Baseline "
         "and Current XER files, or their packaged cloud chunks."
     )
     st.stop()

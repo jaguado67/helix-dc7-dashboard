@@ -1,8 +1,8 @@
 from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parent
-DATA_DIR = ROOT_DIR.parent / "data"
-LOGOS_DIR = ROOT_DIR.parent / "LOGOS"
+DATA_DIR = ROOT_DIR / "data"
+LOGOS_DIR = ROOT_DIR / "LOGOS"
 
 APP_TITLE = "Project & Portfolio Control Center"
 APP_SUBTITLE = "Integrated Schedule Performance Dashboard"
