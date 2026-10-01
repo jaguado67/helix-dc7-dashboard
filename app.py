@@ -27,16 +27,25 @@ def _materialize_cloud_xers(data_root: Path) -> Path:
     if all((dc7 / name).exists() for name in official):
         return data_root
 
+    runtime_root = Path(tempfile.gettempdir()) / "helix_dc7_tfo_runtime_data"
+    runtime_dc7 = runtime_root / "DC7.TFO"
+    runtime_dc7.mkdir(parents=True, exist_ok=True)
+
+    packaged = {name: dc7 / f"{name}.b64" for name in official}
+    if all(packaged[name].exists() for name in official):
+        for name in official:
+            target = runtime_dc7 / name
+            if not target.exists():
+                encoded = packaged[name].read_text(encoding="ascii").strip()
+                target.write_bytes(base64.b64decode(encoded))
+        return runtime_root
+
     chunk_sets = {
         name: sorted(dc7.glob(f"{name}.gz.b64.part*"))
         for name in official
     }
     if not all(chunk_sets[name] for name in official):
         return data_root
-
-    runtime_root = Path(tempfile.gettempdir()) / "helix_dc7_tfo_runtime_data"
-    runtime_dc7 = runtime_root / "DC7"
-    runtime_dc7.mkdir(parents=True, exist_ok=True)
 
     for name in official:
         target = runtime_dc7 / name
