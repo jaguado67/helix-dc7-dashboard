@@ -104,7 +104,7 @@ def render_kpis(m: DC7Model):
     counts = m.status_counts()
     p = m.status_percentages()
     st.markdown('<div class="section-caption">PROJECT STATUS SUMMARY</div>', unsafe_allow_html=True)
-    st.markdown('<div class="panel schedule"><div class="panel-head"><div><span class="time-pill">TIME</span><span class="panel-title">SCHEDULE PERFORMANCE</span></div><div class="panel-note">Project finish from DC7 main project · HELIX scope activity mix</div></div>', unsafe_allow_html=True)
+    st.markdown('<div class="panel schedule"><div class="panel-head"><div><span class="time-pill">TIME</span><span class="panel-title">SCHEDULE PERFORMANCE</span></div><div class="panel-note">Project finish from DC7.TFO project · HELIX scope activity mix</div></div>', unsafe_allow_html=True)
     cards = [
         ("Baseline Completion", _fmt_date(m.baseline_finish), m.baseline_path.stem, ""),
         ("Current Forecast Finish", _fmt_date(m.current_finish), _fmt_days(fv) + " vs Baseline", _var_class(fv)),
@@ -187,11 +187,11 @@ def render_windows(m: DC7Model):
 
 
 def render_fte_ready(m: DC7Model):
-    st.markdown('<div class="section-caption">FTE READY MILESTONES · BASELINE VS CURRENT</div>', unsafe_allow_html=True)
-    st.markdown('<div class="small-note">Main DC7 project only. Gray diamond = Baseline FTE Ready. Colored circle = Current FTE Ready. Variance = Baseline − Current. Green/positive = ahead, red/negative = late, blue/zero = no date change. No external-project milestones or external relationships are used.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-caption">TFO QC 2.2 MILESTONES · BASELINE VS CURRENT</div>', unsafe_allow_html=True)
+    st.markdown('<div class="small-note">DC7.TFO project only. Gray diamond = Baseline QC 2.2. Colored circle = Current QC 2.2. Variance = Baseline − Current. Green/positive = ahead, red/negative = late, blue/zero = no date change. No external-project milestones or external relationships are used.</div>', unsafe_allow_html=True)
     df = m.fte_ready_comparison()
     if df.empty:
-        st.info("No comparable FTE Ready milestones were identified in the DC7 main project.")
+        st.info("No comparable QC 2.2 Complete milestones were identified in the DC7.TFO project.")
         return
 
     fig = go.Figure()
@@ -212,13 +212,13 @@ def render_fte_ready(m: DC7Model):
             fig.add_trace(go.Scatter(
                 x=[bd], y=[y], mode="markers",
                 marker=dict(size=12, color=BASELINE, symbol="diamond"), showlegend=False,
-                hovertemplate=f"<b>{r['Area']} · Baseline FTE Ready</b><br>Activity ID: {_safe(r['Activity ID'])}<br>Date: {_fmt_date(bd)}<extra></extra>"
+                hovertemplate=f"<b>{r['Area']} · Baseline QC 2.2</b><br>Activity ID: {_safe(r['Activity ID'])}<br>Date: {_fmt_date(bd)}<extra></extra>"
             ))
         if pd.notna(cd):
             fig.add_trace(go.Scatter(
                 x=[cd], y=[y], mode="markers",
                 marker=dict(size=12, color=col, symbol="circle"), showlegend=False,
-                hovertemplate=f"<b>{r['Area']} · Current FTE Ready</b><br>Activity ID: {_safe(r['Activity ID'])}<br>Date: {_fmt_date(cd)}<br>Finish Variance: {_fmt_days(v)}<br>Status: {_safe(r['Status'])}<extra></extra>"
+                hovertemplate=f"<b>{r['Area']} · Current QC 2.2</b><br>Activity ID: {_safe(r['Activity ID'])}<br>Date: {_fmt_date(cd)}<br>Finish Variance: {_fmt_days(v)}<br>Status: {_safe(r['Status'])}<extra></extra>"
             ))
             fig.add_annotation(
                 x=cd, y=y, text=_fmt_days(v), showarrow=False,
@@ -255,7 +255,7 @@ def render_fte_ready(m: DC7Model):
     audit["Finish Variance"] = audit["Finish Variance (d)"].apply(_fmt_days)
     audit = audit.drop(columns=["Finish Variance (d)"])
     st.dataframe(audit, use_container_width=True, hide_index=True)
-    st.caption("Source: DC7 main project only. FTE Ready is matched by the IST.6100 activity family in Baseline and Current. External projects and cross-project relationships are excluded from this dashboard.")
+    st.caption("Source: DC7.TFO project only. QC 2.2 Complete is matched by the MS.1020 activity family in Baseline and Current. External projects and cross-project relationships are excluded from this dashboard.")
 
 
 def render_stats(m: DC7Model):
@@ -331,11 +331,11 @@ def _render_gate_table(reg: pd.DataFrame):
 
 def render_gates(m: DC7Model):
     st.markdown('<div class="section-caption">PROJECT CONTROL GATES · FTE READY</div>', unsafe_allow_html=True)
-    st.caption("Main DC7 project only · Baseline vs Current. FTE Ready is matched by the IST.6100 activity family inside the tracked DC7 project. Finish Variance = Baseline Date − Current Date. Positive = ahead, negative = late, zero = no change.")
+    st.caption("DC7.TFO project only · Baseline vs Current. QC 2.2 Complete is matched by the MS.1020 activity family inside the tracked DC7 project. Finish Variance = Baseline Date − Current Date. Positive = ahead, negative = late, zero = no change.")
     st.markdown(
         '''<div class="gate-legend">
-          <span class="item"><span class="diamond"></span>Baseline FTE Ready</span>
-          <span class="item"><span class="dot"></span>Current FTE Ready</span>
+          <span class="item"><span class="diamond"></span>Baseline QC 2.2</span>
+          <span class="item"><span class="dot"></span>Current QC 2.2</span>
           <span class="item"><span class="line-late"></span>Later than Baseline (− days)</span>
           <span class="item"><span class="line-early"></span>Earlier than Baseline (+ days)</span>
           <span class="item"><span class="line-zero"></span>No change (0 days)</span>
@@ -345,7 +345,7 @@ def render_gates(m: DC7Model):
 
     reg = m.fte_ready_comparison().copy()
     if reg.empty:
-        st.info("No comparable FTE Ready milestones were identified in the DC7 main project.")
+        st.info("No comparable QC 2.2 Complete milestones were identified in the DC7.TFO project.")
         return
 
     f1, f2 = st.columns([1, 1], gap="small")
@@ -383,14 +383,14 @@ def render_gates(m: DC7Model):
                 x=[b], y=[y], mode="markers",
                 marker=dict(symbol="diamond", size=12, color="#7048c7"),
                 showlegend=False,
-                hovertemplate=f"<b>{_safe(r['Area'])} · Baseline FTE Ready</b><br>Activity ID: {_safe(r['Activity ID'])}<br>Date: {_fmt_date(b)}<extra></extra>"
+                hovertemplate=f"<b>{_safe(r['Area'])} · Baseline QC 2.2</b><br>Activity ID: {_safe(r['Activity ID'])}<br>Date: {_fmt_date(b)}<extra></extra>"
             ))
         if pd.notna(c):
             tf_txt = "—" if pd.isna(tf) else f"{float(tf):+.1f} d"
             fig.add_trace(go.Scatter(
                 x=[c], y=[y], mode="markers",
                 marker=dict(size=12, color=col), showlegend=False,
-                hovertemplate=f"<b>{_safe(r['Area'])} · Current FTE Ready</b><br>Activity ID: {_safe(r['Activity ID'])}<br>Date: {_fmt_date(c)}<br>Finish Variance: {_fmt_days(v)}<br>Total Float: {tf_txt}<br>Status: {_safe(r['Status'])}<extra></extra>"
+                hovertemplate=f"<b>{_safe(r['Area'])} · Current QC 2.2</b><br>Activity ID: {_safe(r['Activity ID'])}<br>Date: {_fmt_date(c)}<br>Finish Variance: {_fmt_days(v)}<br>Total Float: {tf_txt}<br>Status: {_safe(r['Status'])}<extra></extra>"
             ))
             fig.add_annotation(
                 x=c, y=y, text=_fmt_days(v), showarrow=False,
@@ -426,7 +426,7 @@ def render_gates(m: DC7Model):
     audit["Total Float"] = audit["Total Float (d)"].apply(lambda x: "—" if pd.isna(x) else f"{float(x):+.1f} d")
     audit = audit.drop(columns=["Finish Variance (d)", "Total Float (d)"])
     st.dataframe(audit, use_container_width=True, hide_index=True)
-    st.caption("Control gates are restricted to FTE Ready milestones from the DC7 main project. External projects and cross-project relationships are excluded.")
+    st.caption("Control gates are restricted to QC 2.2 Complete milestones from the DC7.TFO project. External projects and cross-project relationships are excluded.")
 
 def render_dashboard(m: DC7Model):
     render_header(m)
@@ -436,7 +436,7 @@ def render_dashboard(m: DC7Model):
     render_stats(m)
     render_progress_detail(m)
     render_gates(m)
-    with st.expander("Diagnostics · DC7 XER / HELIX Scope Audit", expanded=False):
+    with st.expander("Diagnostics · DC7.TFO XER / HELIX Scope Audit", expanded=False):
         d = m.diagnostics()
         st.dataframe(pd.DataFrame([d]), use_container_width=True, hide_index=True)
-        st.caption("Scope rule: current HELIX activities are selected by Activity Code QTS - Subcontractor = HELIX. Baseline scope is matched 1:1 by task_code. Areas use QTS - AREA; progress detail uses QTS - DASH. FTE Ready compares the matched main-project IST.6100 Baseline/Current milestones only; external projects and external relationships are excluded. Project Control Gates are restricted to the six main-project FTE Ready IST.6100 milestones, matched Baseline vs Current by exact task_code.")
+        st.caption("Scope rule: current HELIX activities are selected by Activity Code QTS - Subcontractor = HELIX. Baseline scope is matched 1:1 by task_code. Areas use QTS - AREA; progress detail uses QTS - DASH. QC 2.2 Complete compares the matched main-project MS.1020 Baseline/Current milestones only; external projects and external relationships are excluded. Project Control Gates are restricted to the six main-project QC 2.2 Complete MS.1020 milestones, matched Baseline vs Current by exact task_code.")
