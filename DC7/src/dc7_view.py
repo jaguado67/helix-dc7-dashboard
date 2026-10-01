@@ -281,20 +281,20 @@ def render_progress_detail(m: DC7Model):
         h = f'<div class="panel"><div class="panel-head"><div class="panel-title">{area} · SUMMARY BY QTS - DASH</div></div><table class="detail-table"><thead><tr><th>Area</th><th>Tasks</th><th>Activity Completion %</th><th>Not Started</th><th>In Progress</th><th>Completed</th></tr></thead><tbody>'
         for _, r in df.iterrows():
             label = _safe(r.Area)
-            if str(r.Area) == "Electrical Infrastructure & Equipment":
+            if str(r.Area) == "Other HELIX Electrical Scope":
                 label = '<span style="color:#b36b00;font-weight:800">Electrical Infrastructure &amp; Equipment</span>'
             h += f'<tr><td>{label}</td><td>{int(r.Tasks)}</td><td>{r["Activity Completion %"]:.1f}%</td><td>{int(r["Not Started"])} </td><td>{int(r["In Progress"])} </td><td>{int(r.Completed)}</td></tr>'
         st.markdown(h + '</tbody></table></div>', unsafe_allow_html=True)
     with c2:
-        colors = ["#c48a23" if str(x) == "Electrical Infrastructure & Equipment" else "#1f6d8a" for x in df.Area]
+        colors = ["#c48a23" if str(x) == "Other HELIX Electrical Scope" else "#1f6d8a" for x in df.Area]
         fig = go.Figure(go.Bar(x=df.Area, y=df["Activity Completion %"], text=[f"{x:.1f}%" for x in df["Activity Completion %"]], textposition="outside", textfont=dict(size=13, color=TEXT), marker=dict(color=colors)))
         ymax = max(10, float(df["Activity Completion %"].max()) * 1.35 + 1) if not df.empty else 10
         fig.update_layout(**_layout(410, 70, 115, 38), showlegend=False, title=f"ACTIVITY COMPLETION BY AREA · {area}", yaxis_title="Activity Completion %")
         fig.update_yaxes(range=[0, ymax], ticksuffix="%", gridcolor=GRID)
         fig.update_xaxes(tickangle=-25)
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
-    if "Electrical Infrastructure & Equipment" in set(df["Area"].astype(str)):
-        st.caption("Electrical Infrastructure & Equipment is a dashboard-derived category for HELIX activities without a QTS-DASH assignment; the original XER coding remains unchanged.")
+    if "Other HELIX Electrical Scope" in set(df["Area"].astype(str)):
+        st.caption("Other HELIX Electrical Scope is a dashboard-derived category for HELIX activities without a QTS-DASH assignment; the original XER coding remains unchanged.")
     render_lineups_detail(m, area)
 
 
