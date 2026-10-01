@@ -175,16 +175,16 @@ def _helix_task_ids(tables: dict[str, pd.DataFrame], proj_id: str) -> set[str]:
 
 def _clean_subarea(name: str) -> str:
     if name is None or (isinstance(name, float) and pd.isna(name)):
-        return "Electrical Infrastructure & Equipment"
+        return "Other HELIX Electrical Scope"
     x = str(name).strip()
     if not x or x.lower() == "nan":
-        return "Electrical Infrastructure & Equipment"
+        return "Other HELIX Electrical Scope"
     fixes = {
         "Commissining & Start-Up": "Commissioning & Start-Up",
         "Gallery Rooms": "Galleries",
         "Corridors": "Corridor",
     }
-    return fixes.get(x, x or "Electrical Infrastructure & Equipment")
+    return fixes.get(x, x or "Other HELIX Electrical Scope")
 
 
 def _date_min(df: pd.DataFrame, cols: list[str]) -> pd.Timestamp:
@@ -346,7 +346,7 @@ class DC7Model:
             c_all = self.current_tasks[self.current_tasks["Area"].eq(area)].copy()
 
             # Representative start anchor from the current coded production scope.
-            cand = c_all[c_all["Subarea"].ne("Electrical Infrastructure & Equipment")].copy()
+            cand = c_all[c_all["Subarea"].ne("Other HELIX Electrical Scope")].copy()
             dur = pd.to_numeric(cand.get("target_drtn_hr_cnt", pd.Series(np.nan, index=cand.index)), errors="coerce").fillna(0)
             typ = cand.get("task_type", pd.Series("", index=cand.index)).fillna("").astype(str).str.upper()
             names = cand.get("task_name", pd.Series("", index=cand.index)).fillna("").astype(str).str.lower()
@@ -417,7 +417,7 @@ class DC7Model:
                 "In Progress %": _status_pct(sg, "In Progress"),
                 "Not Started %": _status_pct(sg, "Not Started"),
             })
-        order = ["Priority Rooms", "Other Rooms", "Electrical Rooms", "Data Hall", "Galleries", "Corridor", "Electrical Yard", "Mechanical Yard", "Commissioning & Start-Up", "Electrical Infrastructure & Equipment"]
+        order = ["Priority Rooms", "Other Rooms", "Electrical Rooms", "Data Hall", "Galleries", "Corridor", "Electrical Yard", "Mechanical Yard", "Commissioning & Start-Up", "Other HELIX Electrical Scope"]
         rank = {x: i for i, x in enumerate(order)}
         out = pd.DataFrame(rows)
         out["_rank"] = out["Area"].map(rank).fillna(50)
@@ -638,7 +638,7 @@ def build_dc7_model(data_dir: Path) -> DC7Model:
     area_map = _assignment_map(ut, upid, "QTS - AREA", "short_name")
     sub_map = _assignment_map(ut, upid, "QTS - DASH", "actv_code_name")
     current["Area"] = current["task_id"].astype(str).map(area_map).fillna("Unclassified")
-    current["Subarea"] = current["task_id"].astype(str).map(sub_map).map(_clean_subarea).fillna("Electrical Infrastructure & Equipment")
+    current["Subarea"] = current["task_id"].astype(str).map(sub_map).map(_clean_subarea).fillna("Other HELIX Electrical Scope")
 
     if current["task_code"].duplicated().any():
         raise ValueError("Duplicate task_code values found inside current HELIX scope; baseline matching is not unique.")
