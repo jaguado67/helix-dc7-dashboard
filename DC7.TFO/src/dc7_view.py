@@ -321,17 +321,17 @@ def render_lineups_detail(m: DC7Model, area: str):
 
 
 def _render_gate_table(reg: pd.DataFrame):
-    h = '<div class="gate-wrap"><table class="gate-table"><thead><tr><th>Control Gate</th><th>Activity ID</th><th>Area</th><th>Gate Type</th><th>Status</th><th>Baseline Date</th><th>Current Date</th><th>Finish Variance</th><th>Total Float</th></tr></thead><tbody>'
+    h = '<div class="gate-wrap"><table class="gate-table"><thead><tr><th>Milestone</th><th>Activity ID</th><th>Area</th><th>Milestone Type</th><th>Status</th><th>Baseline Date</th><th>Current Date</th><th>Finish Variance</th><th>Total Float</th></tr></thead><tbody>'
     for _, r in reg.iterrows():
         v = r["Finish Date Shift"]; tf = r["Total Float"]
         vc = "var-early" if pd.notna(v) and v > 0 else ("var-late" if pd.notna(v) and v < 0 else "var-zero")
         tc = "tf-neg" if pd.notna(tf) and tf < 0 else ("tf-pos" if pd.notna(tf) and tf > 0 else "tf-zero")
-        h += f'<tr><td>{_safe(r["Control Gate"])}</td><td>{_safe(r["Activity ID"])}</td><td>{_safe(r["Area"])}</td><td>{_safe(r["Gate Type"])}</td><td>{_safe(r["Status"])}</td><td>{_fmt_date(r["Baseline Date"])}</td><td>{_fmt_date(r["Current Date"])}</td><td class="{vc}">{_fmt_days(r["Finish Date Shift"])}</td><td class="{tc}">{"—" if pd.isna(tf) else f"{tf:+.1f} d"}</td></tr>'
+        h += f'<tr><td>{_safe(r["Milestone"])}</td><td>{_safe(r["Activity ID"])}</td><td>{_safe(r["Area"])}</td><td>{_safe(r["Milestone Type"])}</td><td>{_safe(r["Status"])}</td><td>{_fmt_date(r["Baseline Date"])}</td><td>{_fmt_date(r["Current Date"])}</td><td class="{vc}">{_fmt_days(r["Finish Date Shift"])}</td><td class="{tc}">{"—" if pd.isna(tf) else f"{tf:+.1f} d"}</td></tr>'
     st.markdown(h + '</tbody></table></div>', unsafe_allow_html=True)
 
 
 def render_gates(m: DC7Model):
-    st.markdown('<div class="section-caption">PROJECT CONTROL GATES · TFO QC 2.2 COMPLETE</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-caption">PROJECT KEY MILESTONES · TFO QC 2.2 COMPLETE</div>', unsafe_allow_html=True)
     st.caption("DC7.TFO project only · Baseline vs Current. QC 2.2 Complete is matched by the MS.1020 activity family inside the tracked DC7 project. Finish Date Shift = Baseline Date − Current Date. Positive = ahead, negative = late, zero = no change.")
     st.markdown(
         '''<div class="gate-legend">
@@ -427,7 +427,7 @@ def render_gates(m: DC7Model):
     audit["Total Float"] = audit["Total Float (d)"].apply(lambda x: "—" if pd.isna(x) else f"{float(x):+.1f} d")
     audit = audit.drop(columns=["Finish Date Shift (d)", "Total Float (d)"])
     st.dataframe(audit, use_container_width=True, hide_index=True)
-    st.caption("Control gates are restricted to QC 2.2 Complete milestones from the DC7.TFO project. External projects and cross-project relationships are excluded.")
+    st.caption("Key milestones are restricted to QC 2.2 Complete milestones from the DC7.TFO project. External projects and cross-project relationships are excluded.")
 
 def render_dashboard(m: DC7Model):
     render_header(m)
@@ -440,4 +440,4 @@ def render_dashboard(m: DC7Model):
     with st.expander("Diagnostics · DC7.TFO XER / HELIX Scope Audit", expanded=False):
         d = m.diagnostics()
         st.dataframe(pd.DataFrame([d]), use_container_width=True, hide_index=True)
-        st.caption("Scope rule: current HELIX activities are selected by Activity Code QTS - Subcontractor = HELIX. Baseline scope is matched 1:1 by task_code. Areas use QTS - AREA; progress detail uses QTS - DASH. QC 2.2 Complete compares the matched main-project MS.1020 Baseline/Current milestones only; external projects and external relationships are excluded. Project Control Gates are restricted to the six main-project QC 2.2 Complete MS.1020 milestones, matched Baseline vs Current by exact task_code.")
+        st.caption("Scope rule: current HELIX activities are selected by Activity Code QTS - Subcontractor = HELIX. Baseline scope is matched 1:1 by task_code. Areas use QTS - AREA; progress detail uses QTS - DASH. QC 2.2 Complete compares the matched main-project MS.1020 Baseline/Current milestones only; external projects and external relationships are excluded. Project Milestones are restricted to the six main-project QC 2.2 Complete MS.1020 milestones, matched Baseline vs Current by exact task_code.")
