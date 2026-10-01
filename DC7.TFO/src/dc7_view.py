@@ -17,7 +17,7 @@ CSS=f"""
 <style>
 #MainMenu{{visibility:hidden}} footer{{visibility:hidden}} header[data-testid="stHeader"]{{background:#fff}}
 [data-testid="stToolbar"]{{display:none!important}} [data-testid="stSidebar"]{{display:none!important}} [data-testid="collapsedControl"]{{display:none!important}}
-.block-container{{padding-top:.35rem;padding-bottom:2rem;max-width:1680px}} [data-testid="stAppViewContainer"]{{background:#fff}}
+.block-container{{padding-top:1.15rem;padding-bottom:2rem;max-width:1680px}} [data-testid="stAppViewContainer"]{{background:#fff}}
 html,body,[class*="css"]{{font-family:Arial,Helvetica,sans-serif;color:{TEXT}}} [data-testid="stVerticalBlock"]{{gap:.55rem}}
 .helix-header{{background:{NAVY};color:#fff;min-height:84px;padding:11px 17px;display:grid;grid-template-columns:105px minmax(500px,1.65fr) 250px 295px 112px;align-items:center;column-gap:16px}}
 .logo-card{{background:#fff;border-radius:5px;height:55px;padding:4px 8px;display:flex;align-items:center;justify-content:center}} .logo-card img{{max-width:100%;max-height:47px;object-fit:contain}}
@@ -87,7 +87,7 @@ def render_header(m: DC7Model):
     <div class="helix-header">
       <div class="logo-card"><img src="{_logo('toro')}"></div>
       <div><div class="brand-title">{BRAND_NAME} {APP_TITLE}</div><div class="brand-subtitle">{APP_SUBTITLE}</div></div>
-      <div class="header-center"><span class="header-chip">DC7 PROJECT DETAIL</span><span class="header-chip">v{VERSION}</span></div>
+      <div class="header-center"><span class="header-chip">DC7.TFO PROJECT DETAIL</span><span class="header-chip">v{VERSION}</span></div>
       <div class="header-meta">
         <div class="line">Latest Data Date&nbsp;&nbsp;<span class="value">{_fmt_date(m.data_date)}</span></div>
         <div class="line">Current Update&nbsp;&nbsp;<span class="value">{_safe(m.update_path.stem)}</span></div>
@@ -95,7 +95,7 @@ def render_header(m: DC7Model):
       </div>
       <div class="logo-card"><img src="{_logo('helix')}"></div>
     </div>
-    <div class="project-strip"><span>DC7 VIEW</span><span class="right">Full-project finish · HELIX Activity Code scope analytics</span></div>
+    <div class="project-strip"><span>DC7.TFO VIEW</span><span class="right">Full-project finish · HELIX Activity Code scope analytics</span></div>
     """, unsafe_allow_html=True)
 
 
