@@ -535,7 +535,7 @@ class DC7Model:
                 "Current Forecast Finish": cf,
                 "Start Date Shift (d)": (bs.normalize() - cs.normalize()).days if pd.notna(cs) and pd.notna(bs) else np.nan,
                 "Finish Date Shift (d)": (bf.normalize() - cf.normalize()).days if pd.notna(cf) and pd.notna(bf) else np.nan,
-                "Schedule Window Shift (d)": ((bf - bs) - (cf - cs)).days if all(pd.notna(x) for x in [bs, bf, cs, cf]) else np.nan,
+                "Duration Change (d)": ((bf - bs) - (cf - cs)).days if all(pd.notna(x) for x in [bs, bf, cs, cf]) else np.nan,
                 "Activity Completion %": _activity_completion_pct(c_all),
                 "Start Anchor ID": anchor_code,
                 "Start Anchor": anchor_name,
@@ -821,7 +821,7 @@ class DC7Model:
                 "Status": r.get("Status", ""),
                 "Baseline Date": bd,
                 "Current Date": cd,
-                "Finish Variance": v,
+                "Finish Date Shift": v,
                 "Total Float": tf,
                 "_score": score,
             })
