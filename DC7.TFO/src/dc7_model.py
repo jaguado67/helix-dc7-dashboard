@@ -173,6 +173,59 @@ def _helix_task_ids(tables: dict[str, pd.DataFrame], proj_id: str) -> set[str]:
     return set(m["task_id"].astype(str))
 
 
+def _wbs_lineup_task_map(tables: dict[str, pd.DataFrame], proj_id: str) -> dict[str, str]:
+    """Map task_id -> TFO line-up from the PROJWBS hierarchy.
+
+    A valid line-up is a WBS node such as A110, B120, K150 or R160
+    whose ancestor chain contains an 'Equipment Line-Ups' node.
+    """
+    wbs = tables.get("PROJWBS", pd.DataFrame()).copy()
+    task = tables.get("TASK", pd.DataFrame()).copy()
+    if wbs.empty or task.empty:
+        return {}
+
+    wbs = wbs[wbs["proj_id"].astype(str).eq(str(proj_id))].copy()
+    task = task[task["proj_id"].astype(str).eq(str(proj_id))].copy()
+    if wbs.empty or task.empty:
+        return {}
+
+    parent = dict(zip(wbs["wbs_id"].astype(str), wbs["parent_wbs_id"].fillna("").astype(str)))
+    name = dict(zip(
+        wbs["wbs_id"].astype(str),
+        wbs.get("wbs_name", pd.Series("", index=wbs.index)).fillna("").astype(str).str.strip()
+    ))
+
+    lineup_by_wbs: dict[str, str] = {}
+    for wid in name:
+        chain = []
+        cur = wid
+        seen = set()
+        while cur and cur not in seen and cur in name:
+            seen.add(cur)
+            chain.append(cur)
+            cur = parent.get(cur, "")
+
+        labels = [name.get(x, "") for x in chain]
+        has_equipment_parent = any("EQUIPMENT LINE-UPS" in _norm(lbl) for lbl in labels)
+        if not has_equipment_parent:
+            continue
+
+        lineup = None
+        for lbl in labels:
+            m = re.fullmatch(r"([A-HJKR]\d{3})", str(lbl).strip(), flags=re.I)
+            if m:
+                lineup = m.group(1).upper()
+                break
+        if lineup:
+            lineup_by_wbs[wid] = lineup
+
+    return {
+        str(r["task_id"]): lineup_by_wbs.get(str(r.get("wbs_id", "")), "")
+        for _, r in task.iterrows()
+        if lineup_by_wbs.get(str(r.get("wbs_id", "")), "")
+    }
+
+
 def _clean_subarea(name: str) -> str:
     if name is None or (isinstance(name, float) and pd.isna(name)):
         return "Electrical Infrastructure & Equipment"
@@ -434,14 +487,14 @@ class DC7Model:
         if g.empty:
             return pd.DataFrame()
 
-        names = g.get("task_name", pd.Series("", index=g.index)).fillna("").astype(str)
-        codes = g.get("task_code", pd.Series("", index=g.index)).fillna("").astype(str)
-
-        # Primary TFO convention: line-up identifier appears as a standalone
-        # A-H/J/K/R + three digits token, e.g. A110, K140, R160.
-        from_name = names.str.extract(r"\b([A-HJKR]\d{3})\b", expand=False, flags=re.I)
-        from_code = codes.str.extract(r"(?:^|[-_.])([A-HJKR]\d{3})(?:[-_.]|$)", expand=False, flags=re.I)
-        g["Line-Up"] = from_name.fillna(from_code).str.upper()
+        lineup = g.get("Line-Up", pd.Series("", index=g.index)).fillna("").astype(str).str.upper()
+        if not lineup.str.len().gt(0).any():
+            names = g.get("task_name", pd.Series("", index=g.index)).fillna("").astype(str)
+            codes = g.get("task_code", pd.Series("", index=g.index)).fillna("").astype(str)
+            from_name = names.str.extract(r"\b([A-HJKR]\d{3})\b", expand=False, flags=re.I)
+            from_code = codes.str.extract(r"(?:^|[-_.])([A-HJKR]\d{3})(?:[-_.]|$)", expand=False, flags=re.I)
+            lineup = from_name.fillna(from_code).fillna("").str.upper()
+        g["Line-Up"] = lineup.replace("", np.nan)
 
         # Keep only the line-up family belonging to the selected Data Hall.
         # DH1100 -> xx110, DH1200 -> xx120, ... DH1600 -> xx160.
@@ -659,12 +712,14 @@ def build_dc7_model(data_dir: Path) -> DC7Model:
     sub_map = _assignment_map(ut, upid, "QTS - DASH", "actv_code_name")
     current["Area"] = current["task_id"].astype(str).map(area_map).fillna("Unclassified")
     current["Subarea"] = current["task_id"].astype(str).map(sub_map).map(_clean_subarea).fillna("Electrical Infrastructure & Equipment")
+    lineup_map = _wbs_lineup_task_map(ut, upid)
+    current["Line-Up"] = current["task_id"].astype(str).map(lineup_map).fillna("")
 
     if current["task_code"].duplicated().any():
         raise ValueError("Duplicate task_code values found inside current HELIX scope; baseline matching is not unique.")
     base_all = to_task_frame(bt["TASK"])
     base_all = base_all[base_all["proj_id"].astype(str).eq(bpid)].copy()
-    mapping = current[["task_code", "Area", "Subarea"]].drop_duplicates("task_code")
+    mapping = current[["task_code", "Area", "Subarea", "Line-Up"]].drop_duplicates("task_code")
     baseline = base_all.merge(mapping, on="task_code", how="inner")
 
     # A schedule update may legitimately add, split, replace, or recode activities.
