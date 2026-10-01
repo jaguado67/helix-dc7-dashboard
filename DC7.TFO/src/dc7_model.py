@@ -262,6 +262,61 @@ def _foh_boh_package(task_code: str, task_name: str, area: str) -> str:
     return "Other Electrical Scope"
 
 
+def _wbs_functional_package_task_map(tables: dict[str, pd.DataFrame], proj_id: str) -> dict[str, str]:
+    """Map task_id -> functional TFO package from the PROJWBS hierarchy."""
+    wbs = tables.get("PROJWBS", pd.DataFrame()).copy()
+    task = tables.get("TASK", pd.DataFrame()).copy()
+    if wbs.empty or task.empty:
+        return {}
+
+    wbs = wbs[wbs["proj_id"].astype(str).eq(str(proj_id))].copy()
+    task = task[task["proj_id"].astype(str).eq(str(proj_id))].copy()
+    if wbs.empty or task.empty:
+        return {}
+
+    parent = dict(zip(wbs["wbs_id"].astype(str), wbs["parent_wbs_id"].fillna("").astype(str)))
+    name = dict(zip(
+        wbs["wbs_id"].astype(str),
+        wbs.get("wbs_name", pd.Series("", index=wbs.index)).fillna("").astype(str).str.strip()
+    ))
+
+    def labels_for(wid: str) -> list[str]:
+        labels = []
+        cur = str(wid)
+        seen = set()
+        while cur and cur not in seen and cur in name:
+            seen.add(cur)
+            labels.append(name.get(cur, ""))
+            cur = parent.get(cur, "")
+        return labels
+
+    out = {}
+    for _, r in task.iterrows():
+        labels = labels_for(str(r.get("wbs_id", "")))
+        norms = [_norm(x) for x in labels]
+
+        package = ""
+        if any(x == "DATA HALL" for x in norms):
+            package = "Data Hall"
+        elif any(x == "ELECTRICAL ROOMS" for x in norms):
+            package = "Electrical Rooms"
+        elif any(x == "PDU GALLERY" for x in norms):
+            package = "PDU Gallery"
+        elif any(x.startswith("SKID INSTALATION") or x.startswith("SKID INSTALLATION") for x in norms):
+            package = "Skid Installation"
+        elif any("COMISSIONING BY OTHERS" in x or "COMMISSIONING BY OTHERS" in x for x in norms):
+            package = "Commissioning by Others"
+        elif any("FIRE STOPPING" in x for x in norms):
+            package = "Fire Stopping"
+        elif "MILESTONES" in norms:
+            package = "Milestones"
+
+        if package:
+            out[str(r["task_id"])] = package
+
+    return out
+
+
 def _clean_subarea(name: str) -> str:
     if name is None or (isinstance(name, float) and pd.isna(name)):
         return "Electrical Infrastructure & Equipment"
@@ -501,12 +556,19 @@ class DC7Model:
                 )
             ]
             group_col = "Display Group"
+            direct_labels = True
+        elif str(area).upper().startswith("DH"):
+            package = g.get("WBS Package", pd.Series("", index=g.index)).fillna("").astype(str)
+            g["Display Group"] = package.where(package.str.len().gt(0), "Other Electrical Scope")
+            group_col = "Display Group"
+            direct_labels = True
         else:
             group_col = "Subarea"
+            direct_labels = False
 
         rows = []
         for sub, sg in g.groupby(group_col, dropna=False):
-            label = str(sub) if area in {"FOH", "BOH"} else _clean_subarea(sub)
+            label = str(sub) if direct_labels else _clean_subarea(sub)
             vc = sg["Status"].value_counts()
             rows.append({
                 "Area": label,
@@ -523,8 +585,9 @@ class DC7Model:
             "Milestones", "Layout, Rough-In & Walls", "Panels",
             "Feeders & Distribution", "Branch Circuits & Devices",
             "Branch Circuit & Devices", "Firestopping & QC", "QC",
-            "Priority Rooms", "Other Rooms", "Electrical Rooms", "Data Hall",
-            "Galleries", "Corridor", "Electrical Yard", "Mechanical Yard",
+            "Data Hall", "Electrical Rooms", "PDU Gallery", "Skid Installation",
+            "Commissioning by Others", "Fire Stopping", "Other Electrical Scope",
+            "Priority Rooms", "Other Rooms", "Galleries", "Corridor", "Electrical Yard", "Mechanical Yard",
             "Commissioning & Start-Up", "Electrical Infrastructure & Equipment"
         ]
         rank = {x: i for i, x in enumerate(order)}
@@ -810,12 +873,14 @@ def build_dc7_model(data_dir: Path) -> DC7Model:
     current["Subarea"] = current["task_id"].astype(str).map(sub_map).map(_clean_subarea).fillna("Electrical Infrastructure & Equipment")
     lineup_map = _wbs_lineup_task_map(ut, upid)
     current["Line-Up"] = current["task_id"].astype(str).map(lineup_map).fillna("")
+    package_map = _wbs_functional_package_task_map(ut, upid)
+    current["WBS Package"] = current["task_id"].astype(str).map(package_map).fillna("")
 
     if current["task_code"].duplicated().any():
         raise ValueError("Duplicate task_code values found inside current HELIX scope; baseline matching is not unique.")
     base_all = to_task_frame(bt["TASK"])
     base_all = base_all[base_all["proj_id"].astype(str).eq(bpid)].copy()
-    mapping = current[["task_code", "Area", "Subarea", "Line-Up"]].drop_duplicates("task_code")
+    mapping = current[["task_code", "Area", "Subarea", "Line-Up", "WBS Package"]].drop_duplicates("task_code")
     baseline = base_all.merge(mapping, on="task_code", how="inner")
 
     # A schedule update may legitimately add, split, replace, or recode activities.
