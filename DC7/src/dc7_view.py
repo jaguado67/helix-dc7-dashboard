@@ -15,7 +15,7 @@ GREEN="#14936f"; RED="#d83a3a"; BLUE="#2f80ed"; EARLY="#18845f"; BASELINE="#aab8
 
 CSS=f"""
 <style>
-#MainMenu{{visibility:hidden}} footer{{visibility:hidden}} header[data-testid="stHeader"]{{background:transparent;height:0;min-height:0}}
+#MainMenu{{visibility:hidden}} footer{{visibility:hidden}} header[data-testid="stHeader"]{{background:#fff}}
 [data-testid="stToolbar"]{{display:none!important}} [data-testid="stSidebar"]{{display:none!important}} [data-testid="collapsedControl"]{{display:none!important}}
 .block-container{{padding-top:.35rem;padding-bottom:2rem;max-width:1680px}} [data-testid="stAppViewContainer"]{{background:#fff}}
 html,body,[class*="css"]{{font-family:Arial,Helvetica,sans-serif;color:{TEXT}}} [data-testid="stVerticalBlock"]{{gap:.55rem}}
