@@ -59,7 +59,11 @@ def _logo(keyword):
         if root.exists():
             m=sorted([p for p in root.iterdir() if p.is_file() and keyword.lower() in p.name.lower()])
             if m:
-                return base64.b64encode(m[0].read_bytes()).decode("ascii")
+                p=m[0]
+                ext=p.suffix.lower()
+                mime="image/jpeg" if ext in {".jpg", ".jpeg"} else ("image/webp" if ext==".webp" else "image/png")
+                encoded=base64.b64encode(p.read_bytes()).decode("ascii")
+                return f"data:{mime};base64,{encoded}"
     return ""
 
 
@@ -81,7 +85,7 @@ def render_header(m: DC7Model):
     st.markdown(CSS, unsafe_allow_html=True)
     st.markdown(f"""
     <div class="helix-header">
-      <div class="logo-card"><img src="data:image/png;base64,{_logo('toro')}"></div>
+      <div class="logo-card"><img src="{_logo('toro')}"></div>
       <div><div class="brand-title">{BRAND_NAME} {APP_TITLE}</div><div class="brand-subtitle">{APP_SUBTITLE}</div></div>
       <div class="header-center"><span class="header-chip">DC7 PROJECT DETAIL</span><span class="header-chip">v{VERSION}</span></div>
       <div class="header-meta">
@@ -89,7 +93,7 @@ def render_header(m: DC7Model):
         <div class="line">Current Update&nbsp;&nbsp;<span class="value">{_safe(m.update_path.stem)}</span></div>
         <div class="line">Scope&nbsp;&nbsp;<span class="value">HELIX Electric</span></div>
       </div>
-      <div class="logo-card"><img src="data:image/png;base64,{_logo('helix')}"></div>
+      <div class="logo-card"><img src="{_logo('helix')}"></div>
     </div>
     <div class="project-strip"><span>DC7 VIEW</span><span class="right">Full-project finish · HELIX Activity Code scope analytics</span></div>
     """, unsafe_allow_html=True)
