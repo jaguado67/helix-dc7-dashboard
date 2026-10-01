@@ -389,9 +389,9 @@ class DC7Model:
                 "Baseline Finish": bf,
                 "Current Start": cs,
                 "Current Forecast Finish": cf,
-                "Start Variance (d)": (bs.normalize() - cs.normalize()).days if pd.notna(cs) and pd.notna(bs) else np.nan,
-                "Finish Variance (d)": (bf.normalize() - cf.normalize()).days if pd.notna(cf) and pd.notna(bf) else np.nan,
-                "Schedule Window Variance (d)": ((bf - bs) - (cf - cs)).days if all(pd.notna(x) for x in [bs, bf, cs, cf]) else np.nan,
+                "Start Date Shift (d)": (bs.normalize() - cs.normalize()).days if pd.notna(cs) and pd.notna(bs) else np.nan,
+                "Finish Date Shift (d)": (bf.normalize() - cf.normalize()).days if pd.notna(cf) and pd.notna(bf) else np.nan,
+                "Duration Change (d)": ((bf - bs) - (cf - cs)).days if all(pd.notna(x) for x in [bs, bf, cs, cf]) else np.nan,
                 "Activity Completion %": _activity_completion_pct(c_all),
                 "Start Anchor ID": anchor_code,
                 "Start Anchor": anchor_name,
@@ -526,7 +526,7 @@ class DC7Model:
                 "Activity Name": str(r.get("task_name", code)),
                 "Baseline Date": bd,
                 "Current Date": cd,
-                "Finish Variance (d)": (bd.normalize() - cd.normalize()).days if pd.notna(cd) and pd.notna(bd) else np.nan,
+                "Finish Date Shift (d)": (bd.normalize() - cd.normalize()).days if pd.notna(cd) and pd.notna(bd) else np.nan,
                 "Total Float (d)": tf,
                 "Status": r.get("Status", ""),
             })
@@ -582,14 +582,14 @@ class DC7Model:
             name = str(r.get("task_name", code))
             score = sum(1 for kw in CONTROL_GATE_KEYWORDS if kw.lower() in f"{name} {code}".lower())
             rows.append({
-                "Control Gate": name,
+                "Milestone": name,
                 "Activity ID": code,
                 "Area": self._gate_area(code, name),
-                "Gate Type": self._gate_family(name, code),
+                "Milestone Type": self._gate_family(name, code),
                 "Status": r.get("Status", ""),
                 "Baseline Date": bd,
                 "Current Date": cd,
-                "Finish Variance": v,
+                "Finish Date Shift": v,
                 "Total Float": tf,
                 "_score": score,
             })
@@ -601,6 +601,9 @@ class DC7Model:
         return out.drop(columns="_score").reset_index(drop=True)
 
     def diagnostics(self) -> dict:
+        current_codes = set(self.current_tasks.get("task_code", pd.Series(dtype=str)).dropna().astype(str))
+        baseline_codes = set(self.baseline_tasks.get("task_code", pd.Series(dtype=str)).dropna().astype(str))
+        current_only = sorted(current_codes - baseline_codes)
         return {
             "Baseline XER": self.baseline_path.name,
             "Baseline proj_id": str(self.baseline_project.get("proj_id", "")),
@@ -609,9 +612,11 @@ class DC7Model:
             "Update proj_id": str(self.update_project.get("proj_id", "")),
             "Update Data Date": self.data_date,
             "HELIX Current Activities": len(self.current_tasks),
-            "HELIX Baseline Matches": len(self.baseline_tasks),
+            "HELIX Baseline Comparable Activities": len(self.baseline_tasks),
+            "Current-only HELIX Activities": len(current_only),
+            "Current-only Activity IDs": ", ".join(current_only[:20]) if current_only else "None",
             "Areas": ", ".join(self.areas()),
-            "Scope Rule": "Main DC7 project only; external projects and external relationships excluded",
+            "Scope Rule": "Main DC7 project only; baseline comparisons use matched task_code values; current-only activities remain in current-status analytics",
         }
 
 
@@ -641,7 +646,8 @@ def build_dc7_model(data_dir: Path) -> DC7Model:
     base_all = base_all[base_all["proj_id"].astype(str).eq(bpid)].copy()
     mapping = current[["task_code", "Area", "Subarea"]].drop_duplicates("task_code")
     baseline = base_all.merge(mapping, on="task_code", how="inner")
-    if len(baseline) != len(current):
-        raise ValueError(f"Baseline/current HELIX scope mismatch: BL={len(baseline):,}, UP={len(current):,}.")
 
+    # Updates may add, split, replace, or recode activities.
+    # Baseline-vs-current comparisons use matched task_codes only,
+    # while current-status analytics retain the full current HELIX scope.
     return DC7Model(bl_path, up_path, bp, up, baseline, current, bt, ut)
