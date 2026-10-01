@@ -1,18 +1,10 @@
 from pathlib import Path
 import os
-import sys
 import base64
 import gzip
 import tempfile
 import streamlit as st
 
-APP_DIR = Path(__file__).resolve().parent
-for _name in list(sys.modules):
-    if _name == "config" or _name == "src" or _name.startswith("src."):
-        del sys.modules[_name]
-if str(APP_DIR) in sys.path:
-    sys.path.remove(str(APP_DIR))
-sys.path.insert(0, str(APP_DIR))
 
 from config import DATA_DIR
 from src.dc7_model import build_dc7_model
