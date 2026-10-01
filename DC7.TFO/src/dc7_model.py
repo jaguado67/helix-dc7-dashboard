@@ -206,8 +206,8 @@ def _wbs_lineup_task_map(tables: dict[str, pd.DataFrame], proj_id: str) -> dict[
             cur = parent.get(cur, "")
 
         labels = [name.get(x, "") for x in chain]
-        has_equipment_parent = any("EQUIPMENT LINE-UPS" in _norm(lbl) for lbl in labels)
-        if not has_equipment_parent:
+        has_lineups_parent = any(_norm(lbl) == "LINE-UPS" for lbl in labels)
+        if not has_lineups_parent:
             continue
 
         lineup = None
