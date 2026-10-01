@@ -476,6 +476,46 @@ class DC7Model:
         out["_rank"] = out["Area"].map(rank).fillna(50)
         return out.sort_values(["_rank", "Area"]).drop(columns="_rank").reset_index(drop=True)
 
+    def area_activity_detail(self, area: str) -> pd.DataFrame:
+        """Current HELIX activity detail for FOH/BOH and other selected areas."""
+        g = self.current_tasks[self.current_tasks["Area"].eq(area)].copy()
+        if g.empty:
+            return pd.DataFrame()
+
+        def pick_date_row(row, cols):
+            for col in cols:
+                if col in row.index:
+                    x = pd.to_datetime(row.get(col), errors="coerce")
+                    if pd.notna(x):
+                        return x
+            return pd.NaT
+
+        rows = []
+        for _, r in g.iterrows():
+            od = pd.to_numeric(pd.Series([r.get("target_drtn_hr_cnt")]), errors="coerce").iloc[0]
+            rd = pd.to_numeric(pd.Series([r.get("remain_drtn_hr_cnt")]), errors="coerce").iloc[0]
+            pct = np.nan
+            if pd.notna(od) and od > 0 and pd.notna(rd):
+                pct = max(0.0, min(100.0, 100.0 * (od - rd) / od))
+            elif str(r.get("Status", "")) == "Completed":
+                pct = 100.0
+            elif str(r.get("Status", "")) == "Not Started":
+                pct = 0.0
+
+            rows.append({
+                "Activity ID": str(r.get("task_code", "")),
+                "Activity Name": str(r.get("task_name", "")),
+                "Status": str(r.get("Status", "")),
+                "Activity Completion %": pct,
+                "Current Start": pick_date_row(r, ["act_start_date", "early_start_date", "restart_date", "target_start_date"]),
+                "Current Finish": pick_date_row(r, ["act_end_date", "reend_date", "early_end_date", "target_end_date"]),
+            })
+
+        out = pd.DataFrame(rows)
+        order = {"In Progress": 0, "Not Started": 1, "Completed": 2}
+        out["_status_rank"] = out["Status"].map(order).fillna(9)
+        return out.sort_values(["_status_rank", "Current Start", "Activity ID"], na_position="last").drop(columns="_status_rank").reset_index(drop=True)
+
     def lineup_stats(self, area: str) -> pd.DataFrame:
         """Activity-count status by TFO electrical line-up for the selected Data Hall.
 
