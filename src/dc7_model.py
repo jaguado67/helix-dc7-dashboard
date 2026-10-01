@@ -48,8 +48,8 @@ def _find_files(data_dir: Path) -> tuple[Path, Path]:
     if not all_xer:
         raise FileNotFoundError(f"No XER files found below data directory: {data_dir}")
 
-    exact_bl = [p for p in all_xer if p.name.casefold() == "226021.005.mo-bl.xer"]
-    exact_up = [p for p in all_xer if p.name.casefold() == "226021.010.mo-up.xer"]
+    exact_bl = [p for p in all_xer if p.name.casefold() == "dc7.tfo-bl.xer"]
+    exact_up = [p for p in all_xer if p.name.casefold() == "dc7.tfo-b.xer"]
 
     if exact_bl and exact_up:
         pairs = [(b, u) for b in exact_bl for u in exact_up if b.parent == u.parent]
@@ -57,17 +57,17 @@ def _find_files(data_dir: Path) -> tuple[Path, Path]:
             def pair_rank(pair):
                 b, _ = pair
                 rel_depth = len(b.parent.relative_to(data_dir).parts) if b.parent != data_dir else 0
-                dc7_penalty = 0 if b.parent.name.strip().upper() == "DC7" else 1
+                dc7_penalty = 0 if b.parent.name.strip().upper() == "DC7.TFO" else 1
                 return (dc7_penalty, rel_depth, str(b.parent).lower())
             return sorted(pairs, key=pair_rank)[0]
         if len(exact_bl) == 1 and len(exact_up) == 1:
             return exact_bl[0], exact_up[0]
 
     roots = []
-    if data_dir.name.strip().upper() == "DC7":
+    if data_dir.name.strip().upper() == "DC7.TFO":
         roots.append(data_dir)
     else:
-        roots.extend([p for p in data_dir.rglob("*") if p.is_dir() and p.name.strip().upper() == "DC7"])
+        roots.extend([p for p in data_dir.rglob("*") if p.is_dir() and p.name.strip().upper() == "DC7.TFO"])
         roots.append(data_dir)
 
     seen = set()
@@ -75,7 +75,7 @@ def _find_files(data_dir: Path) -> tuple[Path, Path]:
 
     def eligible(p: Path) -> bool:
         text = " ".join(x.upper() for x in p.parts)
-        return "TFO" not in text and "MIL" not in p.stem.upper()
+        return "MIL" not in p.stem.upper()
 
     def is_dc7_main(path: Path) -> bool:
         try:
@@ -83,7 +83,7 @@ def _find_files(data_dir: Path) -> tuple[Path, Path]:
             row = _project_row(t, path)
             short = str(row.get("proj_short_name", "")).upper()
             name = str(row.get("proj_name", "")).upper()
-            return short.startswith("226021.") or "DC7" in name
+            return short.startswith("DC7.TFO") or ("DC7" in name and "TFO" in name)
         except Exception:
             return False
 
@@ -101,9 +101,9 @@ def _find_files(data_dir: Path) -> tuple[Path, Path]:
         names = ", ".join(p.name for p in all_xer[:20])
         suffix = " ..." if len(all_xer) > 20 else ""
         raise FileNotFoundError(
-            "DC7 BL/UP pair not found. Expected official files "
-            "226021.005.MO-BL.xer and 226021.010.MO-UP.xer either directly "
-            f"inside {data_dir} or in a DC7 subfolder. XERs seen: {names}{suffix}"
+            "DC7.TFO BL/Update pair not found. Expected official files "
+            "DC7.TFO-BL.xer and DC7.TFO-B.xer either directly "
+            f"inside {data_dir} or in a DC7.TFO subfolder. XERs seen: {names}{suffix}"
         )
 
     def dd_key(path: Path):
@@ -491,22 +491,22 @@ class DC7Model:
         return out
 
     def fte_ready_comparison(self) -> pd.DataFrame:
-        """FTE Ready milestones from the DC7 main project only.
+        """TFO QC 2.2 completion milestones from the DC7.TFO project only.
 
         The comparison is strictly like-for-like between the Baseline and
-        Current main schedule using the IST.6100 milestone family. No external
+        Current TFO schedule using the MS.1020 QC 2.2 milestone family. No external
         projects, external activities, or cross-project relationships are used.
         """
         rows = []
         for area in [a for a in AREA_ORDER if a.startswith("DH")]:
             c = self.current_tasks[self.current_tasks["Area"].eq(area)].copy()
-            mask = c.get("task_code", pd.Series("", index=c.index)).fillna("").astype(str).str.upper().str.endswith(".IST.6100")
+            mask = c.get("task_code", pd.Series("", index=c.index)).fillna("").astype(str).str.upper().str.endswith(".MS.1020")
             cand = c[mask].copy()
             if cand.empty:
                 continue
 
             names = cand.get("task_name", pd.Series("", index=cand.index)).fillna("").astype(str)
-            explicit = cand[names.str.contains("Equipment Installed & Terminated", case=False, na=False)]
+            explicit = cand[names.str.contains("TFO - QC 2.2 Complete", case=False, na=False)]
             r = explicit.iloc[0] if not explicit.empty else cand.iloc[0]
             code = str(r.get("task_code", ""))
 
@@ -535,14 +535,14 @@ class DC7Model:
     @staticmethod
     def _gate_family(name: str, code: str) -> str:
         text = f"{name} {code}".lower()
-        if "fte ready" in text or text.strip().endswith(".ist.6100"):
-            return "FTE Ready"
+        if "qc 2.2" in text or text.strip().endswith(".ms.1020"):
+            return "QC 2.2 Complete"
         if "l3" in text and ("start" in text or "commission" in text):
             return "L3 Start"
         if "early access" in text:
             return "Early Access"
         if "substantial completion" in text or "tco" in text:
-            return "TCO"
+            return "Substantial Completion"
         if "ready to receive" in text:
             return "Ready to Receive"
         if "ofci" in text or "first skid" in text:
@@ -611,7 +611,7 @@ class DC7Model:
             "HELIX Current Activities": len(self.current_tasks),
             "HELIX Baseline Matches": len(self.baseline_tasks),
             "Areas": ", ".join(self.areas()),
-            "Scope Rule": "Main DC7 project only; external projects and external relationships excluded",
+            "Scope Rule": "DC7.TFO project only; external projects and external relationships excluded",
         }
 
 
@@ -628,7 +628,7 @@ def build_dc7_model(data_dir: Path) -> DC7Model:
     helix_ids = _helix_task_ids(ut, upid)
     current = cur_all[cur_all["task_id"].astype(str).isin(helix_ids)].copy()
     if current.empty:
-        raise ValueError("HELIX scope contains zero activities in the DC7 update.")
+        raise ValueError("HELIX scope contains zero activities in the DC7.TFO update.")
 
     area_map = _assignment_map(ut, upid, "QTS - AREA", "short_name")
     sub_map = _assignment_map(ut, upid, "QTS - DASH", "actv_code_name")
