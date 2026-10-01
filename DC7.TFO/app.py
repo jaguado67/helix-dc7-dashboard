@@ -63,12 +63,14 @@ if not source_data_dir.exists():
 
 data_dir = _materialize_cloud_xers(source_data_dir)
 
+MODEL_VERSION = "dc7-tfo-2026-10-01-lineups-v2"
+
 @st.cache_resource(show_spinner="Reading DC7.TFO baseline/update XER and building HELIX scope…")
-def load_model(path_text: str):
+def load_model(path_text: str, model_version: str):
     return build_dc7_model(Path(path_text))
 
 try:
-    model = load_model(str(data_dir))
+    model = load_model(str(data_dir), MODEL_VERSION)
 except Exception as exc:
     st.error(f"DC7.TFO dashboard could not be built: {exc}")
     st.info(
