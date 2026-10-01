@@ -276,23 +276,10 @@ def render_progress_detail(m: DC7Model):
     st.markdown('<div class="section-caption">PROJECT PROGRESS DETAIL</div>', unsafe_allow_html=True)
     area = st.selectbox("Area / Data Hall", m.areas(), index=0, key="dc7_area")
 
-    if area in {"FOH", "BOH"}:
-        detail = m.area_activity_detail(area)
-        st.markdown(f'<div class="panel"><div class="panel-head"><div class="panel-title">{area} · HELIX ACTIVITY DETAIL</div><div class="panel-note">Current HELIX scope · direct activity-level view because QTS - DASH is not populated for most {area} activities</div></div>', unsafe_allow_html=True)
-        show = detail.copy()
-        if not show.empty:
-            show["Activity Completion %"] = show["Activity Completion %"].apply(lambda x: "—" if pd.isna(x) else f"{float(x):.1f}%")
-            show["Current Start"] = show["Current Start"].apply(_fmt_date)
-            show["Current Finish"] = show["Current Finish"].apply(_fmt_date)
-            st.dataframe(show, use_container_width=True, hide_index=True, height=min(920, 78 + 35 * len(show)))
-        else:
-            st.info(f"No HELIX activities were found for {area}.")
-        return
-
     df = m.subarea_stats(area)
     c1, c2 = st.columns([1.15, 1], gap="large")
     with c1:
-        h = f'<div class="panel"><div class="panel-head"><div class="panel-title">{area} · SUMMARY BY QTS - DASH</div></div><table class="detail-table"><thead><tr><th>Area</th><th>Tasks</th><th>Activity Completion %</th><th>Not Started</th><th>In Progress</th><th>Completed</th></tr></thead><tbody>'
+        h = f'<div class="panel"><div class="panel-head"><div class="panel-title">{area} · {"FUNCTIONAL PACKAGE SUMMARY" if area in {"FOH", "BOH"} else "SUMMARY BY QTS - DASH"}</div></div><table class="detail-table"><thead><tr><th>Area</th><th>Tasks</th><th>Activity Completion %</th><th>Not Started</th><th>In Progress</th><th>Completed</th></tr></thead><tbody>'
         for _, r in df.iterrows():
             label = _safe(r.Area)
             if str(r.Area) == "Electrical Infrastructure & Equipment":
