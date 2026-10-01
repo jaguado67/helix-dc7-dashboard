@@ -601,6 +601,9 @@ class DC7Model:
         return out.drop(columns="_score").reset_index(drop=True)
 
     def diagnostics(self) -> dict:
+        current_codes = set(self.current_tasks.get("task_code", pd.Series(dtype=str)).dropna().astype(str))
+        baseline_codes = set(self.baseline_tasks.get("task_code", pd.Series(dtype=str)).dropna().astype(str))
+        current_only = sorted(current_codes - baseline_codes)
         return {
             "Baseline XER": self.baseline_path.name,
             "Baseline proj_id": str(self.baseline_project.get("proj_id", "")),
@@ -609,9 +612,11 @@ class DC7Model:
             "Update proj_id": str(self.update_project.get("proj_id", "")),
             "Update Data Date": self.data_date,
             "HELIX Current Activities": len(self.current_tasks),
-            "HELIX Baseline Matches": len(self.baseline_tasks),
+            "HELIX Baseline Comparable Activities": len(self.baseline_tasks),
+            "Current-only HELIX Activities": len(current_only),
+            "Current-only Activity IDs": ", ".join(current_only[:20]) if current_only else "None",
             "Areas": ", ".join(self.areas()),
-            "Scope Rule": "DC7.TFO project only; external projects and external relationships excluded",
+            "Scope Rule": "DC7.TFO project only; baseline comparisons use matched task_code values; current-only activities remain in current-status analytics",
         }
 
 
@@ -641,7 +646,8 @@ def build_dc7_model(data_dir: Path) -> DC7Model:
     base_all = base_all[base_all["proj_id"].astype(str).eq(bpid)].copy()
     mapping = current[["task_code", "Area", "Subarea"]].drop_duplicates("task_code")
     baseline = base_all.merge(mapping, on="task_code", how="inner")
-    if len(baseline) != len(current):
-        raise ValueError(f"Baseline/current HELIX scope mismatch: BL={len(baseline):,}, UP={len(current):,}.")
 
+    # A schedule update may legitimately add, split, replace, or recode activities.
+    # Baseline-vs-current date comparisons use only task_codes present in both files,
+    # while current-status/progress analytics retain the full current HELIX scope.
     return DC7Model(bl_path, up_path, bp, up, baseline, current, bt, ut)
