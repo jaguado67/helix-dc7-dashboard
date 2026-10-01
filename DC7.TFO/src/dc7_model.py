@@ -226,6 +226,42 @@ def _wbs_lineup_task_map(tables: dict[str, pd.DataFrame], proj_id: str) -> dict[
     }
 
 
+def _foh_boh_package(task_code: str, task_name: str, area: str) -> str:
+    """Functional package for FOH/BOH where QTS-DASH is not populated."""
+    code = str(task_code or "").upper().strip()
+    name = str(task_name or "").upper()
+    area = str(area or "").upper()
+
+    if ".MS." in code or "START WORK" in name:
+        return "Milestones"
+
+    m = re.search(r"-(\d{3})$", code)
+    n = int(m.group(1)) if m else None
+
+    if area == "FOH":
+        if n is not None and 20 <= n <= 60:
+            return "Layout, Rough-In & Walls"
+        if n is not None and 70 <= n <= 100:
+            return "Panels"
+        if n is not None and 110 <= n <= 200:
+            return "Feeders & Distribution"
+        if n is not None and 210 <= n <= 250:
+            return "Branch Circuits & Devices"
+        if n is not None and 260 <= n <= 280:
+            return "Firestopping & QC"
+    elif area == "BOH":
+        if n is not None and 20 <= n <= 40:
+            return "Layout, Rough-In & Walls"
+        if n is not None and 50 <= n <= 70:
+            return "Branch Circuit & Devices"
+        if n is not None and 80 <= n <= 90:
+            return "QC"
+
+    if "QC" in name:
+        return "QC"
+    return "Other Electrical Scope"
+
+
 def _clean_subarea(name: str) -> str:
     if name is None or (isinstance(name, float) and pd.isna(name)):
         return "Electrical Infrastructure & Equipment"
@@ -455,9 +491,22 @@ class DC7Model:
         g = self.current_tasks[self.current_tasks["Area"].eq(area)].copy()
         if g.empty:
             return pd.DataFrame()
+
+        if area in {"FOH", "BOH"}:
+            g["Display Group"] = [
+                _foh_boh_package(code, name, area)
+                for code, name in zip(
+                    g.get("task_code", pd.Series("", index=g.index)),
+                    g.get("task_name", pd.Series("", index=g.index)),
+                )
+            ]
+            group_col = "Display Group"
+        else:
+            group_col = "Subarea"
+
         rows = []
-        for sub, sg in g.groupby("Subarea", dropna=False):
-            label = _clean_subarea(sub)
+        for sub, sg in g.groupby(group_col, dropna=False):
+            label = str(sub) if area in {"FOH", "BOH"} else _clean_subarea(sub)
             vc = sg["Status"].value_counts()
             rows.append({
                 "Area": label,
@@ -470,7 +519,14 @@ class DC7Model:
                 "In Progress %": _status_pct(sg, "In Progress"),
                 "Not Started %": _status_pct(sg, "Not Started"),
             })
-        order = ["Priority Rooms", "Other Rooms", "Electrical Rooms", "Data Hall", "Galleries", "Corridor", "Electrical Yard", "Mechanical Yard", "Commissioning & Start-Up", "Electrical Infrastructure & Equipment"]
+        order = [
+            "Milestones", "Layout, Rough-In & Walls", "Panels",
+            "Feeders & Distribution", "Branch Circuits & Devices",
+            "Branch Circuit & Devices", "Firestopping & QC", "QC",
+            "Priority Rooms", "Other Rooms", "Electrical Rooms", "Data Hall",
+            "Galleries", "Corridor", "Electrical Yard", "Mechanical Yard",
+            "Commissioning & Start-Up", "Electrical Infrastructure & Equipment"
+        ]
         rank = {x: i for i, x in enumerate(order)}
         out = pd.DataFrame(rows)
         out["_rank"] = out["Area"].map(rank).fillna(50)
