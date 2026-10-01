@@ -1,20 +1,22 @@
 from pathlib import Path
 import os
+import sys
 import base64
 import gzip
 import tempfile
 import streamlit as st
 
+APP_DIR = Path(__file__).resolve().parent
+for _name in list(sys.modules):
+    if _name == "config" or _name == "src" or _name.startswith("src."):
+        del sys.modules[_name]
+if str(APP_DIR) in sys.path:
+    sys.path.remove(str(APP_DIR))
+sys.path.insert(0, str(APP_DIR))
+
 from config import DATA_DIR
 from src.dc7_model import build_dc7_model
 from src.dc7_view import render_dashboard
-
-st.set_page_config(
-    page_title="HELIX Project Dashboard · DC7.TFO",
-    page_icon="📊",
-    layout="wide",
-    initial_sidebar_state="collapsed",
-)
 
 def _materialize_cloud_xers(data_root: Path) -> Path:
     data_root = Path(data_root)
