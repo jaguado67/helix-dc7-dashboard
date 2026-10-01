@@ -5,6 +5,13 @@ import gzip
 import tempfile
 import streamlit as st
 
+st.set_page_config(
+    page_title="HELIX · DC7 Dashboard",
+    page_icon="📊",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
+
 
 from config import DATA_DIR
 from src.dc7_model import build_dc7_model
