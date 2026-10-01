@@ -15,9 +15,9 @@ GREEN="#14936f"; RED="#d83a3a"; BLUE="#2f80ed"; EARLY="#18845f"; BASELINE="#aab8
 
 CSS=f"""
 <style>
-#MainMenu{{visibility:hidden}} footer{{visibility:hidden}} header[data-testid="stHeader"]{{background:#fff}}
+#MainMenu{{visibility:hidden}} footer{{visibility:hidden}} header[data-testid="stHeader"]{{display:none!important}}
 [data-testid="stToolbar"]{{display:none!important}} [data-testid="stSidebar"]{{display:none!important}} [data-testid="collapsedControl"]{{display:none!important}}
-.block-container{{padding-top:1.15rem;padding-bottom:2rem;max-width:1680px}} [data-testid="stAppViewContainer"]{{background:#fff}}
+.block-container{{padding-top:.6rem;padding-bottom:2rem;max-width:1680px}} [data-testid="stAppViewContainer"]{{background:#fff}}
 html,body,[class*="css"]{{font-family:Arial,Helvetica,sans-serif;color:{TEXT}}} [data-testid="stVerticalBlock"]{{gap:.55rem}}
 .helix-header{{background:{NAVY};color:#fff;min-height:84px;padding:11px 17px;display:grid;grid-template-columns:105px minmax(500px,1.65fr) 250px 295px 112px;align-items:center;column-gap:16px}}
 .logo-card{{background:#fff;border-radius:5px;height:55px;padding:4px 8px;display:flex;align-items:center;justify-content:center}} .logo-card img{{max-width:100%;max-height:47px;object-fit:contain}}
