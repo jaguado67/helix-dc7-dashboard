@@ -1,21 +1,8 @@
-import streamlit as st
+from pathlib import Path
+import runpy
+import sys
 
-st.set_page_config(
-    page_title="HELIX Dashboards",
-    page_icon="📊",
-    layout="wide",
-)
+APP_DIR = Path(__file__).resolve().parent / "DC7"
+sys.path.insert(0, str(APP_DIR))
 
-st.title("HELIX Dashboards")
-st.info(
-    "This repository contains two independent Streamlit applications. "
-    "Deploy DC7 from DC7/app.py and DC7.TFO from DC7.TFO/app.py."
-)
-
-c1, c2 = st.columns(2)
-with c1:
-    st.subheader("DC7")
-    st.code("DC7/app.py")
-with c2:
-    st.subheader("DC7.TFO")
-    st.code("DC7.TFO/app.py")
+runpy.run_path(str(APP_DIR / "app.py"), run_name="__main__")
