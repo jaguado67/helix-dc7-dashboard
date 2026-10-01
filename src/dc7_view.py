@@ -330,7 +330,7 @@ def _render_gate_table(reg: pd.DataFrame):
 
 
 def render_gates(m: DC7Model):
-    st.markdown('<div class="section-caption">PROJECT CONTROL GATES · FTE READY</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-caption">PROJECT CONTROL GATES · TFO QC 2.2 COMPLETE</div>', unsafe_allow_html=True)
     st.caption("DC7.TFO project only · Baseline vs Current. QC 2.2 Complete is matched by the MS.1020 activity family inside the tracked DC7 project. Finish Variance = Baseline Date − Current Date. Positive = ahead, negative = late, zero = no change.")
     st.markdown(
         '''<div class="gate-legend">
