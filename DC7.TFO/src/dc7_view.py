@@ -108,7 +108,7 @@ def render_kpis(m: DC7Model):
     cards = [
         ("Baseline Completion", _fmt_date(m.baseline_finish), m.baseline_path.stem, ""),
         ("Current Forecast Finish", _fmt_date(m.current_finish), _fmt_days(fv) + " vs Baseline", _var_class(fv)),
-        ("Finish Variance", _fmt_days(fv), "Baseline − Current", _var_class(fv)),
+        ("Finish Date Shift", _fmt_days(fv), "Baseline − Current", _var_class(fv)),
         ("Completed Activities", _fmt_pct(p["Completed %"]), f"{counts['Completed']:,} of {counts['Total']:,}", "good" if p["Completed %"] > 0 else ""),
         ("In Progress Activities", _fmt_pct(p["In Progress %"]), f"{counts['In Progress']:,} of {counts['Total']:,}", "neutral" if p["In Progress %"] > 0 else ""),
         ("Not Started Activities", _fmt_pct(p["Not Started %"]), f"{counts['Not Started']:,} of {counts['Total']:,}", "bad" if p["Not Started %"] > 0 else ""),
@@ -188,7 +188,7 @@ def render_windows(m: DC7Model):
 
 def render_fte_ready(m: DC7Model):
     st.markdown('<div class="section-caption">TFO QC 2.2 MILESTONES · BASELINE VS CURRENT</div>', unsafe_allow_html=True)
-    st.markdown('<div class="small-note">DC7.TFO project only. Gray diamond = Baseline QC 2.2. Colored circle = Current QC 2.2. Variance = Baseline − Current. Green/positive = ahead, red/negative = late, blue/zero = no date change. No external-project milestones or external relationships are used.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="small-note">DC7.TFO project only. Gray diamond = Baseline QC 2.2. Colored circle = Current QC 2.2. Date Shift = Baseline − Current. Green/positive = earlier than Baseline, red/negative = later than Baseline, blue/zero = no date change. No external-project milestones or external relationships are used.</div>', unsafe_allow_html=True)
     df = m.fte_ready_comparison()
     if df.empty:
         st.info("No comparable QC 2.2 Complete milestones were identified in the DC7.TFO project.")
@@ -249,11 +249,11 @@ def render_fte_ready(m: DC7Model):
     st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
     # Small audit table so every milestone shown can be found directly in the main P6 project.
-    audit = df[["Area", "Activity ID", "Baseline Date", "Current Date", "Finish Variance (d)", "Status"]].copy()
+    audit = df[["Area", "Activity ID", "Baseline Date", "Current Date", "Finish Date Shift (d)", "Status"]].copy()
     audit["Baseline Date"] = audit["Baseline Date"].apply(_fmt_date)
     audit["Current Date"] = audit["Current Date"].apply(_fmt_date)
-    audit["Finish Variance"] = audit["Finish Variance (d)"].apply(_fmt_days)
-    audit = audit.drop(columns=["Finish Variance (d)"])
+    audit["Finish Date Shift"] = audit["Finish Date Shift (d)"].apply(_fmt_days)
+    audit = audit.drop(columns=["Finish Date Shift (d)"])
     st.dataframe(audit, use_container_width=True, hide_index=True)
     st.caption("Source: DC7.TFO project only. QC 2.2 Complete is matched by the MS.1020 activity family in Baseline and Current. External projects and cross-project relationships are excluded from this dashboard.")
 
@@ -323,16 +323,16 @@ def render_lineups_detail(m: DC7Model, area: str):
 def _render_gate_table(reg: pd.DataFrame):
     h = '<div class="gate-wrap"><table class="gate-table"><thead><tr><th>Control Gate</th><th>Activity ID</th><th>Area</th><th>Gate Type</th><th>Status</th><th>Baseline Date</th><th>Current Date</th><th>Finish Variance</th><th>Total Float</th></tr></thead><tbody>'
     for _, r in reg.iterrows():
-        v = r["Finish Variance"]; tf = r["Total Float"]
+        v = r["Finish Date Shift"]; tf = r["Total Float"]
         vc = "var-early" if pd.notna(v) and v > 0 else ("var-late" if pd.notna(v) and v < 0 else "var-zero")
         tc = "tf-neg" if pd.notna(tf) and tf < 0 else ("tf-pos" if pd.notna(tf) and tf > 0 else "tf-zero")
-        h += f'<tr><td>{_safe(r["Control Gate"])}</td><td>{_safe(r["Activity ID"])}</td><td>{_safe(r["Area"])}</td><td>{_safe(r["Gate Type"])}</td><td>{_safe(r["Status"])}</td><td>{_fmt_date(r["Baseline Date"])}</td><td>{_fmt_date(r["Current Date"])}</td><td class="{vc}">{_fmt_days(r["Finish Variance"])}</td><td class="{tc}">{"—" if pd.isna(tf) else f"{tf:+.1f} d"}</td></tr>'
+        h += f'<tr><td>{_safe(r["Control Gate"])}</td><td>{_safe(r["Activity ID"])}</td><td>{_safe(r["Area"])}</td><td>{_safe(r["Gate Type"])}</td><td>{_safe(r["Status"])}</td><td>{_fmt_date(r["Baseline Date"])}</td><td>{_fmt_date(r["Current Date"])}</td><td class="{vc}">{_fmt_days(r["Finish Date Shift"])}</td><td class="{tc}">{"—" if pd.isna(tf) else f"{tf:+.1f} d"}</td></tr>'
     st.markdown(h + '</tbody></table></div>', unsafe_allow_html=True)
 
 
 def render_gates(m: DC7Model):
     st.markdown('<div class="section-caption">PROJECT CONTROL GATES · TFO QC 2.2 COMPLETE</div>', unsafe_allow_html=True)
-    st.caption("DC7.TFO project only · Baseline vs Current. QC 2.2 Complete is matched by the MS.1020 activity family inside the tracked DC7 project. Finish Variance = Baseline Date − Current Date. Positive = ahead, negative = late, zero = no change.")
+    st.caption("DC7.TFO project only · Baseline vs Current. QC 2.2 Complete is matched by the MS.1020 activity family inside the tracked DC7 project. Finish Date Shift = Baseline Date − Current Date. Positive = ahead, negative = late, zero = no change.")
     st.markdown(
         '''<div class="gate-legend">
           <span class="item"><span class="diamond"></span>Baseline QC 2.2</span>
@@ -351,16 +351,16 @@ def render_gates(m: DC7Model):
 
     f1, f2 = st.columns([1, 1], gap="small")
     area_sel = f1.selectbox("Data Hall", ["All"] + reg["Area"].astype(str).tolist(), index=0, key="fte_gate_area")
-    variance_sel = f2.selectbox("Variance", ["All", "Late", "Ahead", "No Change"], index=0, key="fte_gate_var")
+    shift_sel = f2.selectbox("Date Shift", ["All", "Late", "Ahead", "No Change"], index=0, key="fte_gate_var")
     view = reg.copy()
     if area_sel != "All":
         view = view[view["Area"].eq(area_sel)]
-    if variance_sel == "Late":
-        view = view[view["Finish Variance (d)"] < 0]
-    elif variance_sel == "Ahead":
-        view = view[view["Finish Variance (d)"] > 0]
-    elif variance_sel == "No Change":
-        view = view[view["Finish Variance (d)"].fillna(999999).eq(0)]
+    if shift_sel == "Late":
+        view = view[view["Finish Date Shift (d)"] < 0]
+    elif shift_sel == "Ahead":
+        view = view[view["Finish Date Shift (d)"] > 0]
+    elif shift_sel == "No Change":
+        view = view[view["Finish Date Shift (d)"].fillna(999999).eq(0)]
 
     fig = go.Figure()
     view = view.sort_values("Area").reset_index(drop=True)
@@ -420,12 +420,12 @@ def render_gates(m: DC7Model):
     )
     st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
-    audit = view[["Area", "Activity ID", "Activity Name", "Baseline Date", "Current Date", "Finish Variance (d)", "Total Float (d)", "Status"]].copy()
+    audit = view[["Area", "Activity ID", "Activity Name", "Baseline Date", "Current Date", "Finish Date Shift (d)", "Total Float (d)", "Status"]].copy()
     audit["Baseline Date"] = audit["Baseline Date"].apply(_fmt_date)
     audit["Current Date"] = audit["Current Date"].apply(_fmt_date)
-    audit["Finish Variance"] = audit["Finish Variance (d)"].apply(_fmt_days)
+    audit["Finish Date Shift"] = audit["Finish Date Shift (d)"].apply(_fmt_days)
     audit["Total Float"] = audit["Total Float (d)"].apply(lambda x: "—" if pd.isna(x) else f"{float(x):+.1f} d")
-    audit = audit.drop(columns=["Finish Variance (d)", "Total Float (d)"])
+    audit = audit.drop(columns=["Finish Date Shift (d)", "Total Float (d)"])
     st.dataframe(audit, use_container_width=True, hide_index=True)
     st.caption("Control gates are restricted to QC 2.2 Complete milestones from the DC7.TFO project. External projects and cross-project relationships are excluded.")
 
