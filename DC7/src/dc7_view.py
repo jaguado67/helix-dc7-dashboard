@@ -278,7 +278,8 @@ def render_progress_detail(m: DC7Model):
     df = m.subarea_stats(area)
     c1, c2 = st.columns([1.15, 1], gap="large")
     with c1:
-        h = f'<div class="panel"><div class="panel-head"><div class="panel-title">{area} · SUMMARY BY QTS - DASH</div></div><table class="detail-table"><thead><tr><th>Area</th><th>Tasks</th><th>Activity Completion %</th><th>Not Started</th><th>In Progress</th><th>Completed</th></tr></thead><tbody>'
+        summary_title = "HELIX ELECTRICAL SCOPE SUMMARY" if area == "MOH" else "SUMMARY BY QTS - DASH"
+        h = f'<div class="panel"><div class="panel-head"><div class="panel-title">{area} · {summary_title}</div></div><table class="detail-table"><thead><tr><th>Area</th><th>Tasks</th><th>Activity Completion %</th><th>Not Started</th><th>In Progress</th><th>Completed</th></tr></thead><tbody>'
         for _, r in df.iterrows():
             label = _safe(r.Area)
             if str(r.Area) == "Other HELIX Electrical Scope":
@@ -289,7 +290,8 @@ def render_progress_detail(m: DC7Model):
         colors = ["#c48a23" if str(x) == "Other HELIX Electrical Scope" else "#1f6d8a" for x in df.Area]
         fig = go.Figure(go.Bar(x=df.Area, y=df["Activity Completion %"], text=[f"{x:.1f}%" for x in df["Activity Completion %"]], textposition="outside", textfont=dict(size=13, color=TEXT), marker=dict(color=colors)))
         ymax = max(10, float(df["Activity Completion %"].max()) * 1.35 + 1) if not df.empty else 10
-        fig.update_layout(**_layout(410, 70, 115, 38), showlegend=False, title=f"ACTIVITY COMPLETION BY AREA · {area}", yaxis_title="Activity Completion %")
+        chart_title = f"ACTIVITY COMPLETION · {area}" if area == "MOH" else f"ACTIVITY COMPLETION BY AREA · {area}"
+        fig.update_layout(**_layout(410, 70, 115, 38), showlegend=False, title=chart_title, yaxis_title="Activity Completion %")
         fig.update_yaxes(range=[0, ymax], ticksuffix="%", gridcolor=GRID)
         fig.update_xaxes(tickangle=-25)
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
@@ -303,7 +305,7 @@ def render_lineups_detail(m: DC7Model, area: str):
     if df.empty:
         return
     st.markdown(f'<div class="section-caption">EQUIPMENT LINE-UPS PROGRESS DETAIL · {area}</div>', unsafe_allow_html=True)
-    st.markdown('<div class="small-note">Activity-count status for Equipment Line-Ups identified from the Gallery line-up activity naming structure. Activity Completion % = Completed / Tasks.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="small-note">Activity-count status for Equipment Line-Ups sourced from the dedicated HELIX electrical schedule 226021-HE.B-4.xer. Activity Completion % = Completed / Tasks.</div>', unsafe_allow_html=True)
     c1, c2 = st.columns([1.15, 1], gap="large")
     with c1:
         h = f'<div class="panel"><div class="panel-head"><div class="panel-title">{area} · SUMMARY BY LINE-UP</div></div><table class="detail-table"><thead><tr><th>Line-Up</th><th>Tasks</th><th>Activity Completion %</th><th>Not Started</th><th>In Progress</th><th>Completed</th></tr></thead><tbody>'
