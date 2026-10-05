@@ -253,6 +253,9 @@ class DC7Model:
     current_tasks: pd.DataFrame
     baseline_tables: dict[str, pd.DataFrame]
     update_tables: dict[str, pd.DataFrame]
+    auxiliary_path: Optional[Path] = None
+    auxiliary_tasks: Optional[pd.DataFrame] = None
+    auxiliary_project: Optional[pd.Series] = None
 
     @property
     def data_date(self):
@@ -305,15 +308,28 @@ class DC7Model:
             "Not Started %": 100.0 * c["Not Started"] / total,
         }
 
-    def areas(self) -> list[str]:
+    def _main_areas(self) -> list[str]:
         have = set(self.current_tasks["Area"].dropna().astype(str))
         ordered = [x for x in AREA_ORDER if x in have]
+        return ordered + sorted(have - set(ordered))
+
+    def areas(self) -> list[str]:
+        have = set(self._main_areas())
+        if self.auxiliary_tasks is not None and not self.auxiliary_tasks.empty:
+            if self.auxiliary_tasks["Area"].astype(str).eq("MOH").any():
+                have.add("MOH")
+        ordered = [x for x in AREA_ORDER if x in have]
+        if "MOH" in have and "MOH" not in ordered:
+            ordered.append("MOH")
         return ordered + sorted(have - set(ordered))
 
     def area_stats(self) -> pd.DataFrame:
         rows = []
         for area in self.areas():
-            g = self.current_tasks[self.current_tasks["Area"].eq(area)]
+            if area == "MOH" and self.auxiliary_tasks is not None:
+                g = self.auxiliary_tasks[self.auxiliary_tasks["Area"].eq(area)].copy()
+            else:
+                g = self.current_tasks[self.current_tasks["Area"].eq(area)].copy()
             vc = g["Status"].value_counts()
             rows.append({
                 "Area": area,
@@ -341,7 +357,7 @@ class DC7Model:
         against Baseline.  This keeps the Start comparison like-for-like.
         """
         rows = []
-        for area in self.areas():
+        for area in self._main_areas():
             b_all = self.baseline_tasks[self.baseline_tasks["Area"].eq(area)].copy()
             c_all = self.current_tasks[self.current_tasks["Area"].eq(area)].copy()
 
@@ -399,7 +415,12 @@ class DC7Model:
         return pd.DataFrame(rows)
 
     def subarea_stats(self, area: str) -> pd.DataFrame:
-        g = self.current_tasks[self.current_tasks["Area"].eq(area)].copy()
+        if area == "MOH" and self.auxiliary_tasks is not None:
+            g = self.auxiliary_tasks[self.auxiliary_tasks["Area"].eq(area)].copy()
+            if not g.empty:
+                g["Subarea"] = "Other HELIX Electrical Scope"
+        else:
+            g = self.current_tasks[self.current_tasks["Area"].eq(area)].copy()
         if g.empty:
             return pd.DataFrame()
         rows = []
@@ -424,15 +445,32 @@ class DC7Model:
         return out.sort_values(["_rank", "Area"]).drop(columns="_rank").reset_index(drop=True)
 
     def lineup_stats(self, area: str) -> pd.DataFrame:
-        """Activity-count status by Equipment Line-Up for the selected Data Hall."""
-        g = self.current_tasks[self.current_tasks["Area"].eq(area)].copy()
-        if g.empty:
+        """Activity-count status by Equipment Line-Up.
+
+        DC7 line-up detail is sourced from the dedicated HELIX electrical
+        schedule (226021-HE.B-4.xer) when available. This avoids the incomplete
+        Activity Code assignment seen in the main project update.
+        """
+        source = self.auxiliary_tasks if self.auxiliary_tasks is not None and not self.auxiliary_tasks.empty else self.current_tasks
+        g = source[source["Area"].eq(area)].copy()
+        if g.empty or not str(area).upper().startswith("DH"):
             return pd.DataFrame()
+
         names = g.get("task_name", pd.Series("", index=g.index)).fillna("").astype(str)
-        g["Line-Up"] = names.str.extract(r"([A-Z]\d{3})\s*/\s*Line[- ]?Ups?", expand=False, flags=re.I).str.upper()
+        codes = g.get("task_code", pd.Series("", index=g.index)).fillna("").astype(str)
+        from_name = names.str.extract(r"\b([A-HJKR]\d{3})\b", expand=False, flags=re.I)
+        from_code = codes.str.extract(r"(?:^|[-_.])([A-HJKR]\d{3})(?:[-_.]|$)", expand=False, flags=re.I)
+        g["Line-Up"] = from_name.fillna(from_code).str.upper()
+
+        m = re.search(r"DH(\d{2})00", str(area).upper())
+        if m:
+            suffix = m.group(1) + "0"
+            g = g[g["Line-Up"].fillna("").str.endswith(suffix)]
+
         g = g[g["Line-Up"].notna()].copy()
         if g.empty:
             return pd.DataFrame()
+
         rows = []
         for lineup, sg in g.groupby("Line-Up"):
             vc = sg["Status"].value_counts()
@@ -616,7 +654,9 @@ class DC7Model:
             "Current-only HELIX Activities": len(current_only),
             "Current-only Activity IDs": ", ".join(current_only[:20]) if current_only else "None",
             "Areas": ", ".join(self.areas()),
-            "Scope Rule": "Main DC7 project only; baseline comparisons use matched task_code values; current-only activities remain in current-status analytics",
+            "Line-Up / MOH Source": self.auxiliary_path.name if self.auxiliary_path is not None else "Main DC7 update fallback",
+            "MOH HELIX Activities": int((self.auxiliary_tasks["Area"].eq("MOH")).sum()) if self.auxiliary_tasks is not None and not self.auxiliary_tasks.empty else 0,
+            "Scope Rule": "Main DC7 BL/UP drives project analytics; dedicated HELIX electrical schedule drives Line-Ups and MOH when available",
         }
 
 
@@ -647,7 +687,28 @@ def build_dc7_model(data_dir: Path) -> DC7Model:
     mapping = current[["task_code", "Area", "Subarea"]].drop_duplicates("task_code")
     baseline = base_all.merge(mapping, on="task_code", how="inner")
 
+    # Dedicated HELIX electrical source for Line-Ups and MOH.
+    aux_path = next(iter(sorted(Path(data_dir).rglob("226021-HE.B-4.xer"))), None)
+    aux_tasks = pd.DataFrame()
+    aux_project = None
+    if aux_path is not None:
+        at = parse_xer(aux_path, WANTED)
+        aux_project = _project_row(at, aux_path)
+        apid = str(aux_project["proj_id"])
+        a_all = to_task_frame(at["TASK"])
+        a_all = a_all[a_all["proj_id"].astype(str).eq(apid)].copy()
+        a_helix_ids = _helix_task_ids(at, apid)
+        aux_tasks = a_all[a_all["task_id"].astype(str).isin(a_helix_ids)].copy()
+        a_area_map = _assignment_map(at, apid, "QTS - AREA", "short_name")
+        aux_tasks["Area"] = aux_tasks["task_id"].astype(str).map(a_area_map).fillna("Unclassified")
+        aux_tasks["Subarea"] = "Other HELIX Electrical Scope"
+
     # Updates may add, split, replace, or recode activities.
     # Baseline-vs-current comparisons use matched task_codes only,
     # while current-status analytics retain the full current HELIX scope.
-    return DC7Model(bl_path, up_path, bp, up, baseline, current, bt, ut)
+    return DC7Model(
+        bl_path, up_path, bp, up, baseline, current, bt, ut,
+        auxiliary_path=aux_path,
+        auxiliary_tasks=aux_tasks,
+        auxiliary_project=aux_project,
+    )
