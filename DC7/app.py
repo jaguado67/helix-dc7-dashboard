@@ -24,8 +24,11 @@ def _materialize_cloud_xers(data_root: Path) -> Path:
         "226021.005.MO-BL.xer",
         "226021.010.MO-UP.xer",
     )
+    auxiliary = "226021-HE.B-4.xer"
 
-    if all((dc7 / name).exists() for name in official):
+    official_ready = all((dc7 / name).exists() for name in official)
+    auxiliary_ready = (dc7 / auxiliary).exists()
+    if official_ready and auxiliary_ready:
         return data_root
 
     chunk_sets = {
@@ -34,6 +37,8 @@ def _materialize_cloud_xers(data_root: Path) -> Path:
     }
     if not all(chunk_sets[name] for name in official):
         return data_root
+
+    aux_parts = sorted(dc7.glob(f"{auxiliary}.b64.part*"))
 
     runtime_root = Path(tempfile.gettempdir()) / "helix_dc7_runtime_data"
     runtime_dc7 = runtime_root / "DC7"
@@ -48,6 +53,16 @@ def _materialize_cloud_xers(data_root: Path) -> Path:
             )
             target.write_bytes(gzip.decompress(base64.b64decode(encoded)))
 
+    if auxiliary_ready:
+        src = dc7 / auxiliary
+        target = runtime_dc7 / auxiliary
+        if not target.exists():
+            target.write_bytes(src.read_bytes())
+    elif aux_parts:
+        target = runtime_dc7 / auxiliary
+        encoded = "".join(part.read_text(encoding="ascii").strip() for part in aux_parts)
+        target.write_bytes(base64.b64decode(encoded))
+
     return runtime_root
 
 source_data_dir = Path(os.environ.get("HELIX_PROJECT_DATA_DIR", str(DATA_DIR)))
@@ -61,7 +76,7 @@ if not source_data_dir.exists():
 
 data_dir = _materialize_cloud_xers(source_data_dir)
 
-MODEL_VERSION = "dc7-2026-10-01-stability-v2"
+MODEL_VERSION = "dc7-2026-10-05-he-lineups-moh-v1"
 
 @st.cache_resource(show_spinner="Reading DC7 baseline/update XER and building HELIX scope…")
 def load_model(path_text: str, model_version: str):
