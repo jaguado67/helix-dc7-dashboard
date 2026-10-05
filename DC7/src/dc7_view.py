@@ -278,7 +278,7 @@ def render_progress_detail(m: DC7Model):
     df = m.subarea_stats(area)
     c1, c2 = st.columns([1.15, 1], gap="large")
     with c1:
-        summary_title = "HELIX ELECTRICAL SCOPE SUMMARY" if area == "MOH" else "SUMMARY BY QTS - DASH"
+        summary_title = "FUNCTIONAL PACKAGE SUMMARY" if area == "MOH" else "SUMMARY BY QTS - DASH"
         h = f'<div class="panel"><div class="panel-head"><div class="panel-title">{area} · {summary_title}</div></div><table class="detail-table"><thead><tr><th>Area</th><th>Tasks</th><th>Activity Completion %</th><th>Not Started</th><th>In Progress</th><th>Completed</th></tr></thead><tbody>'
         for _, r in df.iterrows():
             label = _safe(r.Area)
@@ -295,8 +295,10 @@ def render_progress_detail(m: DC7Model):
         fig.update_yaxes(range=[0, ymax], ticksuffix="%", gridcolor=GRID)
         fig.update_xaxes(tickangle=-25)
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
-    if "Other HELIX Electrical Scope" in set(df["Area"].astype(str)):
-        st.caption("Other HELIX Electrical Scope is a dashboard-derived category for HELIX activities without a QTS-DASH assignment; the original XER coding remains unchanged.")
+    if area == "MOH":
+        st.caption("MOH is sourced from 226021-HE.B-4.xer. That file does not contain QTS-DASH, so MOH is grouped by equipment identifiers in the activity names; the original XER coding remains unchanged.")
+    elif "Other HELIX Electrical Scope" in set(df["Area"].astype(str)):
+        st.caption("Other HELIX Electrical Scope contains only activities coded QTS - Subcontractor = HELIX that have no QTS-DASH assignment; the original XER coding remains unchanged.")
     render_lineups_detail(m, area)
 
 
