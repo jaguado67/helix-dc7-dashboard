@@ -173,6 +173,30 @@ def _helix_task_ids(tables: dict[str, pd.DataFrame], proj_id: str) -> set[str]:
     return set(m["task_id"].astype(str))
 
 
+def _moh_package(task_name: str) -> str:
+    """Functional package for MOH activities from the dedicated HELIX schedule.
+
+    HE.B-4 does not contain QTS-DASH, so MOH is grouped from the explicit
+    equipment identifiers embedded in the activity names.
+    """
+    name = str(task_name or "").upper()
+    if re.search(r"\bSWD\b|SWD-", name):
+        return "Switchgear / Main Distribution"
+    if re.search(r"\bXFMR\b|XFMR-", name):
+        return "Transformers"
+    if re.search(r"\bPNL\b|PNL-", name):
+        return "Panels"
+    if re.search(r"\bCIP\b|CIP-", name):
+        return "CIP / Controls"
+    if re.search(r"\bSTS\b|STS-|\bMTS\b|MTS-|\bATS\b|ATS-", name):
+        return "Transfer Equipment"
+    if re.search(r"\bUPS\b|UPS-|\bELI\b|ELI-|\bBATTERY\b", name):
+        return "UPS / ELI / Battery Systems"
+    if re.search(r"\bMPZ\b|MPZ-|\bMMR\b", name):
+        return "MPZ / MMR"
+    return "Other HELIX Electrical Scope"
+
+
 def _clean_subarea(name: str) -> str:
     if name is None or (isinstance(name, float) and pd.isna(name)):
         return "Other HELIX Electrical Scope"
@@ -418,7 +442,7 @@ class DC7Model:
         if area == "MOH" and self.auxiliary_tasks is not None:
             g = self.auxiliary_tasks[self.auxiliary_tasks["Area"].eq(area)].copy()
             if not g.empty:
-                g["Subarea"] = "Other HELIX Electrical Scope"
+                g["Subarea"] = g.get("task_name", pd.Series("", index=g.index)).map(_moh_package)
         else:
             g = self.current_tasks[self.current_tasks["Area"].eq(area)].copy()
         if g.empty:
@@ -438,7 +462,15 @@ class DC7Model:
                 "In Progress %": _status_pct(sg, "In Progress"),
                 "Not Started %": _status_pct(sg, "Not Started"),
             })
-        order = ["Priority Rooms", "Other Rooms", "Electrical Rooms", "Data Hall", "Galleries", "Corridor", "Electrical Yard", "Mechanical Yard", "Commissioning & Start-Up", "Other HELIX Electrical Scope"]
+        order = [
+            "Priority Rooms", "Other Rooms", "Electrical Rooms", "Data Hall",
+            "Galleries", "Corridor", "Electrical Yard", "Mechanical Yard",
+            "Commissioning & Start-Up",
+            "Switchgear / Main Distribution", "Transformers", "Panels",
+            "CIP / Controls", "Transfer Equipment",
+            "UPS / ELI / Battery Systems", "MPZ / MMR",
+            "Other HELIX Electrical Scope"
+        ]
         rank = {x: i for i, x in enumerate(order)}
         out = pd.DataFrame(rows)
         out["_rank"] = out["Area"].map(rank).fillna(50)
@@ -642,6 +674,8 @@ class DC7Model:
         current_codes = set(self.current_tasks.get("task_code", pd.Series(dtype=str)).dropna().astype(str))
         baseline_codes = set(self.baseline_tasks.get("task_code", pd.Series(dtype=str)).dropna().astype(str))
         current_only = sorted(current_codes - baseline_codes)
+        unassigned = self.current_tasks[self.current_tasks.get("Subarea", pd.Series("", index=self.current_tasks.index)).eq("Other HELIX Electrical Scope")].copy()
+        unassigned_ids = sorted(unassigned.get("task_code", pd.Series(dtype=str)).dropna().astype(str).tolist())
         return {
             "Baseline XER": self.baseline_path.name,
             "Baseline proj_id": str(self.baseline_project.get("proj_id", "")),
@@ -653,6 +687,8 @@ class DC7Model:
             "HELIX Baseline Comparable Activities": len(self.baseline_tasks),
             "Current-only HELIX Activities": len(current_only),
             "Current-only Activity IDs": ", ".join(current_only[:20]) if current_only else "None",
+            "HELIX Activities without QTS-DASH": len(unassigned),
+            "HELIX without QTS-DASH IDs": ", ".join(unassigned_ids[:30]) if unassigned_ids else "None",
             "Areas": ", ".join(self.areas()),
             "Line-Up / MOH Source": self.auxiliary_path.name if self.auxiliary_path is not None else "Main DC7 update fallback",
             "MOH HELIX Activities": int((self.auxiliary_tasks["Area"].eq("MOH")).sum()) if self.auxiliary_tasks is not None and not self.auxiliary_tasks.empty else 0,
