@@ -186,3 +186,19 @@ This convention is applied to:
 - Control-gate filters and color rules
 
 P6 Total Float keeps its own independent sign convention and is not changed by this update.
+
+## DC7 data-source architecture
+
+The DC7 dashboard uses three schedule sources with separate roles:
+
+- `DC7/data/226021.005.MO-BL.xer` — project Baseline.
+- `DC7/data/226021.010.MO-UP.xer` — project Current/Update for main DC7 analytics.
+- `DC7/data/226021-HE.B-4.xer` — dedicated HELIX electrical source for Equipment Line-Ups and MOH.
+
+The dedicated HELIX electrical source is intentionally used only where it provides the cleaner coding structure:
+- Equipment Line-Ups by Data Hall.
+- MOH (Middle of the House) HELIX activity scope.
+
+Main project KPIs, S-Curve, finish dates, FTE Ready milestones and Baseline-vs-Current comparisons continue to use the official DC7 Baseline/Current pair.
+
+The dashboard filters HELIX scope through P6 Activity Code `QTS - Subcontractor = HELIX`.
