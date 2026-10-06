@@ -49,7 +49,7 @@ def _find_files(data_dir: Path) -> tuple[Path, Path]:
         raise FileNotFoundError(f"No XER files found below data directory: {data_dir}")
 
     exact_bl = [p for p in all_xer if p.name.casefold() == "dc7.tfo-bl.xer"]
-    exact_up = [p for p in all_xer if p.name.casefold() == "dc7.tfo-b.xer"]
+    exact_up = [p for p in all_xer if p.name.casefold() == "dc7.tfo-curr.xer"]
 
     if exact_bl and exact_up:
         pairs = [(b, u) for b in exact_bl for u in exact_up if b.parent == u.parent]
@@ -102,7 +102,7 @@ def _find_files(data_dir: Path) -> tuple[Path, Path]:
         suffix = " ..." if len(all_xer) > 20 else ""
         raise FileNotFoundError(
             "DC7.TFO BL/Update pair not found. Expected official files "
-            "DC7.TFO-BL.xer and DC7.TFO-B.xer either directly "
+            "DC7.TFO-BL.xer and DC7.TFO-CURR.xer either directly "
             f"inside {data_dir} or in a DC7.TFO subfolder. XERs seen: {names}{suffix}"
         )
 
