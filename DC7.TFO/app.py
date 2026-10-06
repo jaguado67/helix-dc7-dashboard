@@ -68,7 +68,7 @@ if not source_data_dir.exists():
 
 data_dir = _materialize_cloud_xers(source_data_dir)
 
-MODEL_VERSION = "dc7-tfo-2026-10-06-data-update-v1"
+MODEL_VERSION = "dc7-tfo-2026-10-06-project-selection-fix-v2"
 
 @st.cache_resource(show_spinner="Reading DC7.TFO baseline/update XER and building HELIX scope…")
 def load_model(path_text: str, model_version: str):
