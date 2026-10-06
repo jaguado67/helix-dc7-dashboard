@@ -28,10 +28,22 @@ def _project_row(tables: dict[str, pd.DataFrame], path: Path) -> pd.Series:
             return exact.iloc[0]
     tasks = tables.get("TASK", pd.DataFrame())
     counts = tasks.get("proj_id", pd.Series(dtype=str)).astype(str).value_counts()
+
+    # This model is dedicated to DC7.TFO. The external XER filename may be
+    # DC7.TFO-CURR while P6 keeps the internal proj_short_name as DC7.TFO-B.
+    # Prefer the actual TFO project explicitly instead of falling back to the
+    # unrelated DC7 main project contained in the same XER.
     candidates = p.copy()
     if "proj_short_name" in candidates.columns:
-        bad = candidates["proj_short_name"].fillna("").astype(str).str.upper().str.contains(r"MIL|TFO", regex=True)
+        short = candidates["proj_short_name"].fillna("").astype(str).str.upper()
+        tfo = candidates[short.str.contains("DC7.TFO", regex=False)].copy()
+        if not tfo.empty:
+            tfo["_n"] = tfo["proj_id"].astype(str).map(counts).fillna(0)
+            return tfo.sort_values("_n", ascending=False).iloc[0]
+
+        bad = short.str.contains(r"MIL", regex=True)
         candidates = candidates[~bad]
+
     if candidates.empty:
         candidates = p
     candidates = candidates.copy()
