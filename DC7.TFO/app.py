@@ -36,9 +36,8 @@ def _materialize_cloud_xers(data_root: Path) -> Path:
     if all(packaged[name].exists() for name in official):
         for name in official:
             target = runtime_dc7 / name
-            if not target.exists():
-                encoded = packaged[name].read_text(encoding="ascii").strip()
-                target.write_bytes(base64.b64decode(encoded))
+            encoded = packaged[name].read_text(encoding="ascii").strip()
+            target.write_bytes(base64.b64decode(encoded))
         return runtime_root
 
     chunk_sets = {
@@ -50,12 +49,11 @@ def _materialize_cloud_xers(data_root: Path) -> Path:
 
     for name in official:
         target = runtime_dc7 / name
-        if not target.exists():
-            encoded = "".join(
-                part.read_text(encoding="ascii").strip()
-                for part in chunk_sets[name]
-            )
-            target.write_bytes(gzip.decompress(base64.b64decode(encoded)))
+        encoded = "".join(
+            part.read_text(encoding="ascii").strip()
+            for part in chunk_sets[name]
+        )
+        target.write_bytes(gzip.decompress(base64.b64decode(encoded)))
 
     return runtime_root
 
