@@ -22,7 +22,7 @@ def _materialize_cloud_xers(data_root: Path) -> Path:
     dc7 = data_root
     official = (
         "DC7.TFO-BL.xer",
-        "DC7.TFO-B.xer",
+        "DC7.TFO-CURR.xer",
     )
 
     if all((dc7 / name).exists() for name in official):
@@ -80,7 +80,7 @@ except Exception as exc:
     st.error(f"DC7.TFO dashboard could not be built: {exc}")
     st.info(
         "DC7.TFO reads the TFO project only. Expected official pair: "
-        "DC7.TFO-BL.xer + DC7.TFO-B.xer."
+        "DC7.TFO-BL.xer + DC7.TFO-CURR.xer."
     )
     st.stop()
 
