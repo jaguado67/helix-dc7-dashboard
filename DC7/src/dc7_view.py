@@ -19,8 +19,8 @@ CSS=f"""
 [data-testid="stToolbar"]{{display:none!important}} [data-testid="stSidebar"]{{display:none!important}} [data-testid="collapsedControl"]{{display:none!important}}
 .block-container{{padding-top:.6rem;padding-bottom:2rem;max-width:1680px}} [data-testid="stAppViewContainer"]{{background:#fff}}
 html,body,[class*="css"]{{font-family:Arial,Helvetica,sans-serif;color:{TEXT}}} [data-testid="stVerticalBlock"]{{gap:.55rem}}
-.helix-header{{background:{NAVY};color:#fff;min-height:84px;padding:11px 17px;display:grid;grid-template-columns:105px minmax(500px,1.65fr) 250px 295px 112px;align-items:center;column-gap:16px}}
-.logo-card{{background:#fff;border-radius:5px;height:55px;padding:4px 8px;display:flex;align-items:center;justify-content:center}} .logo-card img{{max-width:100%;max-height:47px;object-fit:contain}}
+.helix-header{{background:{NAVY};color:#fff;min-height:100px;padding:11px 16px;display:grid;grid-template-columns:130px minmax(380px,1.65fr) 230px 270px 155px;align-items:center;column-gap:12px}}
+.logo-card{{background:#fff;border-radius:5px;height:72px;padding:4px 6px;display:flex;align-items:center;justify-content:center;min-width:0}} .logo-card img{{display:block;width:100%;height:64px;max-width:100%;max-height:64px;object-fit:contain}}
 .brand-title{{font-size:26px;font-weight:850;line-height:1.02;white-space:nowrap}} .brand-subtitle{{font-size:13px;font-weight:650;margin-top:7px;color:#d7e2ed}}
 .header-center{{display:flex;justify-content:center;gap:8px;align-items:center;white-space:nowrap}} .header-chip{{border:1px solid #6f87a2;border-radius:6px;padding:9px 14px;font-size:12px;font-weight:850}}
 .header-meta{{text-align:right;white-space:nowrap;line-height:1.35}} .header-meta .line{{font-size:12px;font-weight:800;margin:2px 0}} .header-meta .value{{font-size:13px;font-weight:900}}
@@ -41,7 +41,8 @@ html,body,[class*="css"]{{font-family:Arial,Helvetica,sans-serif;color:{TEXT}}} 
 .gate-legend .item{{display:flex;align-items:center;gap:6px}} .gate-legend .diamond{{width:10px;height:10px;background:#7048c7;transform:rotate(45deg);display:inline-block}} .gate-legend .dot{{width:10px;height:10px;border-radius:50%;background:{BLUE};display:inline-block}} .gate-legend .line-late{{width:24px;height:4px;background:{RED};display:inline-block;border-radius:4px}} .gate-legend .line-early{{width:24px;height:4px;background:{EARLY};display:inline-block;border-radius:4px}} .gate-legend .line-zero{{width:24px;height:4px;background:{BLUE};display:inline-block;border-radius:4px}}
 .small-note{{font-size:12px;color:{MUTED};margin:0 0 8px 2px;line-height:1.35}}
 @media(max-width:1450px){{.kpi-grid{{grid-template-columns:repeat(4,1fr)}}}}
-@media(max-width:1200px){{.helix-header{{grid-template-columns:90px minmax(360px,1fr) 210px 260px 92px;column-gap:10px}}.brand-title{{font-size:20px}}.kpi-grid{{grid-template-columns:repeat(3,1fr)}}}}
+@media(max-width:1280px){{.helix-header{{grid-template-columns:112px minmax(260px,1fr) 190px 230px 130px;column-gap:10px}}.brand-title{{font-size:20px}}.logo-card{{height:66px}}.logo-card img{{height:58px;max-height:58px}}.kpi-grid{{grid-template-columns:repeat(3,1fr)}}}}
+@media(max-width:990px){{.helix-header{{grid-template-columns:112px minmax(0,1fr) 132px;row-gap:12px}}.helix-header>.logo-card:last-child{{grid-column:3;grid-row:1}}.helix-header>.header-center{{grid-column:1/3;grid-row:2;justify-content:flex-start}}.helix-header>.header-meta{{grid-column:3;grid-row:2}}.brand-title{{font-size:19px;white-space:normal}}.header-meta .line{{font-size:10px}}.header-meta .value{{font-size:11px}}}}
 .schedule-view-caption{{font-size:14px;font-weight:750;color:#15253b;margin:4px 0 9px 2px}}
 .header-nav-clearance{{display:block;clear:both;height:22px;width:100%}}
 [data-testid="stSegmentedControl"]{{display:flex;justify-content:center}}
