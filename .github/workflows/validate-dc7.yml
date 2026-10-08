@@ -1,0 +1,62 @@
+name: Validate DC7 dashboard
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "DC7/**"
+      - ".github/workflows/validate-dc7.yml"
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Compile Python sources
+        run: python -m compileall -q app.py DC7
+      - name: Smoke-test SUFFOLK and HELIX models
+        run: |
+          python - <<'PY'
+          import base64
+          import gzip
+          import sys
+          import tempfile
+          from pathlib import Path
+
+          sys.path.insert(0, str(Path("DC7").resolve()))
+          from src.dc7_model import build_dc7_model, build_suffolk_model
+
+          raw = Path("DC7/data")
+          root = Path(tempfile.mkdtemp(prefix="validate_dc7_"))
+          for name in ("226021.005.MO-BL.xer", "226021.010.MO-UP.xer"):
+              parts = sorted(raw.glob(f"{name}.gz.b64.part*"))
+              assert parts, f"No parts for {name}"
+              encoded = "".join(p.read_text(encoding="ascii").strip() for p in parts)
+              (root / name).write_bytes(gzip.decompress(base64.b64decode(encoded)))
+          aux_name = "226021-HE.B-4.xer"
+          parts = sorted(raw.glob(f"{aux_name}.b64.part*"))
+          assert parts, "No dedicated HELIX data parts"
+          encoded = "".join(p.read_text(encoding="ascii").strip() for p in parts)
+          (root / aux_name).write_bytes(base64.b64decode(encoded))
+
+          helix = build_dc7_model(root)
+          suffolk = build_suffolk_model(helix)
+
+          h_total = helix.status_counts()["Total"]
+          s_total = suffolk.status_counts()["Total"]
+          assert h_total == 2576, f"HELIX count unexpectedly changed: {h_total}"
+          assert s_total >= h_total, f"SUFFOLK total {s_total} < HELIX {h_total}"
+          assert not helix.scurve().empty, "HELIX S-curve missing"
+          assert not suffolk.area_windows().empty, "SUFFOLK windows missing"
+          assert not suffolk.area_stats().empty, "SUFFOLK area matrix missing"
+          assert not helix.lineup_stats("DH1100").empty, "HELIX line-ups missing"
+          assert not helix.fte_ready_comparison().empty, "FTE milestones missing"
+
+          print(f"PASS: HELIX={h_total}; SUFFOLK={s_total}; two views, line-ups and FTE validated")
+          PY
