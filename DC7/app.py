@@ -14,7 +14,7 @@ st.set_page_config(
 
 
 from config import DATA_DIR
-from src.dc7_model import build_dc7_model
+from src.dc7_model import build_dc7_model, build_suffolk_model
 from src.dc7_view import render_dashboard
 
 def _materialize_cloud_xers(data_root: Path) -> Path:
@@ -76,14 +76,16 @@ if not source_data_dir.exists():
 
 data_dir = _materialize_cloud_xers(source_data_dir)
 
-MODEL_VERSION = "dc7-2026-10-05-he-lineups-moh-v1"
+MODEL_VERSION = "dc7-2026-10-08-suffolk-helix-views-v1"
 
 @st.cache_resource(show_spinner="Reading DC7 baseline/update XER and building HELIX scope…")
 def load_model(path_text: str, model_version: str):
-    return build_dc7_model(Path(path_text))
+    helix = build_dc7_model(Path(path_text))
+    suffolk = build_suffolk_model(helix)
+    return helix, suffolk
 
 try:
-    model = load_model(str(data_dir), MODEL_VERSION)
+    helix_model, suffolk_model = load_model(str(data_dir), MODEL_VERSION)
 except Exception as exc:
     st.error(f"DC7 dashboard could not be built: {exc}")
     st.info(
@@ -92,4 +94,4 @@ except Exception as exc:
     )
     st.stop()
 
-render_dashboard(model)
+render_dashboard(helix_model, suffolk_model)
