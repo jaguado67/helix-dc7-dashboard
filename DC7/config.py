@@ -7,7 +7,7 @@ LOGOS_DIR = ROOT_DIR / "LOGOS"
 APP_TITLE = "Project & Portfolio Control Center"
 APP_SUBTITLE = "Integrated Schedule Performance Dashboard"
 BRAND_NAME = "HELIX"
-VERSION = "0.2.12"
+VERSION = "0.2.13"
 PROJECT = "DC7"
 HOURS_PER_DAY = 8.0
 
