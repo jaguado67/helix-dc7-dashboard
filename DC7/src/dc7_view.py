@@ -455,7 +455,7 @@ def render_dashboard(helix: DC7Model, suffolk: DC7Model):
         view = "SUFFOLK"
     model = suffolk if view == "SUFFOLK" else helix
     st.markdown(CSS, unsafe_allow_html=True)
-    st.markdown(f'<div class="schedule-view-caption">DC7 {view} SCHEDULE</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="schedule-view-caption">{_safe("DC7 Suffolk Schedule" if view == "SUFFOLK" else "DC7 HELIX PROGRESS VIEW")}</div>', unsafe_allow_html=True)
     render_header(model, view)
     st.segmented_control("Schedule View", ["SUFFOLK", "HELIX"], default="SUFFOLK", key="dc7_schedule_view", label_visibility="collapsed")
     note = "SUFFOLK main project · QTS-AREA" if view == "SUFFOLK" else "HELIX subcontractor-coded progress · dedicated electrical line-ups"
