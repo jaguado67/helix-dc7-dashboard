@@ -2,7 +2,7 @@
 
 Cloud-ready Streamlit package for the HELIX DC7 schedule dashboard.
 
-**Version:** 0.2.12
+**Version:** 0.2.13
 
 ## Data scope
 
@@ -13,6 +13,33 @@ This release has two selectable views. SUFFOLK displays the main DC7 project sco
 - No `DC7-MIL`
 - No `DC7.TFO-B`
 - No external-project relationships in dashboard analytics
+
+## v0.2.13 — Consolidated HELIX Data Hall functional groups
+
+The **HELIX PROJECT PROGRESS DETAIL** matrix and chart use a presentation-only
+functional classification for DH1100–DH1600, reducing nine displayed categories
+to seven without changing QTS-DASH assignments or any TASK records:
+
+1. **Technical & Auxiliary Rooms** = Other Rooms + Electrical Rooms.
+2. **Data Hall** = existing Data Hall category.
+3. **Galleries** = existing Galleries category.
+4. **Corridor** = existing Corridor category.
+5. **Electrical Infrastructure & Yard** = Electrical Yard + unassigned under-slab
+   electrical installation activities identified by their activity names.
+6. **Mechanical Systems & Yard** = Mechanical Yard + unassigned roof RTU
+   electrical-system activities identified by their activity names.
+7. **Commissioning & Start-Up** = existing commissioning category.
+
+For the published update, DH1100 remains **402 total / 8 completed /
+1 in progress / 393 not started**, with an unchanged completion ratio of
+about **2.0%**. The other five Data Halls use the same rule. Unknown
+unassigned activity names remain in a visibly separate residual category
+rather than being silently assigned to a functional bucket.
+
+The **SUFFOLK VIEW**, HELIX total KPIs and S-curve, Equipment Line-Ups,
+FTE Ready milestones, and source XER files remain unchanged. The field
+QTS - DASH retains the original Primavera P6 values; only the grouped
+presentation in the HELIX Data Hall detail is modified.
 
 ## v0.2.12 — Two views: SUFFOLK and HELIX
 
