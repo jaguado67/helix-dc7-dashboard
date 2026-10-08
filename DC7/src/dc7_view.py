@@ -292,13 +292,10 @@ def render_progress_detail(m: DC7Model, view: str):
         h = f'<div class="panel"><div class="panel-head"><div class="panel-title">{area} · {summary_title}</div></div><table class="detail-table"><thead><tr><th>Area</th><th>Tasks</th><th>Activity Completion %</th><th>Not Started</th><th>In Progress</th><th>Completed</th></tr></thead><tbody>'
         for _, r in df.iterrows():
             label = _safe(r.Area)
-            if str(r.Area) == "Other HELIX Electrical Scope":
-                label = '<span style="color:#b36b00;font-weight:800">Other HELIX Electrical Scope</span>'
             h += f'<tr><td>{label}</td><td>{int(r.Tasks)}</td><td>{r["Activity Completion %"]:.1f}%</td><td>{int(r["Not Started"])} </td><td>{int(r["In Progress"])} </td><td>{int(r.Completed)}</td></tr>'
         st.markdown(h + '</tbody></table></div>', unsafe_allow_html=True)
     with c2:
-        colors = ["#c48a23" if str(x) == "Other HELIX Electrical Scope" else "#1f6d8a" for x in df.Area]
-        fig = go.Figure(go.Bar(x=df.Area, y=df["Activity Completion %"], text=[f"{x:.1f}%" for x in df["Activity Completion %"]], textposition="outside", textfont=dict(size=13, color=TEXT), marker=dict(color=colors)))
+        fig = go.Figure(go.Bar(x=df.Area, y=df["Activity Completion %"], text=[f"{x:.1f}%" for x in df["Activity Completion %"]], textposition="outside", textfont=dict(size=13, color=TEXT), marker=dict(color="#1f6d8a")))
         ymax = max(10, float(df["Activity Completion %"].max()) * 1.35 + 1) if not df.empty else 10
         chart_title = f"ACTIVITY COMPLETION · {area}" if area == "MOH" else f"ACTIVITY COMPLETION BY AREA · {area}"
         fig.update_layout(**_layout(410, 70, 115, 38), showlegend=False, title=chart_title, yaxis_title="Activity Completion %")
