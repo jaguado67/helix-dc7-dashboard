@@ -496,18 +496,22 @@ class DC7Model:
                 "In Progress %": _status_pct(sg, "In Progress"),
                 "Not Started %": _status_pct(sg, "Not Started"),
             })
-        order = [
-            "Technical & Auxiliary Rooms", "Data Hall", "Galleries", "Corridor",
-            "Electrical Infrastructure & Yard", "Mechanical Systems & Yard",
-            "Commissioning & Start-Up",
-            "Priority Rooms", "Other Rooms", "Electrical Rooms",
-            "Galleries", "Corridor", "Electrical Yard", "Mechanical Yard",
-            "Commissioning & Start-Up",
-            "Switchgear / Main Distribution", "Transformers", "Panels",
-            "CIP / Controls", "Transfer Equipment",
-            "UPS / ELI / Battery Systems", "MPZ / MMR",
-            "Other HELIX Electrical Scope"
-        ]
+        if helix_display and str(area).upper().startswith("DH"):
+            order = [
+                "Technical & Auxiliary Rooms", "Data Hall", "Galleries", "Corridor",
+                "Electrical Infrastructure & Yard", "Mechanical Systems & Yard",
+                "Commissioning & Start-Up", "Other HELIX Electrical Scope",
+            ]
+        else:
+            order = [
+                "Priority Rooms", "Other Rooms", "Electrical Rooms", "Data Hall",
+                "Galleries", "Corridor", "Electrical Yard", "Mechanical Yard",
+                "Commissioning & Start-Up",
+                "Switchgear / Main Distribution", "Transformers", "Panels",
+                "CIP / Controls", "Transfer Equipment",
+                "UPS / ELI / Battery Systems", "MPZ / MMR",
+                "Other HELIX Electrical Scope",
+            ]
         rank = {x: i for i, x in enumerate(order)}
         out = pd.DataFrame(rows)
         out["_rank"] = out["Area"].map(rank).fillna(50)
