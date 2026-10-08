@@ -282,10 +282,13 @@ def render_stats(m: DC7Model, title: str):
 def render_progress_detail(m: DC7Model, view: str):
     st.markdown(f'<div class="section-caption">{view} PROJECT PROGRESS DETAIL</div>', unsafe_allow_html=True)
     area = st.selectbox("Area / Data Hall", m.areas(), index=0, key=f"dc7_area_{view.lower()}")
-    df = m.subarea_stats(area)
+    consolidated = view == "HELIX" and area.upper().startswith("DH")
+    df = m.subarea_stats(area, helix_display=consolidated)
     c1, c2 = st.columns([1.15, 1], gap="large")
     with c1:
-        summary_title = "FUNCTIONAL PACKAGE SUMMARY" if area == "MOH" else "SUMMARY BY QTS - DASH"
+        summary_title = ("FUNCTIONAL PACKAGE SUMMARY" if area == "MOH" else
+                         "SUMMARY BY FUNCTIONAL GROUP" if consolidated else
+                         "SUMMARY BY QTS - DASH")
         h = f'<div class="panel"><div class="panel-head"><div class="panel-title">{area} · {summary_title}</div></div><table class="detail-table"><thead><tr><th>Area</th><th>Tasks</th><th>Activity Completion %</th><th>Not Started</th><th>In Progress</th><th>Completed</th></tr></thead><tbody>'
         for _, r in df.iterrows():
             label = _safe(r.Area)
@@ -302,7 +305,9 @@ def render_progress_detail(m: DC7Model, view: str):
         fig.update_yaxes(range=[0, ymax], ticksuffix="%", gridcolor=GRID)
         fig.update_xaxes(tickangle=-25)
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
-    if area == "MOH":
+    if consolidated:
+        st.caption("HELIX Data Hall display groups consolidate Other Rooms and Electrical Rooms, and classify unassigned underslab electrical / RTU roof activities by function. Original QTS-DASH, task IDs, status, and XER data remain unchanged. Unrecognized activities remain unclassified.")
+    elif area == "MOH":
         st.caption("MOH is sourced from 226021-HE.B-4.xer. That file does not contain QTS-DASH, so MOH is grouped by equipment identifiers in the activity names; the original XER coding remains unchanged.")
     elif "Other HELIX Electrical Scope" in set(df["Area"].astype(str)):
         st.caption("Other HELIX Electrical Scope contains only activities coded QTS - Subcontractor = HELIX that have no QTS-DASH assignment; the original XER coding remains unchanged.")
