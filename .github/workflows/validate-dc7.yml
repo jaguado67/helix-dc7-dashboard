@@ -58,5 +58,50 @@ jobs:
           assert not helix.lineup_stats("DH1100").empty, "HELIX line-ups missing"
           assert not helix.fte_ready_comparison().empty, "FTE milestones missing"
 
+          # Consolidation is a view-only transformation for HELIX Data Halls.
+          # Neither source activity codes nor SUFFOLK grouping may change.
+          import pandas as pd
+          original_task_data = helix.current_tasks[["task_id", "task_code", "Subarea", "Status"]].copy(deep=True)
+          expected_groups = [
+              "Technical & Auxiliary Rooms", "Data Hall", "Galleries",
+              "Corridor", "Electrical Infrastructure & Yard",
+              "Mechanical Systems & Yard", "Commissioning & Start-Up",
+          ]
+          for hall in ("DH1100", "DH1200", "DH1300", "DH1400", "DH1500", "DH1600"):
+              before = helix.subarea_stats(hall)
+              after = helix.subarea_stats(hall, helix_display=True)
+              assert len(before) == 9, (hall, before["Area"].tolist())
+              assert after["Area"].tolist() == expected_groups, (hall, after["Area"].tolist())
+              for column in ("Tasks", "Completed", "In Progress", "Not Started"):
+                  assert int(before[column].sum()) == int(after[column].sum()), (hall, column)
+              source = helix.current_tasks[helix.current_tasks["Area"].eq(hall)]
+              assert int(after["Tasks"].sum()) == len(source), hall
+              assert "Other HELIX Electrical Scope" not in set(after["Area"]), hall
+
+          summary = helix.subarea_stats("DH1100", helix_display=True).set_index("Area")
+          expected_dh1100 = {
+              "Technical & Auxiliary Rooms": (80, 1, 0, 79),
+              "Data Hall": (6, 0, 0, 6),
+              "Galleries": (253, 2, 0, 251),
+              "Corridor": (18, 0, 0, 18),
+              "Electrical Infrastructure & Yard": (29, 3, 1, 25),
+              "Mechanical Systems & Yard": (13, 2, 0, 11),
+              "Commissioning & Start-Up": (3, 0, 0, 3),
+          }
+          for area, counts in expected_dh1100.items():
+              actual = summary.loc[area]
+              assert tuple(int(actual[c]) for c in ("Tasks", "Completed", "In Progress", "Not Started")) == counts, (area, actual)
+          assert int(summary["Tasks"].sum()) == 402
+          assert int(summary["Completed"].sum()) == 8
+          pd.testing.assert_frame_equal(
+              original_task_data,
+              helix.current_tasks[["task_id", "task_code", "Subarea", "Status"]],
+          )
+          # The SUFFOLK area grouping is intentionally unchanged.
+          suffolk_detail = suffolk.subarea_stats("DH1100")
+          assert "Electrical Rooms" in set(suffolk_detail["Area"])
+          assert "Other Rooms" in set(suffolk_detail["Area"])
+          print("PASS: six HELIX Data Halls consolidated to seven groups; no changes to source activity records")
+
           print(f"PASS: HELIX={h_total}; SUFFOLK={s_total}; two views, line-ups and FTE validated")
           PY
