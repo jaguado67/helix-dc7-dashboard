@@ -2,17 +2,28 @@
 
 Cloud-ready Streamlit package for the HELIX DC7 schedule dashboard.
 
-**Version:** 0.2.11
+**Version:** 0.2.12
 
 ## Data scope
 
-This dashboard intentionally uses only the DC7 main project and its baseline:
+This release has two selectable views. SUFFOLK displays the main DC7 project scope grouped by QTS - AREA, while HELIX preserves the existing subcontractor-coded analytics and dedicated HELIX electrical Line-Ups. The main source projects are:
 
 - Current project: `proj_id 1118`
 - Baseline project: `proj_id 1071`
 - No `DC7-MIL`
 - No `DC7.TFO-B`
 - No external-project relationships in dashboard analytics
+
+## v0.2.12 — Two views: SUFFOLK and HELIX
+
+Use the **SUFFOLK / HELIX** selector immediately below the header.
+
+- **SUFFOLK VIEW:** main DC7 project activity status in approved FOH, BOH and Data Hall QTS-AREA assignments; area-status matrix and chart; Area Start–Finish Baseline/Current comparison; SUFFOLK Project Progress Detail. No HELIX Line-Ups or FTE chart in this view.
+- **HELIX VIEW:** existing QTS - Subcontractor = HELIX activity S-curve and overall status; HELIX area matrix; HELIX progress detail including MOH; dedicated Equipment Line-Ups and FTE Ready milestones. The old duplicated lower status matrix is not shown in SUFFOLK.
+- **Sources:** no XER files, actual dates, or scheduling mathematics have been changed. SUFFOLK and HELIX coded progress still derive from the existing main DC7 BL/UP pair; dedicated Line-Ups/MOH derive from \`226021-HE.B-4.xer\`. The independent HELIX BL XER \`226021-HE.B\` is not present in the connected data source and is not represented as though loaded.
+- **Meaning of percent:** Activity Completion % = Completed Tasks / Total Tasks, not weighted physical progress.
+
+Automated CI validates Python compilation plus both scope models, HELIX S-curve, SUFFOLK area windows, HELIX line-ups and FTE milestones using the packaged XER files.
 
 ## Repository structure
 
