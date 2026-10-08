@@ -42,8 +42,8 @@ html,body,[class*="css"]{{font-family:Arial,Helvetica,sans-serif;color:{TEXT}}} 
 .small-note{{font-size:12px;color:{MUTED};margin:0 0 8px 2px;line-height:1.35}}
 @media(max-width:1450px){{.kpi-grid{{grid-template-columns:repeat(4,1fr)}}}}
 @media(max-width:1200px){{.helix-header{{grid-template-columns:90px minmax(360px,1fr) 210px 260px 92px;column-gap:10px}}.brand-title{{font-size:20px}}.kpi-grid{{grid-template-columns:repeat(3,1fr)}}}}
-.schedule-view-caption{font-size:14px;font-weight:750;color:#15253b;margin:4px 0 9px 2px}
-[data-testid="stSegmentedControl"]{display:flex;justify-content:center}
+.schedule-view-caption{{font-size:14px;font-weight:750;color:#15253b;margin:4px 0 9px 2px}}
+[data-testid="stSegmentedControl"]{{display:flex;justify-content:center}}
 </style>
 """
 
