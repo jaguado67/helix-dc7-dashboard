@@ -43,6 +43,7 @@ html,body,[class*="css"]{{font-family:Arial,Helvetica,sans-serif;color:{TEXT}}} 
 @media(max-width:1450px){{.kpi-grid{{grid-template-columns:repeat(4,1fr)}}}}
 @media(max-width:1200px){{.helix-header{{grid-template-columns:90px minmax(360px,1fr) 210px 260px 92px;column-gap:10px}}.brand-title{{font-size:20px}}.kpi-grid{{grid-template-columns:repeat(3,1fr)}}}}
 .schedule-view-caption{{font-size:14px;font-weight:750;color:#15253b;margin:4px 0 9px 2px}}
+.header-nav-clearance{{display:block;clear:both;height:22px;width:100%}}
 [data-testid="stSegmentedControl"]{{display:flex;justify-content:center}}
 </style>
 """
@@ -84,7 +85,6 @@ def _layout(height=360,left=55,bottom=50,top=48):
 
 
 def render_header(m: DC7Model, view: str):
-    st.markdown(CSS, unsafe_allow_html=True)
     st.markdown(f"""
     <div class="helix-header">
       <div class="logo-card"><img src="{_logo('toro')}"></div>
@@ -97,6 +97,7 @@ def render_header(m: DC7Model, view: str):
       </div>
       <div class="logo-card"><img src="{_logo('helix')}"></div>
     </div>
+    <div class="header-nav-clearance" aria-hidden="true"></div>
     """, unsafe_allow_html=True)
 
 
@@ -459,7 +460,15 @@ def render_dashboard(helix: DC7Model, suffolk: DC7Model):
     st.markdown(CSS, unsafe_allow_html=True)
     st.markdown(f'<div class="schedule-view-caption">{_safe("DC7 Suffolk Schedule" if view == "SUFFOLK" else "DC7 HELIX PROGRESS VIEW")}</div>', unsafe_allow_html=True)
     render_header(model, view)
-    st.segmented_control("Schedule View", ["SUFFOLK", "HELIX"], default="SUFFOLK", key="dc7_schedule_view", label_visibility="collapsed")
+    # Keep the native control in its own Streamlit layout row, separated from the HTML header.
+    with st.container(border=True):
+        left_nav, center_nav, right_nav = st.columns([3, 2, 3], gap="small")
+        with center_nav:
+            st.segmented_control(
+                "Schedule View", ["SUFFOLK", "HELIX"],
+                default="SUFFOLK", key="dc7_schedule_view",
+                label_visibility="collapsed",
+            )
     note = "SUFFOLK main project · QTS-AREA" if view == "SUFFOLK" else "HELIX subcontractor-coded progress · dedicated electrical line-ups"
     st.markdown(f'<div class="project-strip"><span>{view} VIEW</span><span class="right">{_safe(note)}</span></div>', unsafe_allow_html=True)
     render_kpis(model, view)
