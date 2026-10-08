@@ -748,3 +748,51 @@ def build_dc7_model(data_dir: Path) -> DC7Model:
         auxiliary_tasks=aux_tasks,
         auxiliary_project=aux_project,
     )
+
+
+def build_suffolk_model(helix_model: DC7Model) -> DC7Model:
+    """View of the SUFFOLK main project using the same XER files.
+
+    HELIX filters are deliberately not applied to this view. Only activities
+    assigned to the dashboard's approved QTS-AREA list are presented in the
+    FOH/BOH/Data Hall summary; the project-level finish remains the official
+    SUFFOLK project finish. No XER or scheduling calculations are changed.
+    """
+    update_project_id = str(helix_model.update_project["proj_id"])
+    baseline_project_id = str(helix_model.baseline_project["proj_id"])
+    current_all = to_task_frame(helix_model.update_tables["TASK"])
+    current_all = current_all[
+        current_all["proj_id"].astype(str).eq(update_project_id)
+    ].copy()
+
+    area_codes = _assignment_map(
+        helix_model.update_tables, update_project_id, "QTS - AREA", "short_name"
+    )
+    dash_codes = _assignment_map(
+        helix_model.update_tables, update_project_id, "QTS - DASH", "actv_code_name"
+    )
+    current_all["Area"] = current_all["task_id"].astype(str).map(area_codes)
+    current_all = current_all[current_all["Area"].isin(AREA_ORDER)].copy()
+    current_all["Subarea"] = (
+        current_all["task_id"].astype(str)
+        .map(dash_codes).map(_clean_subarea)
+        .replace("Other HELIX Electrical Scope", "Other SUFFOLK Scope")
+    )
+    if current_all.empty:
+        raise ValueError("No SUFFOLK activities matched QTS - AREA.")
+    if current_all["task_code"].duplicated().any():
+        raise ValueError("Duplicate activity IDs in SUFFOLK QTS-AREA scope.")
+
+    baseline_all = to_task_frame(helix_model.baseline_tables["TASK"])
+    baseline_all = baseline_all[
+        baseline_all["proj_id"].astype(str).eq(baseline_project_id)
+    ].copy()
+    area_mapping = current_all[["task_code", "Area", "Subarea"]].drop_duplicates("task_code")
+    baseline = baseline_all.merge(area_mapping, on="task_code", how="inner")
+
+    return DC7Model(
+        helix_model.baseline_path, helix_model.update_path,
+        helix_model.baseline_project, helix_model.update_project,
+        baseline, current_all,
+        helix_model.baseline_tables, helix_model.update_tables,
+    )
