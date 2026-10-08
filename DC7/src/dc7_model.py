@@ -211,6 +211,38 @@ def _clean_subarea(name: str) -> str:
     return fixes.get(x, x or "Other HELIX Electrical Scope")
 
 
+def _helix_display_subarea(row: pd.Series) -> str:
+    """Consolidate HELIX Data Hall categories for display only.
+
+    The source QTS-DASH assignment in P6 is never overwritten. In particular,
+    missing QTS-DASH activities are reclassified only if their descriptions
+    unambiguously identify electrical work under slab or RTU roof systems.
+    Unknown / future unclassified work remains visible in the residual group
+    rather than being silently assigned to the wrong scope.
+    """
+    subarea = _clean_subarea(row.get("Subarea", ""))
+    if not str(row.get("Area", "")).upper().startswith("DH"):
+        return subarea
+
+    groups = {
+        "Other Rooms": "Technical & Auxiliary Rooms",
+        "Electrical Rooms": "Technical & Auxiliary Rooms",
+        "Electrical Yard": "Electrical Infrastructure & Yard",
+        "Mechanical Yard": "Mechanical Systems & Yard",
+    }
+    if subarea in groups:
+        return groups[subarea]
+    if subarea != "Other HELIX Electrical Scope":
+        return subarea
+
+    name = str(row.get("task_name", "")).upper()
+    if re.search(r"\b(?:UNDER[\s-]*SLAB|UNDERSLAB)\b", name) and "ELECTRICAL" in name:
+        return "Electrical Infrastructure & Yard"
+    if re.search(r"\bROOF\s*-\s*RTUS?\b", name):
+        return "Mechanical Systems & Yard"
+    return subarea
+
+
 def _date_min(df: pd.DataFrame, cols: list[str]) -> pd.Timestamp:
     vals = []
     for c in cols:
@@ -438,7 +470,7 @@ class DC7Model:
             })
         return pd.DataFrame(rows)
 
-    def subarea_stats(self, area: str) -> pd.DataFrame:
+    def subarea_stats(self, area: str, helix_display: bool = False) -> pd.DataFrame:
         if area == "MOH" and self.auxiliary_tasks is not None:
             g = self.auxiliary_tasks[self.auxiliary_tasks["Area"].eq(area)].copy()
             if not g.empty:
@@ -447,6 +479,8 @@ class DC7Model:
             g = self.current_tasks[self.current_tasks["Area"].eq(area)].copy()
         if g.empty:
             return pd.DataFrame()
+        if helix_display and str(area).upper().startswith("DH"):
+            g["Subarea"] = g.apply(_helix_display_subarea, axis=1)
         rows = []
         for sub, sg in g.groupby("Subarea", dropna=False):
             label = _clean_subarea(sub)
@@ -463,7 +497,10 @@ class DC7Model:
                 "Not Started %": _status_pct(sg, "Not Started"),
             })
         order = [
-            "Priority Rooms", "Other Rooms", "Electrical Rooms", "Data Hall",
+            "Technical & Auxiliary Rooms", "Data Hall", "Galleries", "Corridor",
+            "Electrical Infrastructure & Yard", "Mechanical Systems & Yard",
+            "Commissioning & Start-Up",
+            "Priority Rooms", "Other Rooms", "Electrical Rooms",
             "Galleries", "Corridor", "Electrical Yard", "Mechanical Yard",
             "Commissioning & Start-Up",
             "Switchgear / Main Distribution", "Transformers", "Panels",
