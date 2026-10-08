@@ -42,6 +42,8 @@ html,body,[class*="css"]{{font-family:Arial,Helvetica,sans-serif;color:{TEXT}}} 
 .small-note{{font-size:12px;color:{MUTED};margin:0 0 8px 2px;line-height:1.35}}
 @media(max-width:1450px){{.kpi-grid{{grid-template-columns:repeat(4,1fr)}}}}
 @media(max-width:1200px){{.helix-header{{grid-template-columns:90px minmax(360px,1fr) 210px 260px 92px;column-gap:10px}}.brand-title{{font-size:20px}}.kpi-grid{{grid-template-columns:repeat(3,1fr)}}}}
+.schedule-view-caption{font-size:14px;font-weight:750;color:#15253b;margin:4px 0 9px 2px}
+[data-testid="stSegmentedControl"]{display:flex;justify-content:center}
 </style>
 """
 
@@ -81,7 +83,7 @@ def _layout(height=360,left=55,bottom=50,top=48):
     )
 
 
-def render_header(m: DC7Model):
+def render_header(m: DC7Model, view: str):
     st.markdown(CSS, unsafe_allow_html=True)
     st.markdown(f"""
     <div class="helix-header">
@@ -91,20 +93,19 @@ def render_header(m: DC7Model):
       <div class="header-meta">
         <div class="line">Latest Data Date&nbsp;&nbsp;<span class="value">{_fmt_date(m.data_date)}</span></div>
         <div class="line">Current Update&nbsp;&nbsp;<span class="value">{_safe(m.update_path.stem)}</span></div>
-        <div class="line">Scope&nbsp;&nbsp;<span class="value">HELIX Electric</span></div>
+        <div class="line">Scope&nbsp;&nbsp;<span class="value">{_safe("SUFFOLK QTS-AREA" if view == "SUFFOLK" else "HELIX Electric")}</span></div>
       </div>
       <div class="logo-card"><img src="{_logo('helix')}"></div>
     </div>
-    <div class="project-strip"><span>DC7 VIEW</span><span class="right">Full-project finish · HELIX Activity Code scope analytics</span></div>
     """, unsafe_allow_html=True)
 
 
-def render_kpis(m: DC7Model):
+def render_kpis(m: DC7Model, view: str):
     fv = m.finish_variance_days
     counts = m.status_counts()
     p = m.status_percentages()
     st.markdown('<div class="section-caption">PROJECT STATUS SUMMARY</div>', unsafe_allow_html=True)
-    st.markdown('<div class="panel schedule"><div class="panel-head"><div><span class="time-pill">TIME</span><span class="panel-title">SCHEDULE PERFORMANCE</span></div><div class="panel-note">Project finish from DC7 main project · HELIX scope activity mix</div></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="panel schedule"><div class="panel-head"><div><span class="time-pill">TIME</span><span class="panel-title">SCHEDULE PERFORMANCE</span></div><div class="panel-note">{_safe("SUFFOLK project finish · QTS-AREA task status" if view == "SUFFOLK" else "SUFFOLK project finish · HELIX subcontractor-coded status")}</div></div>', unsafe_allow_html=True)
     cards = [
         ("Baseline Completion", _fmt_date(m.baseline_finish), m.baseline_path.stem, ""),
         ("Current Forecast Finish", _fmt_date(m.current_finish), _fmt_days(fv) + " vs Baseline", _var_class(fv)),
@@ -112,7 +113,7 @@ def render_kpis(m: DC7Model):
         ("Completed Activities", _fmt_pct(p["Completed %"]), f"{counts['Completed']:,} of {counts['Total']:,}", "good" if p["Completed %"] > 0 else ""),
         ("In Progress Activities", _fmt_pct(p["In Progress %"]), f"{counts['In Progress']:,} of {counts['Total']:,}", "neutral" if p["In Progress %"] > 0 else ""),
         ("Not Started Activities", _fmt_pct(p["Not Started %"]), f"{counts['Not Started']:,} of {counts['Total']:,}", "bad" if p["Not Started %"] > 0 else ""),
-        ("HELIX Scope Activities", f"{counts['Total']:,}", f"{counts['Completed']} C · {counts['In Progress']} IP · {counts['Not Started']} NS", ""),
+        (f"{view} Scope Activities", f"{counts['Total']:,}", f"{counts['Completed']} C · {counts['In Progress']} IP · {counts['Not Started']} NS", ""),
         ("Current Data Date", _fmt_date(m.data_date), "P6 last recalculation / Data Date", ""),
     ]
     h = '<div class="kpi-grid">'
@@ -258,23 +259,29 @@ def render_fte_ready(m: DC7Model):
     st.caption("Source: DC7 main project only. FTE Ready is matched by the IST.6100 activity family in Baseline and Current. External projects and cross-project relationships are excluded from this dashboard.")
 
 
-def render_stats(m: DC7Model):
-    st.markdown('<div class="section-caption">PROJECT STATS · HELIX SCOPE</div>', unsafe_allow_html=True)
+def render_stats(m: DC7Model, title: str):
+    st.markdown(f'<div class="section-caption">{_safe(title)}</div>', unsafe_allow_html=True)
     df = m.area_stats().copy()
-    h = '<div class="panel"><table class="stats-table"><thead><tr><th>Area</th><th>Total Tasks</th><th>Activity Completion %</th><th>Completed</th><th>In Progress</th><th>Not Started</th></tr></thead><tbody>'
-    for _, r in df.iterrows():
-        h += f'<tr><td>{r.Area}</td><td>{int(r["Total Tasks"]):,}</td><td>{r["Activity Completion %"]:.1f}%</td><td>{int(r.Completed)}</td><td>{int(r["In Progress"])} </td><td>{int(r["Not Started"])} </td></tr>'
-    st.markdown(h + '</tbody></table></div>', unsafe_allow_html=True)
-    fig = go.Figure(go.Bar(x=df["Activity Completion %"], y=df.Area, orientation="h", text=[f"{x:.1f}%" for x in df["Activity Completion %"]], textposition="outside", textfont=dict(size=13, color=TEXT), marker=dict(color="#1f6d8a")))
-    fig.update_layout(**_layout(max(300, 42 * len(df) + 90), 90, 40, 28), showlegend=False, xaxis_title="Activity Completion %", yaxis_title="", title=dict(text=""))
-    fig.update_xaxes(range=[0, max(10, float(df["Activity Completion %"].max()) * 1.35 + 1)], ticksuffix="%", gridcolor=GRID)
-    fig.update_yaxes(autorange="reversed", gridcolor="#fff")
-    st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+    if df.empty:
+        st.info("No area-coded activities found.")
+        return
+    left, right = st.columns([1.45, 1], gap="large")
+    with left:
+        h = '<div class="panel"><table class="stats-table"><thead><tr><th>Area</th><th>Total Tasks</th><th>Activity Completion %</th><th>Completed</th><th>In Progress</th><th>Not Started</th></tr></thead><tbody>'
+        for _, r in df.iterrows():
+            h += f'<tr><td>{_safe(r.Area)}</td><td>{int(r["Total Tasks"]):,}</td><td>{r["Activity Completion %"]:.1f}%</td><td>{int(r.Completed)}</td><td>{int(r["In Progress"])}</td><td>{int(r["Not Started"])}</td></tr>'
+        st.markdown(h + '</tbody></table></div>', unsafe_allow_html=True)
+    with right:
+        fig = go.Figure(go.Bar(x=df["Activity Completion %"], y=df.Area, orientation="h", text=[f"{x:.1f}%" for x in df["Activity Completion %"]], textposition="outside", textfont=dict(size=13, color=TEXT), marker=dict(color="#1f6d8a")))
+        fig.update_layout(**_layout(max(355, 44 * len(df) + 95), 90, 40, 28), showlegend=False, xaxis_title="Activity Completion %", yaxis_title="", title=dict(text=""))
+        fig.update_xaxes(range=[0, max(10, float(df["Activity Completion %"].max()) * 1.35 + 1)], ticksuffix="%", gridcolor=GRID)
+        fig.update_yaxes(autorange="reversed", gridcolor="#fff")
+        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
 
-def render_progress_detail(m: DC7Model):
-    st.markdown('<div class="section-caption">PROJECT PROGRESS DETAIL</div>', unsafe_allow_html=True)
-    area = st.selectbox("Area / Data Hall", m.areas(), index=0, key="dc7_area")
+def render_progress_detail(m: DC7Model, view: str):
+    st.markdown(f'<div class="section-caption">{view} PROJECT PROGRESS DETAIL</div>', unsafe_allow_html=True)
+    area = st.selectbox("Area / Data Hall", m.areas(), index=0, key=f"dc7_area_{view.lower()}")
     df = m.subarea_stats(area)
     c1, c2 = st.columns([1.15, 1], gap="large")
     with c1:
@@ -299,7 +306,7 @@ def render_progress_detail(m: DC7Model):
         st.caption("MOH is sourced from 226021-HE.B-4.xer. That file does not contain QTS-DASH, so MOH is grouped by equipment identifiers in the activity names; the original XER coding remains unchanged.")
     elif "Other HELIX Electrical Scope" in set(df["Area"].astype(str)):
         st.caption("Other HELIX Electrical Scope contains only activities coded QTS - Subcontractor = HELIX that have no QTS-DASH assignment; the original XER coding remains unchanged.")
-    render_lineups_detail(m, area)
+    # Dedicated HELIX Line-Ups are rendered separately in HELIX VIEW only.
 
 
 def render_lineups_detail(m: DC7Model, area: str):
@@ -432,15 +439,46 @@ def render_gates(m: DC7Model):
     st.dataframe(audit, use_container_width=True, hide_index=True)
     st.caption("Key milestones are restricted to FTE Ready milestones from the DC7 main project. External projects and cross-project relationships are excluded.")
 
-def render_dashboard(m: DC7Model):
-    render_header(m)
-    render_kpis(m)
-    render_scurve_and_status(m)
-    render_windows(m)
-    render_stats(m)
-    render_progress_detail(m)
-    render_gates(m)
-    with st.expander("Diagnostics · DC7 XER / HELIX Scope Audit", expanded=False):
-        d = m.diagnostics()
-        st.dataframe(pd.DataFrame([d]), use_container_width=True, hide_index=True)
-        st.caption("Scope rule: current HELIX activities are selected by Activity Code QTS - Subcontractor = HELIX. Baseline comparisons use activities matched by task_code; current-only HELIX activities remain in current-status analytics. Areas use QTS - AREA; progress detail uses QTS - DASH. FTE Ready compares the matched main-project IST.6100 Baseline/Current milestones only; external projects and external relationships are excluded. Key Milestones are restricted to the six main-project FTE Ready IST.6100 milestones, matched Baseline vs Current by exact task_code.")
+def render_helix_lineups(m: DC7Model):
+    halls = [a for a in m.areas() if a.startswith("DH") and not m.lineup_stats(a).empty]
+    if not halls:
+        st.info("No dedicated HELIX equipment line-ups were found.")
+        return
+    st.markdown('<div class="section-caption">HELIX · EQUIPMENT LINE-UPS</div>', unsafe_allow_html=True)
+    area = st.selectbox("Data Hall · Equipment Line-Ups", halls, key="helix_lineup_area")
+    render_lineups_detail(m, area)
+
+
+def render_dashboard(helix: DC7Model, suffolk: DC7Model):
+    view = st.session_state.get("dc7_schedule_view", "SUFFOLK")
+    if view not in ("SUFFOLK", "HELIX"):
+        view = "SUFFOLK"
+    model = suffolk if view == "SUFFOLK" else helix
+    st.markdown(CSS, unsafe_allow_html=True)
+    st.markdown(f'<div class="schedule-view-caption">DC7 {view} SCHEDULE</div>', unsafe_allow_html=True)
+    render_header(model, view)
+    st.segmented_control("Schedule View", ["SUFFOLK", "HELIX"], default="SUFFOLK", key="dc7_schedule_view", label_visibility="collapsed")
+    note = "SUFFOLK main project · QTS-AREA" if view == "SUFFOLK" else "HELIX subcontractor-coded progress · dedicated electrical line-ups"
+    st.markdown(f'<div class="project-strip"><span>{view} VIEW</span><span class="right">{_safe(note)}</span></div>', unsafe_allow_html=True)
+    render_kpis(model, view)
+
+    if view == "SUFFOLK":
+        render_stats(suffolk, "SUFFOLK PROJECT STATS · AREA PROGRESS")
+        render_windows(suffolk)
+        render_progress_detail(suffolk, view="SUFFOLK")
+    else:
+        render_scurve_and_status(helix)
+        render_stats(helix, "PROJECT STATS · HELIX SCOPE")
+        render_progress_detail(helix, view="HELIX")
+        render_helix_lineups(helix)
+        render_gates(helix)
+        st.caption(
+            "Source note: HELIX KPIs, S-curve and FTE comparison retain the existing "
+            "QTS - Subcontractor = HELIX selection from the SUFFOLK BL/UP schedule. "
+            "Equipment Line-Ups and MOH use 226021-HE.B-4.xer. "
+            "The independent HELIX baseline XER is not loaded."
+        )
+
+    with st.expander(f"Diagnostics · DC7 {view} XER / Scope Audit", expanded=False):
+        st.dataframe(pd.DataFrame([model.diagnostics()]), use_container_width=True, hide_index=True)
+        st.caption("Activity Completion % = Completed Tasks / Total Tasks; this is not weighted physical progress. XER inputs and scheduling calculations remain unchanged.")
