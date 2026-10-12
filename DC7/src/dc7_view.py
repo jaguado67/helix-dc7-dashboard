@@ -556,10 +556,12 @@ def render_helix_lineup_stats(m: DC7Model):
         )
         if data is not None:
             st.caption(
-                f"Total actividades mapeadas a Line-Ups, Commissioning y MOH: "
-                f"{int(summary['Total Activities'].sum()):,}. "
-                "Las actividades fuera de estas ramas quedan en la auditoría."
+                f"Line-Ups + Commissioning + MOH: "
+                f"{int(summary['Total Activities'].sum()):,} actividades. "
+                "Los 24 hitos del proyecto están contabilizados por separado."
             )
+            st.markdown("**CONCILIACIÓN DEL XER ORIGINAL**")
+            st.dataframe(data["_reconciliation"], use_container_width=True, hide_index=True)
     with right:
         if data is None:
             st.info(
@@ -688,6 +690,19 @@ def render_helix_lineups(m: DC7Model):
             "Las cantidades y fechas son exclusivamente de la línea base P6. "
             "No representan avance real, estado actual ni pronóstico de ejecución."
         )
+        st.caption(
+            "Fuente verificada: 4.689 actividades en el XER HELIX original; "
+            "4.665 en Line-Ups/Commissioning/MOH y 24 hitos separados. "
+            "Son cantidades de Baseline, no avance Current."
+        )
+        with st.expander("HELIX P6 BASELINE · 24 PROJECT MILESTONES", expanded=False):
+            st.dataframe(data["_milestones"], use_container_width=True, hide_index=True)
+            st.download_button(
+                "Descargar 24 hitos de línea base (CSV)",
+                data["_milestones"].to_csv(index=False).encode("utf-8-sig"),
+                file_name="DC7_HELIX_Baseline_24_Milestones.csv",
+                mime="text/csv", key="helix_milestone_audit",
+            )
         audit = data["_audit"]
         st.download_button(
             "Descargar auditoría de actividades de la línea base HELIX (CSV)",
@@ -732,8 +747,9 @@ def render_dashboard(helix: DC7Model, suffolk: DC7Model):
         st.caption(
             "**SOURCE OF PROGRESS:** SUFFOLK DC7 BL / Current-C, "
             "filtered to HELIX Construction activities, including commissioning. "
-            "**ELECTRICAL LINE-UPS & MOH:** independent HELIX "
-            "226021-HE.B baseline (pending); there is no independent "
+            "**ELECTRICAL LINE-UPS & MOH:** verified official HELIX "
+            "226021-HE.B independent Baseline, 4,689 original P6 activities "
+            "(including 24 project milestones). There is no independent "
             "HELIX Current. These two data sources are not interchangeable."
         )
         render_kpis(helix, "HELIX")

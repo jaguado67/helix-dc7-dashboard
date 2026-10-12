@@ -2,7 +2,7 @@
 
 Cloud-ready Streamlit package for the HELIX DC7 schedule dashboard.
 
-**Version:** 0.2.22
+**Version:** 0.2.23
 
 ## Data scope
 
@@ -13,6 +13,57 @@ This release has two selectable views. SUFFOLK displays the main DC7 project sco
 - No `DC7-MIL`
 - No `DC7.TFO-B`
 - No external-project relationships in dashboard analytics
+
+## v0.2.23 — Official HELIX independent Baseline loaded and 4,689 activities audited
+
+**Primary source:** exact \`226021-HE.B.xer\` from
+\`DASHBOARD HELIX / DH / DC7\`, Google Drive file
+\`1hWBBoCJaDcl1xNFvf-u17lEXUglBPXJN\`.
+Source size: 3,042,495 bytes. SHA-256:
+\`1057564634e2392de2f5a3f825d15363a50f5a8f9b152bc1733c128dbf1d8d2b\`.
+Exact P6 project short name: \`226021-HE.B\`; P6 Data Date:
+**29-Sep-2026**; Date Added **01-Oct-2026 17:13**.
+
+Unlike SUFFOLK Construction progress, **NO QTS-Subcontractor filter is applied**:
+all activities in the standalone HELIX baseline project count,
+regardless of subcontractor assignment.
+
+| P6 native WBS branch | Quantity |
+|---|---:|
+| DH1100 Electrical (10 x 65 + R110 x 82) | 732 |
+| DH1100 Commissioning | 4 |
+| DH1200 Electrical (R120 first) | 732 |
+| DH1200 Commissioning | 4 |
+| DH1300 Electrical | 732 |
+| DH1300 Commissioning | 4 |
+| DH1400 Electrical (R140 first) | 732 |
+| DH1400 Commissioning | 4 |
+| DH1500 Electrical | 732 |
+| DH1500 Commissioning | 4 |
+| DH1600 Electrical (R160 first) | 732 |
+| DH1600 Commissioning | 4 |
+| MOH / Equipment | 249 |
+| Project / Milestones (L3 Cx, L4 Cx, QC 2.2 etc.) | 24 |
+| **Total independent HELIX Baseline Activity IDs** | **4689** |
+
+Reconciliation: **66 Line-Ups / 4,392 activities**, plus
+**24 Data Hall Commissioning** and **249 MOH Equipment** makes **4,665**,
+plus **24 separate project milestones** makes **4,689**.
+All original 4,689 \`TASK.task_code\` are unique and included
+in the downloadable independent activity audit. The 24 milestones remain
+visible in a separate expandable section and CSV; they are not disguised
+as Line-Up / MOH tasks.
+
+The 6-DH + MOH baseline activity matrix and per-Line-Up tables/plots
+now populate from the actual P6 TASK/PROJWBS relationships. Baseline
+task counts/dates are not progress measurements. The separate
+SUFFOLK-derived HELIX Construction progress summary/S-curve retains its
+existing source and 2,545-task audit; **no independent HELIX Current**
+is asserted. The historical \`226021-HE.B-4.xer\` is still prohibited.
+
+Cloud loading verifies original bytes against the pinned hash before any
+baseline analytics. GitHub Actions runs the full XER reconciliation and
+original SUFFOLK regression checks.
 
 ## v0.2.22 — HELIX Project Stats count Line-Ups, Commissioning and MOH
 

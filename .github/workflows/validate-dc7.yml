@@ -46,7 +46,19 @@ jobs:
           assert parts, "Historical fixture is missing"
           encoded = "".join(p.read_text(encoding="ascii").strip() for p in parts)
           (root / historical_name).write_bytes(base64.b64decode(encoded))
-          assert not (root / "226021-HE.B.xer").exists()
+          # Bring in the approved 226021-HE.B official baseline; -4 stays as
+          # a negative fixture. Verify exact bytes independent of filename.
+          import hashlib
+          original = "226021-HE.B.xer"
+          base_parts = sorted(raw.glob(f"{original}.gz.b64.part*"))
+          assert len(base_parts) == 3, "Verified original HELIX BL package missing"
+          raw_baseline = gzip.decompress(base64.b64decode(
+              "".join(p.read_text(encoding="ascii").strip() for p in base_parts)
+          ))
+          expected_sha = "1057564634e2392de2f5a3f825d15363a50f5a8f9b152bc1733c128dbf1d8d2b"
+          assert len(raw_baseline) == 3042495
+          assert hashlib.sha256(raw_baseline).hexdigest() == expected_sha
+          (root / original).write_bytes(raw_baseline)
 
           helix = build_dc7_model(root)
           suffolk = build_suffolk_model(helix)
@@ -64,64 +76,34 @@ jobs:
           assert [x["Line-Up"] for x in outline["DH1600"][:2]] == ["R160", "A160"]
           assert len(outline["DH1200"]) == 12
           assert outline["MOH"] == [{"WBS Level": "Equipment", "Line-Up": "Equipment"}]
-          assert helix.independent_helix_baseline() is None
-          assert helix.auxiliary_path is None
-          pending = lineup_activity_summary(None)
-          assert pending["Area"].tolist() == list(HALLS) + ["MOH"]
-          assert not set(pending["Area"]).intersection({"FOH", "BOH"})
-          assert (pending["Total Activities"] == "Pendiente BL").all()
-          assert (pending["Electrical Line-Ups"] == "—").all()
-
-          # Native WBS fixture: ensure 1200 R before A, commissioning
-          # isolated from electrical; MOH is its own Equipment branch.
-          sample_wbs = [
-              {"wbs_id":"1","proj_id":"BL","wbs_name":"HELIX","parent_wbs_id":"0"},
-              {"wbs_id":"2","proj_id":"BL","wbs_name":"DH 1200","parent_wbs_id":"1"},
-              {"wbs_id":"3","proj_id":"BL","wbs_name":"Electrical","parent_wbs_id":"2"},
-              {"wbs_id":"4","proj_id":"BL","wbs_name":"R120","parent_wbs_id":"3"},
-              {"wbs_id":"5","proj_id":"BL","wbs_name":"A120","parent_wbs_id":"3"},
-              {"wbs_id":"6","proj_id":"BL","wbs_name":"Commissioning","parent_wbs_id":"2"},
-              {"wbs_id":"7","proj_id":"BL","wbs_name":"MOH","parent_wbs_id":"1"},
-              {"wbs_id":"8","proj_id":"BL","wbs_name":"Equipment","parent_wbs_id":"7"},
-          ]
-          sample_tasks = [
-              {"task_id":str(i),"proj_id":"BL","wbs_id":wbsid,
-               "task_code":code,"task_name":code,"status_code":"TK_NOTSTART",
-               "target_start_date":"2026-09-29 08:00",
-               "target_end_date":"2026-10-05 16:00"}
-              for i, (wbsid,code) in enumerate(
-                  [("4","R120-ACT"),("5","A120-ACT"),("6","CM-ACT"),("8","MOH-ACT")],1
-              )
-          ]
-          sample = summarize_approved_baseline(
-              {"PROJWBS":pd.DataFrame(sample_wbs),"TASK":pd.DataFrame(sample_tasks)},"BL"
-          )
-          dh1200 = sample["DH1200"]
-          assert dh1200.iloc[0]["Line-Up"] == "R120"
-          assert dh1200.iloc[0]["Baseline Tasks"] == 1
-          assert dh1200.iloc[1]["Line-Up"] == "A120"
-          assert dh1200.iloc[1]["Baseline Tasks"] == 1
-          assert dh1200.iloc[-1]["Line-Up"] == "Commissioning"
-          assert dh1200.iloc[-1]["Baseline Tasks"] == 1
-          assert sample["MOH"].iloc[0]["Baseline Tasks"] == 1
-          assert len(sample["_audit"]) == 4
-          assert all(sample["_audit"]["Classification"] == "MAPPED")
-          official_counts = lineup_activity_summary(sample)
-          assert official_counts["Area"].tolist() == list(HALLS) + ["MOH"]
-          assert len(official_counts) == 7
-          assert not set(official_counts["Area"]).intersection({"FOH", "BOH"})
-          actual_dh = official_counts.set_index("Area").loc["DH1200"]
-          assert actual_dh["Electrical Line-Ups"] == 2
-          assert actual_dh["Commissioning"] == 1
-          assert actual_dh["Total Activities"] == 3
-          actual_moh = official_counts.set_index("Area").loc["MOH"]
-          assert actual_moh["MOH Equipment"] == 1
-          assert actual_moh["Electrical Line-Ups"] == 0
-          assert int(official_counts["Total Activities"].sum()) == 4
-          assert int(official_counts["Total Activities"].sum()) == int(
-              sample["_audit"]["Classification"].eq("MAPPED").sum()
-          )
-
+          assert helix.auxiliary_path is not None
+          assert helix.auxiliary_path.name == "226021-HE.B.xer"
+          assert str(helix.auxiliary_project["proj_short_name"]) == "226021-HE.B"
+          assert str(helix.auxiliary_project["last_recalc_date"]).startswith("2026-09-29")
+          assert str(helix.auxiliary_project["add_date"]).startswith("2026-10-01")
+          approved = helix.independent_helix_baseline()
+          assert approved is not None
+          counts = lineup_activity_summary(approved).set_index("Area")
+          assert list(counts.index) == list(HALLS) + ["MOH"]
+          assert set(counts.index).isdisjoint({"FOH","BOH"})
+          for area in HALLS:
+              result = approved[area]
+              assert result["Line-Up"].tolist()[:-1] == list(lineup_order(area))
+              assert result["Baseline Tasks"].tolist()[:-1] == ([82] + [65]*10 if area in ("DH1200","DH1400","DH1600") else [65]*10 + [82]),area
+              assert int(result.iloc[-1]["Baseline Tasks"]) == 4
+              assert int(counts.loc[area,"Electrical Line-Ups"]) == 732
+              assert int(counts.loc[area,"Commissioning"]) == 4
+              assert int(counts.loc[area,"Total Activities"]) == 736
+          assert int(counts.loc["MOH","MOH Equipment"]) == 249
+          assert int(counts.loc["MOH","Total Activities"]) == 249
+          assert int(counts["Total Activities"].sum()) == 4665
+          assert len(approved["_audit"]) == 4689
+          assert len(approved["_milestones"]) == 24
+          assert len(set(approved["_audit"]["Activity ID"])) == 4689
+          assert approved["_audit"]["Classification"].eq("MAPPED").sum() == 4665
+          assert approved["_reconciliation"]["Activities"].iloc[-1] == 4689
+          print("PASS: HELIX official BL 4689 source, 4665 mapped, 24 project milestones; all six hall line-ups, Commissioning and MOH")
+          
           view_text = Path("DC7/src/dc7_view.py").read_text(encoding="utf-8")
           dispatch = view_text.split("def render_dashboard(",1)[1]
           assert 'if view == "HELIX":' in dispatch
@@ -140,11 +122,12 @@ jobs:
           assert not any(line.lstrip().startswith("render_progress_detail(helix") for line in helix_case.splitlines())
           assert not any(line.lstrip().startswith("render_stats(helix") for line in helix_case.splitlines())
           assert "render_stats(suffolk" in dispatch
+          assert 'HELIX P6 BASELINE · 24 PROJECT MILESTONES' in view_text
           assert '"Activities": "Pendiente BL"' in view_text
           assert '"MOH Equipment"' in view_text
           assert "lineup_activity_summary(data)" in view_text
           assert 'SUFFOLK DC7 BL / Current-C' in helix_case
-          assert '226021-HE.B baseline (pending)' in helix_case
+          assert '226021-HE.B independent Baseline' in helix_case
           assert "render_windows(helix)" not in helix_case
           print("PASS: HELIX Line-Ups/Commissioning/MOH count summary without FOH/BOH; prior overview and FTE preserved")
 
@@ -265,13 +248,13 @@ jobs:
           assert not dh_ex["Activity ID"].isin(helix.audit_reports["departures"]["Activity ID"]).any()
           print("PASS: DH1100-DH1600 seven native WBS groups; 2073 shown, 147 audited exceptions; 2545 total unchanged")
 
-          assert helix.auxiliary_path is None, "Rejected -4 source incorrectly loaded"
-          assert helix.auxiliary_tasks is not None and helix.auxiliary_tasks.empty
-          assert helix.lineup_stats("DH1100").empty, "Line-Ups cannot use rejected B-4 or SUFFOLK fallback"
-          assert "MOH" not in helix.areas(), "MOH must not be generated from rejected B-4"
-          assert "Not loaded" in helix.diagnostics()["Line-Up / MOH Source"]
+          assert helix.auxiliary_path is not None and helix.auxiliary_path.name == "226021-HE.B.xer"
+          assert helix.auxiliary_tasks is not None and len(helix.auxiliary_tasks) == 4689
+          assert not helix.lineup_stats("DH1100").empty, "Official HELIX Line-Ups missing"
+          assert "MOH" in helix.areas(), "Official HELIX baseline MOH missing"
+          assert helix.diagnostics()["Line-Up / MOH Source"] == "226021-HE.B.xer"
           assert helix.current_tasks["task_code"].nunique() == 2545
-          print("PASS: official HELIX baseline is not loaded; historical B-4 rejected; Line-Ups/MOH unavailable without unauthorized fallback")
+          print("PASS: approved HELIX baseline loaded, rejected -4 ignored; baseline Line-Ups/MOH available")
           assert helix.fte_ready_comparison().empty, "Archived FTE milestones leaked into active Construction"
 
           # Consolidation is a view-only transformation for HELIX Data Halls.
