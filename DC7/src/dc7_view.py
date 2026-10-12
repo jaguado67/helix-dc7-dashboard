@@ -537,10 +537,9 @@ def render_helix_lineup_stats(m: DC7Model):
         unsafe_allow_html=True,
     )
     st.caption(
-        "Seis Data Halls y MOH; sin FOH ni BOH. "
-        "Electrical = suma de los 11 Line-Ups por Data Hall; "
-        "Commissioning es una rama independiente; MOH = Equipment. "
-        "Las cifras proceden únicamente de la línea base oficial HELIX."
+        "Solo actividades codificadas QTS - Subcontractor = HELIX "
+        "dentro de los 11 Electrical Line-Ups por Data Hall y MOH / Equipment. "
+        "FOH, BOH, Commissioning, hitos y otros subcontratistas quedan fuera."
     )
     left, right = st.columns([1.25, 1], gap="large")
     with left:
@@ -549,30 +548,26 @@ def render_helix_lineup_stats(m: DC7Model):
             column_config={
                 "Area": st.column_config.TextColumn("Data Hall / MOH"),
                 "Electrical Line-Ups": st.column_config.TextColumn("Electrical Line-Ups") if data is None else st.column_config.NumberColumn("Electrical Line-Ups", format="%d"),
-                "Commissioning": st.column_config.TextColumn("Commissioning") if data is None else st.column_config.NumberColumn("Commissioning", format="%d"),
                 "MOH Equipment": st.column_config.TextColumn("MOH Equipment") if data is None else st.column_config.NumberColumn("MOH Equipment", format="%d"),
                 "Total Activities": st.column_config.TextColumn("Total Activities") if data is None else st.column_config.NumberColumn("Total Activities", format="%d"),
             },
         )
         if data is not None:
             st.caption(
-                f"Line-Ups + Commissioning + MOH: "
-                f"{int(summary['Total Activities'].sum()):,} actividades. "
-                "Los 24 hitos del proyecto están contabilizados por separado."
+                f"Total HELIX en Line-Ups y MOH: "
+                f"{int(summary['Total Activities'].sum()):,} actividades únicas, "
+                "auditadas por Activity ID y QTS - Subcontractor."
             )
-            st.markdown("**CONCILIACIÓN DEL XER ORIGINAL**")
-            st.dataframe(data["_reconciliation"], use_container_width=True, hide_index=True)
     with right:
         if data is None:
             st.info(
-                "Cantidad de actividades y gráfica pendientes del XER oficial "
-                "226021-HE.B.xer. No se utilizarán cantidades del cronograma SUFFOLK."
+                "Pendiente la línea base oficial HELIX: no se utilizan "
+                "cantidades de SUFFOLK ni de otros subcontratistas."
             )
         else:
             fig = go.Figure()
             for label, color in (
                 ("Electrical Line-Ups", NAVY2),
-                ("Commissioning", BLUE),
                 ("MOH Equipment", GREEN),
             ):
                 fig.add_trace(go.Bar(
@@ -604,11 +599,10 @@ def render_helix_lineups(m: DC7Model):
         unsafe_allow_html=True,
     )
     st.caption(
-        "Jerarquía original: DH → Electrical → Line-Ups y Commissioning; "
-        "MOH → Equipment. R aparece primero en DH1200, DH1400 y DH1600, "
+        "Solo QTS - Subcontractor = HELIX dentro de Electrical Line-Ups "
+        "y MOH Equipment. R primero en DH1200, DH1400 y DH1600, "
         "y al final en DH1100, DH1300 y DH1500. "
-        "Solo se utiliza la línea base HELIX 226021-HE.B.xer; "
-        "no existe un Current HELIX independiente."
+        "Fuente exclusiva: línea base oficial 226021-HE.B.xer; sin Current independiente."
     )
     area = st.selectbox(
         "Data Hall / MOH", areas, index=0, key="helix_baseline_area"
@@ -619,8 +613,8 @@ def render_helix_lineups(m: DC7Model):
         st.info(
             "La línea base HELIX 226021-HE.B.xer todavía no está disponible. "
             "La columna Activities indica 'Pendiente BL' hasta poder "
-            "contar los Activity IDs reales dentro de cada Line-Up, "
-            "Commissioning y MOH Equipment. No se usa el XER -4."
+            "contar los Activity IDs HELIX de cada Line-Up y MOH. "
+            "No se usa el XER -4."
         )
 
     if data is None:
@@ -650,17 +644,11 @@ def render_helix_lineups(m: DC7Model):
         st.dataframe(rows, use_container_width=True, hide_index=True)
     else:
         electrical = rows[rows["P6 WBS"].eq("Electrical")].copy()
-        commissioning = rows[rows["P6 WBS"].eq("Commissioning")].copy()
         st.markdown(
             f'<div class="section-caption">{_safe(area)} · ELECTRICAL LINE-UPS · ACTIVITY COUNT</div>',
             unsafe_allow_html=True,
         )
         st.dataframe(electrical, use_container_width=True, hide_index=True)
-        st.markdown(
-            f'<div class="section-caption">{_safe(area)} · COMMISSIONING · ACTIVITY COUNT</div>',
-            unsafe_allow_html=True,
-        )
-        st.dataframe(commissioning, use_container_width=True, hide_index=True)
 
     if data is not None:
         total_activities = int(data[area]["Baseline Tasks"].sum())
@@ -691,23 +679,14 @@ def render_helix_lineups(m: DC7Model):
             "No representan avance real, estado actual ni pronóstico de ejecución."
         )
         st.caption(
-            "Fuente verificada: 4.689 actividades en el XER HELIX original; "
-            "4.665 en Line-Ups/Commissioning/MOH y 24 hitos separados. "
-            "Son cantidades de Baseline, no avance Current."
+            "Auditoría: actividades HELIX exclusivamente en los Line-Ups "
+            "y MOH Equipment. Cantidades de línea base, no avance Current."
         )
-        with st.expander("HELIX P6 BASELINE · 24 PROJECT MILESTONES", expanded=False):
-            st.dataframe(data["_milestones"], use_container_width=True, hide_index=True)
-            st.download_button(
-                "Descargar 24 hitos de línea base (CSV)",
-                data["_milestones"].to_csv(index=False).encode("utf-8-sig"),
-                file_name="DC7_HELIX_Baseline_24_Milestones.csv",
-                mime="text/csv", key="helix_milestone_audit",
-            )
         audit = data["_audit"]
         st.download_button(
-            "Descargar auditoría de actividades de la línea base HELIX (CSV)",
+            "Descargar auditoría HELIX · Line-Ups y MOH (CSV)",
             audit.to_csv(index=False).encode("utf-8-sig"),
-            file_name="DC7_HELIX_Official_BL_Lineup_WBS_Audit.csv",
+            file_name="DC7_HELIX_Only_Lineups_MOH_Baseline_Audit.csv",
             mime="text/csv",
             key="helix_baseline_audit_csv",
         )
@@ -748,8 +727,8 @@ def render_dashboard(helix: DC7Model, suffolk: DC7Model):
             "**SOURCE OF PROGRESS:** SUFFOLK DC7 BL / Current-C, "
             "filtered to HELIX Construction activities, including commissioning. "
             "**ELECTRICAL LINE-UPS & MOH:** verified official HELIX "
-            "226021-HE.B independent Baseline, 4,689 original P6 activities "
-            "(including 24 project milestones). There is no independent "
+            "226021-HE.B independent Baseline: HELIX-subcontractor activities "
+            "in Electrical Line-Ups and MOH only. There is no independent "
             "HELIX Current. These two data sources are not interchangeable."
         )
         render_kpis(helix, "HELIX")
