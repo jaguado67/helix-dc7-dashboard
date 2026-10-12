@@ -2,7 +2,7 @@
 
 Cloud-ready Streamlit package for the HELIX DC7 schedule dashboard.
 
-**Version:** 0.2.25
+**Version:** 0.2.26
 
 ## Data scope
 
@@ -13,6 +13,34 @@ This release has two selectable views. SUFFOLK displays the main DC7 project sco
 - No `DC7-MIL`
 - No `DC7.TFO-B`
 - No external-project relationships in dashboard analytics
+
+## v0.2.26 — HELIX Line-Up detail: P6 activity status instead of dates
+
+The expanded Data Hall / MOH table now contains only the original
+Line-Up leaf rows, with five columns:
+
+| Line-Up | Total Activities | Not Started | In Progress | Completed |
+|---|---:|---:|---:|---:|
+| A110 | 58 | Computed from P6 | Computed from P6 | Computed from P6 |
+| R110 | 74 | Computed from P6 | Computed from P6 | Computed from P6 |
+
+- Remove duplicate Data Hall and Electrical parent subtotal rows from
+  the table; their meaning remains in the expandable Data Hall header.
+- Remove the `P6 BASELINE` suffix from the section title and replace
+  the `Original P6 WBS` column with `Line-Up`.
+- Replace `Baseline Start` and `Baseline Finish` with
+  `Not Started`, `In Progress` and `Completed`.
+- The status of each of the 4,153 HELIX-coded Line-Up/MOH activity IDs
+  comes from the **official independent HELIX Baseline P6 TASK.status_code**
+  (`TK_NOTSTART`, `TK_ACTIVE`, `TK_COMPLETE`), **not** from Remaining
+  Duration, the SUFFOLK schedule or any separate HELIX Current.
+- Check at activity and Line-Up levels that
+  `Not Started + In Progress + Completed = Total Activities`.
+- No changes to the Line-Up horizontal bar charts, original WBS order,
+  4,153 activity universe, MOH, SUFFOLK VIEW or other HELIX panels.
+
+The status figures are a snapshot of the **stored baseline statuses**,
+not a declaration of actual current construction progress.
 
 ## v0.2.25 — HELIX WBS tree by Data Hall and individual Line-Up
 
