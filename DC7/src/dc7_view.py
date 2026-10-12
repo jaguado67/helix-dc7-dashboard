@@ -589,108 +589,128 @@ def render_helix_lineup_stats(m: DC7Model):
 
 
 def render_helix_lineups(m: DC7Model):
-    """HELIX independent P6 baseline navigation: only Data Hall Line-Ups + MOH."""
-    from src.helix_baseline import HALLS, baseline_outline
+    """WBS-style tree: each Data Hall -> Electrical -> each original Line-Up.
+
+    Six Data Halls appear as independent expandable sections, retaining
+    their real P6 Line-Up ordering. MOH is a seventh independent section.
+    All quantities are audited HELIX-only Baseline Activity IDs, not RD.
+    """
+    from src.helix_baseline import HALLS, wbs_lineup_hierarchy, lineup_order
 
     data = m.independent_helix_baseline()
-    areas = list(HALLS) + ["MOH"]
     st.markdown(
-        '<div class="section-caption">HELIX · DATA HALL LINE-UPS & MOH · P6 BASELINE</div>',
+        '<div class="section-caption">HELIX · DATA HALL / LINE-UP DETAIL · P6 BASELINE</div>',
         unsafe_allow_html=True,
     )
     st.caption(
-        "Solo QTS - Subcontractor = HELIX dentro de Electrical Line-Ups "
-        "y MOH Equipment. R primero en DH1200, DH1400 y DH1600, "
-        "y al final en DH1100, DH1300 y DH1500. "
-        "Fuente exclusiva: línea base oficial 226021-HE.B.xer; sin Current independiente."
+        "Estructura WBS de P6: cada Data Hall → Electrical → sus 11 Line-Ups; "
+        "MOH → Equipment. Cantidades de actividades asignadas a "
+        "QTS - Subcontractor = HELIX, sin FOH, BOH, Commissioning ni hitos. "
+        "Las filas de Data Hall y Electrical son subtotales, no actividades adicionales. "
+        "R va primero en DH1200, DH1400 y DH1600."
     )
-    area = st.selectbox(
-        "Data Hall / MOH", areas, index=0, key="helix_baseline_area"
-    )
-    outline = baseline_outline()
-    expected = outline[area]
-    if data is None:
-        st.info(
-            "La línea base HELIX 226021-HE.B.xer todavía no está disponible. "
-            "La columna Activities indica 'Pendiente BL' hasta poder "
-            "contar los Activity IDs HELIX de cada Line-Up y MOH. "
-            "No se usa el XER -4."
-        )
 
-    if data is None:
-        rows = pd.DataFrame([
-            {
-                "P6 WBS": r["WBS Level"], "Line-Up": r["Line-Up"],
-                "Activities": "Pendiente BL",
-            }
-            for r in expected
-        ])
-    else:
-        rows = data[area].copy()
-        required_order = [(r["WBS Level"], r["Line-Up"]) for r in expected]
-        actual_order = list(zip(rows["WBS Level"], rows["Line-Up"]))
-        if actual_order != required_order:
-            raise ValueError(f"Original HELIX WBS line-up order mismatch for {area}")
-        rows["Baseline Start"] = rows["Baseline Start"].apply(_fmt_date)
-        rows["Baseline Finish"] = rows["Baseline Finish"].apply(_fmt_date)
-        rows = rows.rename(columns={
-            "WBS Level": "P6 WBS", "Baseline Tasks": "Activities",
-        })
-    if area == "MOH":
-        st.markdown(
-            '<div class="section-caption">MOH · EQUIPMENT · ACTIVITY COUNT</div>',
-            unsafe_allow_html=True,
+    for area in (*HALLS, "MOH"):
+        hierarchy = wbs_lineup_hierarchy(data, area)
+        is_moh = area == "MOH"
+        expected_total = hierarchy.iloc[0]["Activities"]
+        heading = (
+            f"MOH  ·  Equipment  ·  {expected_total:,} actividades HELIX"
+            if is_moh and data is not None else
+            "MOH  ·  Equipment  ·  Pendiente BL"
+            if is_moh else
+            f"DH {area[2:]}  ·  Electrical  ·  {expected_total:,} actividades HELIX"
+            if data is not None else
+            f"DH {area[2:]}  ·  Electrical  ·  Pendiente BL"
         )
-        st.dataframe(rows, use_container_width=True, hide_index=True)
-    else:
-        electrical = rows[rows["P6 WBS"].eq("Electrical")].copy()
-        st.markdown(
-            f'<div class="section-caption">{_safe(area)} · ELECTRICAL LINE-UPS · ACTIVITY COUNT</div>',
-            unsafe_allow_html=True,
-        )
-        st.dataframe(electrical, use_container_width=True, hide_index=True)
+        with st.expander(heading, expanded=(area == "DH1100")):
+            show = hierarchy.copy()
+            show["P6 WBS"] = [
+                label if int(level) == 0
+                else "\u00a0\u00a0\u00a0↳ " + label if int(level) == 1
+                else "\u00a0\u00a0\u00a0\u00a0\u00a0\u00a0↳ " + label
+                for level, label in zip(show["Level"], show["P6 WBS"])
+            ]
+            show["Baseline Start"] = show["Baseline Start"].apply(_fmt_date)
+            show["Baseline Finish"] = show["Baseline Finish"].apply(_fmt_date)
+            show = show[["P6 WBS", "Activities", "Baseline Start", "Baseline Finish"]]
+            st.caption(
+                "P6 WBS · Data Hall → Electrical → Line-Up"
+                if not is_moh else "P6 WBS · MOH → Equipment"
+            )
+            if is_moh:
+                st.dataframe(show, use_container_width=True, hide_index=True)
+            else:
+                left, right = st.columns([1.14, 1], gap="large")
+                with left:
+                    st.dataframe(
+                        show,
+                        use_container_width=True,
+                        hide_index=True,
+                        height=520,
+                        column_config={
+                            "P6 WBS": st.column_config.TextColumn("Original P6 WBS"),
+                            "Activities": (
+                                st.column_config.NumberColumn("HELIX Activities", format="%d")
+                                if data is not None
+                                else st.column_config.TextColumn("HELIX Activities")
+                            ),
+                        },
+                    )
+                with right:
+                    if data is None:
+                        st.info(
+                            "Cantidad pendiente de la línea base HELIX "
+                            "226021-HE.B.xer. No se emplean valores RD."
+                        )
+                    else:
+                        details = data[area]
+                        names = details["Line-Up"].tolist()
+                        if names != list(lineup_order(area)):
+                            raise ValueError(f"Line-Up ordering differs from P6: {area}")
+                        values = details["Baseline Tasks"].astype(int).tolist()
+                        fig = go.Figure(go.Bar(
+                            y=names, x=values, orientation="h",
+                            marker_color=NAVY2,
+                            text=values, textposition="outside",
+                            hovertemplate="%{y}<br>%{x:,} actividades HELIX<extra></extra>",
+                        ))
+                        fig.update_layout(
+                            **_layout(520, 46, 55, 50),
+                            title=f"HELIX ACTIVITIES BY LINE-UP · {area}",
+                            showlegend=False,
+                            xaxis_title="Cantidad de actividades",
+                        )
+                        fig.update_yaxes(
+                            autorange="reversed", categoryorder="array",
+                            categoryarray=names,
+                        )
+                        fig.update_xaxes(rangemode="tozero", gridcolor=GRID)
+                        st.plotly_chart(
+                            fig, use_container_width=True,
+                            config={"displayModeBar": False},
+                            key=f"helix_lineup_chart_{area}",
+                        )
+                st.caption(
+                    f"{area}: {expected_total:,} Activity IDs HELIX, "
+                    "contados una sola vez en los once Line-Ups."
+                    if data is not None else
+                    "La cantidad de actividades estará disponible cuando se cargue la línea base."
+                )
 
     if data is not None:
-        total_activities = int(data[area]["Baseline Tasks"].sum())
-        st.caption(
-            f"{area}: {total_activities:,} baseline activities "
-            "from the original approved HELIX P6 WBS."
-        )
-        counts = rows.copy()
-        fig = go.Figure(go.Bar(
-            x=counts["Line-Up"],
-            y=counts["Activities"],
-            marker_color=NAVY2,
-            text=counts["Activities"],
-            textposition="outside",
-            hovertemplate="%{x}: %{y:,.0f} baseline activities<extra></extra>",
-        ))
-        fig.update_layout(
-            **_layout(400, 60, 68, 55),
-            title=f"BASELINE ACTIVITY COUNT BY LINE-UP · {area}",
-            yaxis_title="Activities",
-            showlegend=False,
-        )
-        fig.update_yaxes(rangemode="tozero", gridcolor=GRID)
-        fig.update_xaxes(tickangle=-20)
-        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
-        st.caption(
-            "Las cantidades y fechas son exclusivamente de la línea base P6. "
-            "No representan avance real, estado actual ni pronóstico de ejecución."
-        )
-        st.caption(
-            "Auditoría: actividades HELIX exclusivamente en los Line-Ups "
-            "y MOH Equipment. Cantidades de línea base, no avance Current."
-        )
         audit = data["_audit"]
+        st.caption(
+            f"Auditoría de los seis Data Halls y MOH: {len(audit):,} Activity IDs "
+            "únicos, con QTS - Subcontractor = HELIX. "
+            "Las fechas son de Baseline; no representan avance Current."
+        )
         st.download_button(
             "Descargar auditoría HELIX · Line-Ups y MOH (CSV)",
             audit.to_csv(index=False).encode("utf-8-sig"),
             file_name="DC7_HELIX_Only_Lineups_MOH_Baseline_Audit.csv",
-            mime="text/csv",
-            key="helix_baseline_audit_csv",
+            mime="text/csv", key="helix_baseline_audit_csv",
         )
-
 
 def render_dashboard(helix: DC7Model, suffolk: DC7Model):
     view = st.session_state.get("dc7_schedule_view", "SUFFOLK")
