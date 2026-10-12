@@ -2,7 +2,7 @@ name: Validate DC7 dashboard
 
 on:
   push:
-    branches: [main]
+    branches: [main, fix/dc7-remove-marked-ui-milestones-v029]
     paths:
       - "DC7/**"
       - ".github/workflows/validate-dc7.yml"
@@ -182,7 +182,6 @@ jobs:
               'render_scurve_and_status(helix)',
               'render_helix_lineup_stats(helix)',
               'render_helix_lineups(helix)',
-              'render_gates(helix)',
           ):
               assert required in helix_case, f"Missing restored HELIX section: {required}"
           assert not any(line.lstrip().startswith("render_progress_detail(helix") for line in helix_case.splitlines())
@@ -204,7 +203,8 @@ jobs:
           assert "CONCILIACIÓN DEL XER ORIGINAL" not in view_text
           assert "HELIX P6 BASELINE · 24 PROJECT MILESTONES" not in view_text
           assert '"Commissioning": st.column_config' not in view_text
-          assert 'Download HELIX Line-Ups & MOH Audit (CSV)' in view_text
+          assert 'Download HELIX Line-Ups & MOH Audit (CSV)' not in view_text
+          assert 'helix_baseline_audit_csv' not in view_text
           assert 'heading = "MOH" if is_moh else f"DH {area[2:]}"' in detail_code
           assert "Electrical ·" not in detail_code
           assert "Equipment ·" not in detail_code
@@ -226,12 +226,21 @@ jobs:
           assert "Activity Completion %" in area_view
           assert "Completed" in area_view and "Not Started" in area_view
           assert "BASELINE STATUS</div>" in area_view
-          assert "226021-HE.B baseline snapshot, NOT a current HELIX update" in area_view
+          assert "official 226021-HE.B baseline snapshot, NOT a current HELIX update" not in area_view
+          assert "<b>TOTAL</b>" not in area_view
+          assert "total_percent =" not in area_view
+          assert "Only QTS - Subcontractor = HELIX in six Data Hall" not in area_view
           assert "Baseline Activity Completion %" in area_view
           assert "0 < value < 1" in area_view
           assert "Electrical Line-Ups\", st.column_config" not in area_view
-          assert 'SUFFOLK DC7 BL / Current-C' in helix_case
-          assert '226021-HE.B independent Baseline' in helix_case
+          assert "**SOURCE OF PROGRESS:**" not in helix_case
+          assert 'render_gates(helix)' not in helix_case
+          assert "PROJECT KEY MILESTONES · FTE READY" in view_text
+          assert 'render_helix_lineup_stats(helix)' in helix_case
+          assert 'render_helix_lineups(helix)' in helix_case
+          assert "Only QTS - Subcontractor = HELIX activities in the DH1100" not in detail_code
+          assert "Audit: {len(audit):,}" not in detail_code
+          assert "st.download_button(" not in detail_code
           assert "render_windows(helix)" not in helix_case
           print("PASS: HELIX coded Line-Ups and MOH only; no general XER reconciliation widget")
 
