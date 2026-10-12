@@ -2,7 +2,7 @@
 
 Cloud-ready Streamlit package for the HELIX DC7 schedule dashboard.
 
-**Version:** 0.2.23
+**Version:** 0.2.24
 
 ## Data scope
 
@@ -13,6 +13,48 @@ This release has two selectable views. SUFFOLK displays the main DC7 project sco
 - No `DC7-MIL`
 - No `DC7.TFO-B`
 - No external-project relationships in dashboard analytics
+
+## v0.2.24 — HELIX-only activity-count audit (Line-Ups and MOH)
+
+**Scope correction:** The former "CONCILIACIÓN DEL XER ORIGINAL"
+summary and the separate milestone panel have been **removed from HELIX VIEW**.
+All **displayed baseline activity counts** and downloadable audit rows
+now require two conditions simultaneously:
+
+1. Original P6 \`TASKACTV\` assignment to
+   \`QTS - Subcontractor = HELIX\` (not other subcontractors or unassigned).
+2. Original \`PROJWBS\` ancestry under one of the 66
+   \`DH1100–DH1600 / Electrical / A…K,R\` Line-Ups, or \`MOH / Equipment\`.
+
+Reconciled against official, SHA-verified \`226021-HE.B.xer\`:
+
+| Group | Included HELIX activities |
+|---|---:|
+| DH1100 Line-Ups | 654 |
+| DH1200 Line-Ups | 654 |
+| DH1300 Line-Ups | 654 |
+| DH1400 Line-Ups | 654 |
+| DH1500 Line-Ups | 654 |
+| DH1600 Line-Ups | 654 |
+| MOH Equipment | 229 |
+| **Total HELIX Line-Ups + MOH** | **4,153** |
+
+Per DH: ten Line-Ups have **58 HELIX activities each**;
+the R Line-Up has **74**. R is first in DH1200/DH1400/DH1600.
+There are 4,197 \`HELIX\`-coded activities anywhere in the XER, of
+which **44** fall outside requested Line-Ups/MOH
+(24 Commissioning + 20 milestones). Another **492** source tasks are
+coded to other subcontractors or unassigned. Neither population enters
+the 4,153 display count.
+
+The full project continues to have 4,689 original Activity IDs, but
+that project-wide quantity must **not** be presented as HELIX scope.
+An internal, checked reconciliation guarantees no source activities
+are lost; only the **4,153 in-scope HELIX Activity IDs** appear in the
+downloadable Line-Up/MOH audit.
+
+No changes to SUFFOLK Construction view, its 2,545 activity universe,
+scheduling inputs, independent baseline XER, or source P6 code assignments.
 
 ## v0.2.23 — Official HELIX independent Baseline loaded and 4,689 activities audited
 

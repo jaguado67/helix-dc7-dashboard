@@ -63,20 +63,18 @@ jobs:
           helix = build_dc7_model(root)
           suffolk = build_suffolk_model(helix)
 
-          # HELIX is a baseline-only navigation, NOT a second SUFFOLK progress dashboard.
-          import pandas as pd
-          from src.helix_baseline import HALLS, lineup_order, baseline_outline, summarize_approved_baseline, lineup_activity_summary
+          # Independent HELIX BL: only HELIX-coded activities under
+          # original Electrical Line-Ups and MOH/Equipment, never full-XER.
+          from src.helix_baseline import HALLS, lineup_order, baseline_outline, lineup_activity_summary
           outline = baseline_outline()
-          assert list(outline.keys()) == list(HALLS) + ["MOH"]
-          assert [x["Line-Up"] for x in outline["DH1100"][:2]] == ["A110", "B110"]
-          assert [x["Line-Up"] for x in outline["DH1200"][:2]] == ["R120", "A120"]
-          assert [x["Line-Up"] for x in outline["DH1300"][-2:]] == ["R130", "Commissioning"]
-          assert [x["Line-Up"] for x in outline["DH1400"][:2]] == ["R140", "A140"]
-          assert [x["Line-Up"] for x in outline["DH1500"][:2]] == ["A150", "B150"]
-          assert [x["Line-Up"] for x in outline["DH1600"][:2]] == ["R160", "A160"]
-          assert len(outline["DH1200"]) == 12
-          assert outline["MOH"] == [{"WBS Level": "Equipment", "Line-Up": "Equipment"}]
-          assert helix.auxiliary_path is not None
+          assert list(outline) == list(HALLS)+["MOH"]
+          assert len(outline["DH1200"]) == 11
+          assert [x["Line-Up"] for x in outline["DH1100"][:2]] == ["A110","B110"]
+          assert [x["Line-Up"] for x in outline["DH1200"][:2]] == ["R120","A120"]
+          assert [x["Line-Up"] for x in outline["DH1300"][-2:]] == ["K130","R130"]
+          assert [x["Line-Up"] for x in outline["DH1400"][:2]] == ["R140","A140"]
+          assert [x["Line-Up"] for x in outline["DH1600"][:2]] == ["R160","A160"]
+          assert outline["MOH"] == [{"WBS Level":"Equipment","Line-Up":"Equipment"}]
           assert helix.auxiliary_path.name == "226021-HE.B.xer"
           assert str(helix.auxiliary_project["proj_short_name"]) == "226021-HE.B"
           assert str(helix.auxiliary_project["last_recalc_date"]).startswith("2026-09-29")
@@ -84,25 +82,32 @@ jobs:
           approved = helix.independent_helix_baseline()
           assert approved is not None
           counts = lineup_activity_summary(approved).set_index("Area")
-          assert list(counts.index) == list(HALLS) + ["MOH"]
-          assert set(counts.index).isdisjoint({"FOH","BOH"})
+          assert list(counts.index) == list(HALLS)+["MOH"]
+          assert "Commissioning" not in counts.columns
           for area in HALLS:
-              result = approved[area]
-              assert result["Line-Up"].tolist()[:-1] == list(lineup_order(area))
-              assert result["Baseline Tasks"].tolist()[:-1] == ([82] + [65]*10 if area in ("DH1200","DH1400","DH1600") else [65]*10 + [82]),area
-              assert int(result.iloc[-1]["Baseline Tasks"]) == 4
-              assert int(counts.loc[area,"Electrical Line-Ups"]) == 732
-              assert int(counts.loc[area,"Commissioning"]) == 4
-              assert int(counts.loc[area,"Total Activities"]) == 736
-          assert int(counts.loc["MOH","MOH Equipment"]) == 249
-          assert int(counts.loc["MOH","Total Activities"]) == 249
-          assert int(counts["Total Activities"].sum()) == 4665
-          assert len(approved["_audit"]) == 4689
-          assert len(approved["_milestones"]) == 24
-          assert len(set(approved["_audit"]["Activity ID"])) == 4689
-          assert approved["_audit"]["Classification"].eq("MAPPED").sum() == 4665
-          assert approved["_reconciliation"]["Activities"].iloc[-1] == 4689
-          print("PASS: HELIX official BL 4689 source, 4665 mapped, 24 project milestones; all six hall line-ups, Commissioning and MOH")
+              result=approved[area]
+              assert result["Line-Up"].tolist()==list(lineup_order(area))
+              assert result["Baseline Tasks"].tolist()==(
+                  [74]+[58]*10 if area in ("DH1200","DH1400","DH1600") else [58]*10+[74]
+              ),(area,result)
+              assert int(counts.loc[area,"Electrical Line-Ups"])==654
+              assert int(counts.loc[area,"Total Activities"])==654
+          assert int(counts.loc["MOH","MOH Equipment"])==229
+          assert int(counts.loc["MOH","Total Activities"])==229
+          assert int(counts["Total Activities"].sum())==4153
+          audit=approved["_audit"]
+          assert len(audit)==4153
+          assert audit["Activity ID"].is_unique
+          assert audit["QTS - Subcontractor"].eq("HELIX").all()
+          assert not audit["Original P6 WBS"].str.contains(" / Commissioning| / Milestones",regex=True).any()
+          assert audit["Line-Up"].eq("Equipment").sum()==229
+          control=approved["_internal_control"]
+          assert control=={
+              "total_source":4689,"HELIX_total":4197,
+              "HELIX_in_scope":4153,"HELIX_outside_scope":44,
+              "other_or_unassigned":492,
+          }
+          print("PASS: official HELIX-only Line-Ups 3924, MOH 229 = 4153 unique Activity IDs; 536 non-scope tasks excluded")
           
           view_text = Path("DC7/src/dc7_view.py").read_text(encoding="utf-8")
           dispatch = view_text.split("def render_dashboard(",1)[1]
@@ -122,14 +127,17 @@ jobs:
           assert not any(line.lstrip().startswith("render_progress_detail(helix") for line in helix_case.splitlines())
           assert not any(line.lstrip().startswith("render_stats(helix") for line in helix_case.splitlines())
           assert "render_stats(suffolk" in dispatch
-          assert 'HELIX P6 BASELINE · 24 PROJECT MILESTONES' in view_text
           assert '"Activities": "Pendiente BL"' in view_text
           assert '"MOH Equipment"' in view_text
+          assert "CONCILIACIÓN DEL XER ORIGINAL" not in view_text
+          assert "HELIX P6 BASELINE · 24 PROJECT MILESTONES" not in view_text
+          assert '"Commissioning": st.column_config' not in view_text
+          assert 'Descargar auditoría HELIX · Line-Ups y MOH (CSV)' in view_text
           assert "lineup_activity_summary(data)" in view_text
           assert 'SUFFOLK DC7 BL / Current-C' in helix_case
           assert '226021-HE.B independent Baseline' in helix_case
           assert "render_windows(helix)" not in helix_case
-          print("PASS: HELIX Line-Ups/Commissioning/MOH count summary without FOH/BOH; prior overview and FTE preserved")
+          print("PASS: HELIX coded Line-Ups and MOH only; no general XER reconciliation widget")
 
           h_total = helix.status_counts()["Total"]
           s_total = suffolk.status_counts()["Total"]
