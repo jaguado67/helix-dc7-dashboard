@@ -2,7 +2,7 @@
 
 Cloud-ready Streamlit package for the HELIX DC7 schedule dashboard.
 
-**Version:** 0.2.15
+**Version:** 0.2.16
 
 ## Data scope
 
@@ -13,6 +13,34 @@ This release has two selectable views. SUFFOLK displays the main DC7 project sco
 - No `DC7-MIL`
 - No `DC7.TFO-B`
 - No external-project relationships in dashboard analytics
+
+## v0.2.16 — FOH/BOH Foundations WBS exceptions moved to Activity Audit
+
+The two construction activities \`FDN.1296\` (QTS-AREA FOH) and
+\`FDN.1300\` (QTS-AREA BOH) have their **actual P6 WBS ancestry**
+under \`Construction / Shell / Foundations\`, outside the House Systems
+FOH/BOH WBS branches. They are now **excluded from SUFFOLK FOH/BOH
+PROJECT PROGRESS DETAIL tables and charts** rather than displayed as a
+Foundations category:
+
+| FOH/BOH WBS detail | FOH | BOH |
+|---|---:|---:|
+| P6 House Systems WBS child activities included | 190 | 133 |
+| Shell / Foundations exceptions excluded from WBS detail | 1 | 1 |
+| Unmodified source QTS-AREA populations | 191 | 134 |
+
+Both activities remain **active HELIX Construction** records in the
+original XER. Therefore the **2,545 HELIX Construction source count,
+area summary, activity-level audit, and contractual date/area windows
+are not changed**. The 2 exceptions are **not** part of the 31
+departed/archived activity IDs.
+
+Under **SUFFOLK · HELIX CONSTRUCTION | ACTIVITY AUDIT**, a distinct
+**FOH/BOH WBS classification exceptions** table and downloadable CSV
+now identify the two Activity IDs, QTS-AREA, original P6 WBS path,
+current activity status and reason for exclusion from WBS detail.
+The complete construction activity audit CSV flags both IDs for
+reconciliation. No P6 codes, source files or schedules have been altered.
 
 ## v0.2.15 — FOH/BOH original P6 WBS grouping
 
