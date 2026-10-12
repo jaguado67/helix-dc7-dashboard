@@ -127,7 +127,7 @@ jobs:
           assert '"MOH Equipment"' in view_text
           assert "lineup_activity_summary(data)" in view_text
           assert 'SUFFOLK DC7 BL / Current-C' in helix_case
-          assert '226021-HE.B baseline (pending)' in helix_case
+          assert '226021-HE.B independent Baseline' in helix_case
           assert "render_windows(helix)" not in helix_case
           print("PASS: HELIX Line-Ups/Commissioning/MOH count summary without FOH/BOH; prior overview and FTE preserved")
 
