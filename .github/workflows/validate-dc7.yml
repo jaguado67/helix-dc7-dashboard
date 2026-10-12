@@ -2,7 +2,7 @@ name: Validate DC7 dashboard
 
 on:
   push:
-    branches: [main]
+    branches: [main, fix/dc7-lineups-status-columns-v026]
     paths:
       - "DC7/**"
       - ".github/workflows/validate-dc7.yml"
@@ -92,28 +92,44 @@ jobs:
               ),(area,result)
               assert int(counts.loc[area,"Electrical Line-Ups"])==654
               assert int(counts.loc[area,"Total Activities"])==654
-          # Verify the visible native WBS hierarchy without double-counting:
-          # Data Hall parent -> Electrical subtotal -> 11 ordered leaves.
+          # The table displays Line-Up leaf rows only, not redundant
+          # Data Hall/Electrical parent rows or baseline date fields.
+          expected_columns = [
+              "Line-Up", "Total Activities", "Not Started",
+              "In Progress", "Completed"
+          ]
           for area in HALLS:
-              hierarchy = wbs_lineup_hierarchy(approved, area)
-              assert hierarchy["P6 WBS"].tolist() == [
-                  "DH " + area[2:], "Electrical", *lineup_order(area)
-              ], (area, hierarchy)
-              assert hierarchy["Level"].tolist() == [0, 1] + [2] * 11
-              assert int(hierarchy.iloc[0]["Activities"]) == 654
-              assert int(hierarchy.iloc[1]["Activities"]) == 654
-              assert hierarchy.iloc[2:]["Activities"].tolist() == approved[area]["Baseline Tasks"].tolist()
-              assert int(hierarchy.iloc[2:]["Activities"].sum()) == 654
-              assert hierarchy["Baseline Start"].notna().all()
-              assert hierarchy["Baseline Finish"].notna().all()
+              detail = wbs_lineup_hierarchy(approved, area)
+              assert detail.columns.tolist() == expected_columns
+              assert detail["Line-Up"].tolist() == list(lineup_order(area))
+              assert detail["Total Activities"].tolist() == (
+                  [74] + [58] * 10 if area in ("DH1200", "DH1400", "DH1600")
+                  else [58] * 10 + [74]
+              )
+              assert len(detail) == 11
+              assert int(detail["Total Activities"].sum()) == 654
+              assert (
+                  detail["Not Started"] + detail["In Progress"] + detail["Completed"]
+              ).eq(detail["Total Activities"]).all()
+              assert (detail[expected_columns[1:]] >= 0).all().all()
           mohtree = wbs_lineup_hierarchy(approved, "MOH")
-          assert mohtree["P6 WBS"].tolist() == ["MOH", "Equipment"]
-          assert mohtree["Level"].tolist() == [0, 1]
-          assert mohtree["Activities"].tolist() == [229, 229]
-          assert wbs_lineup_hierarchy(None,"DH1200")["P6 WBS"].iloc[2:].tolist() == list(lineup_order("DH1200"))
-          assert wbs_lineup_hierarchy(None,"DH1200")["Activities"].eq("Pendiente BL").all()
-          print("PASS: native WBS hierarchy Data Hall -> Electrical -> each Line-Up, 6x654 plus MOH 229, parent totals not duplicated")
-
+          assert mohtree.columns.tolist() == expected_columns
+          assert mohtree["Line-Up"].tolist() == ["Equipment"]
+          assert int(mohtree.iloc[0]["Total Activities"]) == 229
+          assert int(mohtree.iloc[0][["Not Started", "In Progress", "Completed"]].sum()) == 229
+          blank = wbs_lineup_hierarchy(None, "DH1200")
+          assert blank["Line-Up"].tolist() == list(lineup_order("DH1200"))
+          assert blank[expected_columns[1:]].eq("Pendiente BL").all().all()
+          all_details = [wbs_lineup_hierarchy(approved, area) for area in (*HALLS, "MOH")]
+          sums = {
+              name: sum(int(detail[name].sum()) for detail in all_details)
+              for name in expected_columns[1:]
+          }
+          assert sums["Total Activities"] == 4153
+          assert sum(sums[name] for name in ("Not Started", "In Progress", "Completed")) == 4153
+          print("HELIX LINE-UP/MOH BASELINE STATUS COUNTS:", sums)
+          print("PASS: leaf-only Line-Up/MOH status table with Total / Not Started / In Progress / Completed")
+          
           assert int(counts.loc["MOH","MOH Equipment"])==229
           assert int(counts.loc["MOH","Total Activities"])==229
           assert int(counts["Total Activities"].sum())==4153
@@ -150,6 +166,13 @@ jobs:
           assert not any(line.lstrip().startswith("render_stats(helix") for line in helix_case.splitlines())
           assert "render_stats(suffolk" in dispatch
           assert 'wbs_lineup_hierarchy(data, area)' in view_text
+          detail_code = view_text.split('def render_helix_lineups(', 1)[1].split('def render_dashboard(', 1)[0]
+          assert 'HELIX · DATA HALL / LINE-UP DETAIL</div>' in detail_code
+          assert 'P6 BASELINE</div>' not in detail_code
+          assert 'Original P6 WBS' not in detail_code
+          assert '"Baseline Start"' not in detail_code and '"Baseline Finish"' not in detail_code
+          assert 'st.dataframe(' in detail_code
+          assert 'st.column_config.NumberColumn(column, format="%d")' in detail_code
           assert 'with st.expander(heading, expanded=(area == "DH1100")):' in view_text
           assert 'for area in (*HALLS, "MOH"):' in view_text
           assert "helix_baseline_area" not in view_text
