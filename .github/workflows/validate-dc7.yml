@@ -2,7 +2,7 @@ name: Validate DC7 dashboard
 
 on:
   push:
-    branches: [main, fix/dc7-helix-lineup-counts-moh-v022]
+    branches: [main]
     paths:
       - "DC7/**"
       - ".github/workflows/validate-dc7.yml"
