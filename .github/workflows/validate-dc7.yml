@@ -2,7 +2,7 @@ name: Validate DC7 dashboard
 
 on:
   push:
-    branches: [main]
+    branches: [main, fix/dc7-restore-helix-sections-v021]
     paths:
       - "DC7/**"
       - ".github/workflows/validate-dc7.yml"
@@ -107,10 +107,21 @@ jobs:
           assert 'if view == "HELIX":' in dispatch
           assert "render_helix_lineups(helix)" in dispatch
           assert dispatch.index("render_helix_lineups(helix)") < dispatch.index("render_kpis(suffolk")
-          assert "render_progress_detail(helix" not in dispatch
-          assert "render_scurve_and_status(helix)" not in dispatch
-          assert "render_gates(helix)" not in dispatch
-          print("PASS: HELIX baseline-only navigation and 6 DH line-up orders + MOH; no SUFFOLK progress duplication")
+          # Restore HELIX scope overview. Only duplicate QTS-DASH detail is removed.
+          helix_case = dispatch.split('if view == "HELIX":', 1)[1].split('return', 1)[0]
+          for required in (
+              'render_kpis(helix, "HELIX")',
+              'render_scurve_and_status(helix)',
+              'render_stats(helix, "PROJECT STATS',
+              'render_helix_lineups(helix)',
+              'render_gates(helix)',
+          ):
+              assert required in helix_case, f"Missing restored HELIX section: {required}"
+          assert not any(line.lstrip().startswith("render_progress_detail(helix") for line in helix_case.splitlines())
+          assert 'SUFFOLK DC7 BL / Current-C' in helix_case
+          assert '226021-HE.B baseline (pending)' in helix_case
+          assert "render_windows(helix)" not in helix_case
+          print("PASS: restored HELIX KPI, S-curve, status, FTE, Line-Ups and MOH; duplicate QTS-DASH only in SUFFOLK")
 
           h_total = helix.status_counts()["Total"]
           s_total = suffolk.status_counts()["Total"]
