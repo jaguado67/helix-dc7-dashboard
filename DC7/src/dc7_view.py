@@ -578,12 +578,13 @@ def render_helix_lineup_stats(m: DC7Model):
                     orientation="h", name=label, marker_color=color,
                     hovertemplate="%{y}<br>%{x:,.0f} activities<extra>" + label + "</extra>",
                 ))
+            layout = _layout(385, 80, 55, 38)
+            layout["legend"] = dict(orientation="h", y=-0.20, x=0)
             fig.update_layout(
-                **_layout(385, 80, 55, 38),
+                **layout,
                 barmode="stack",
                 title="BASELINE ACTIVITY COUNT · DATA HALL & MOH",
                 xaxis_title="Activities",
-                legend=dict(orientation="h", y=-0.20, x=0),
             )
             fig.update_yaxes(autorange="reversed")
             fig.update_xaxes(rangemode="tozero")
