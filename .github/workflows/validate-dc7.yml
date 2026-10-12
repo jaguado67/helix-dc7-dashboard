@@ -2,7 +2,7 @@ name: Validate DC7 dashboard
 
 on:
   push:
-    branches: [main, audit/dc7-current-c-20261012]
+    branches: [main, audit/foh-boh-wbs-20261012]
     paths:
       - "DC7/**"
       - ".github/workflows/validate-dc7.yml"
@@ -59,6 +59,40 @@ jobs:
               matrix = scope_model.area_stats()
               assert int(matrix["Total Tasks"].sum()) == 2545
               assert "MOH" not in set(matrix["Area"]), "Auxiliary MOH must never enter the Suffolk construction totals"
+          # Suffolk FOH/BOH use the original P6 PROJWBS grouping, not QTS-DASH.
+          # Keep the two QTS-AREA-coded foundation activities visible and auditable.
+          expected = {
+              "FOH": {
+                  "Priority Walls": 34, "Other Rooms": 145,
+                  "Equipment": 11, "Foundations": 1,
+              },
+              "BOH": {
+                  "Priority Walls": 35, "Other Rooms": 81,
+                  "Equipment": 13, "Commissioning & Start Up": 4,
+                  "Foundations": 1,
+              },
+          }
+          for area, grouping in expected.items():
+              detail = suffolk.wbs_area_activities(area)
+              report = suffolk.wbs_area_stats(area)
+              source = suffolk.current_tasks[suffolk.current_tasks["Area"].eq(area)]
+              assert dict(zip(report["Area"], report["Tasks"])) == grouping, (area, report)
+              assert report["Area"].is_unique
+              assert len(detail) == len(source) == sum(grouping.values())
+              assert set(detail["task_code"]) == set(source["task_code"])
+              assert len(detail["task_code"]) == detail["task_code"].nunique()
+              for field in ("Completed", "In Progress", "Not Started"):
+                  assert int(report[field].sum()) == int(source["Status"].eq(field).sum())
+              assert detail.loc[detail["WBS Group"].eq("Foundations"), "task_code"].tolist() == [
+                  "FDN.1296" if area == "FOH" else "FDN.1300"
+              ], area
+              assert detail["WBS Path"].str.contains("Construction / ").all()
+              assert not detail["WBS Path"].str.contains("Procurement").any()
+              # This is a read-only grouping: no side effects on either view.
+              assert suffolk.subarea_stats(area)["Tasks"].sum() == len(detail)
+          assert sum(sum(groups.values()) for groups in expected.values()) == 325
+          print("PASS: FOH/BOH native P6 WBS labels; 191 + 134 HELIX Construction; 2 foundations audited")
+
           assert not helix.lineup_stats("DH1100").empty, "HELIX line-ups missing"
           assert helix.fte_ready_comparison().empty, "Archived FTE milestones leaked into active Construction"
 
