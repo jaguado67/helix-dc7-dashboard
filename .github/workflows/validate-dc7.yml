@@ -2,7 +2,7 @@ name: Validate DC7 dashboard
 
 on:
   push:
-    branches: [main]
+    branches: [main, feature/dc7-suffolk-dh-p6-wbs-20261012]
     paths:
       - "DC7/**"
       - ".github/workflows/validate-dc7.yml"
@@ -47,6 +47,26 @@ jobs:
 
           helix = build_dc7_model(root)
           suffolk = build_suffolk_model(helix)
+
+          # Diagnostic of native P6 WBS destinations for HELIX-coded Data Halls.
+          wbs = suffolk.update_tables["PROJWBS"].copy()
+          name = dict(zip(wbs["wbs_id"].astype(str), wbs["wbs_name"].astype(str)))
+          parent = dict(zip(wbs["wbs_id"].astype(str), wbs["parent_wbs_id"].astype(str)))
+          def path_of(wbs_id):
+              path, node, seen = [], str(wbs_id), set()
+              while node in name:
+                  if node in seen:
+                      raise RuntimeError("WBS cycle")
+                  seen.add(node)
+                  path.append(name[node])
+                  node = parent.get(node, "")
+              return " / ".join(reversed(path))
+          for hall in ("DH1100", "DH1200", "DH1300", "DH1400", "DH1500", "DH1600"):
+              source = suffolk.current_tasks[suffolk.current_tasks["Area"].eq(hall)].copy()
+              source["Native WBS Path"] = source["wbs_id"].map(path_of)
+              for label, g in source.groupby("Native WBS Path", sort=True):
+                  print(f"NATIVE_WBS|{hall}|{len(g)}|{label}", flush=True)
+              print(f"NATIVE_WBS_TOTAL|{hall}|{len(source)}", flush=True)
 
           h_total = helix.status_counts()["Total"]
           s_total = suffolk.status_counts()["Total"]
