@@ -2,7 +2,7 @@
 
 Cloud-ready Streamlit package for the HELIX DC7 schedule dashboard.
 
-**Version:** 0.2.30
+**Version:** 0.2.31
 
 ## Data scope
 
@@ -13,6 +13,55 @@ This release has two selectable views. SUFFOLK displays the main DC7 project sco
 - No `DC7-MIL`
 - No `DC7.TFO-B`
 - No external-project relationships in dashboard analytics
+
+## v0.2.31 — US federal working days for HELIX contractual milestone variance
+
+**Requested calendar:** 5-day USA working week (Monday–Friday),
+excluding **observed US federal holidays** for the applicable years,
+following the U.S. Office of Personnel Management (OPM)
+(https://www.opm.gov/policy-data-oversight/pay-leave/federal-holidays/).
+
+For each approved independent HELIX baseline milestone assigned to
+`QTS - Subcontractor = HELIX` with a contractual date in the Activity
+Name, the signed contract deviation is now:
+
+```text
+Delay (US working days)
+    = signed count of Mon–Fri dates excluding observed federal holidays
+      between Contractual Date (excluded) and Baseline Finish (included)
+```
+
+| Activity ID | Previous calendar days | New US working days |
+|---|---:|---:|
+| M.1200 | +22 | +16 |
+| M.1300 | +58 | +40 |
+| M.1400 | +2 | +2 |
+| M.1500 | +131 | +87 |
+| M.1600 | +385 | +264 |
+| IST.1200 | +325 | +224 |
+| IST.1300 | +322 | +220 |
+| IST.1400 | +297 | +202 |
+| IST.1500 | +357 | +244 |
+| IST.1600 | +331 | +228 |
+
+Positive means Finish is later than the contractual date, zero means
+no difference, and negative means Finish is earlier. Chart axis,
+hover labels and the table explicitly use **US working days** rather
+than calendar days; the source Finish and contractual dates are
+unchanged. The calculation uses pandas `USFederalHolidayCalendar`,
+including observed federal holidays (not simply weekends). Regression
+checks Columbus Day, Thanksgiving, cross-year New Year, negative dates
+and the ten original milestones.
+
+**Scope caution:** The US **federal** Monday–Friday calendar is an
+explicit standard approximation, not automatically the P6 project,
+site or subcontract-specific construction calendar (which could have
+other workweeks, union exceptions or company holidays). A different
+contractual work calendar requires separate approval and verification.
+Current Finish is still unavailable for the independent HELIX project;
+these are deviations of **Baseline Finish** from dates literally
+written in Activity Names. All 4,153 HELIX Line-Up/MOH activities,
+SUFFOLK dashboard, and other visuals are unchanged.
 
 ## v0.2.30 — HELIX-only contractual milestone date variance (QC 2.2 / IST)
 
