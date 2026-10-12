@@ -281,8 +281,101 @@ def summarize_approved_baseline(tables: Mapping[str, pd.DataFrame], project_id: 
         "Baseline Start":included["_Start"],
         "Baseline Finish":included["_Finish"],
     }).reset_index(drop=True)
-    # Keep the excluded population for internal auditing only; don't make
-    # "whole-XER reconciliation" a widget or downloadable HELIX scope audit.
+    # Contractual dates are embedded in ORIGINAL Activity Names, not P6
+    # contractual-date UDFs. Only assigned HELIX tasks in Milestones WBS.
+    # The official 226021-HE.B.xer is a baseline, NOT an independent Current.
+    from datetime import datetime
+
+    all_milestones = task[
+        task["_Sub"].eq("HELIX")
+        & task["_WBS Path"].str.contains(" / Milestones / ", regex=False, na=False)
+    ].copy()
+    date_pattern = re.compile(r"\((\d{1,2}/\d{1,2}/(?:\d{4}|\d{2}))\)")
+    milestone_rows = []
+    no_contract_date = []
+    for _, item in all_milestones.iterrows():
+        fullname = str(item["task_name"])
+        found = date_pattern.findall(fullname)
+        parts = str(item["_WBS Path"]).split(" / Milestones / ", 1)
+        category = parts[1] if len(parts) == 2 else ""
+        if not found:
+            no_contract_date.append(str(item["task_code"]))
+            continue
+        if len(found) != 1:
+            raise ValueError(f"Ambiguous embedded contract dates: {item['task_code']}")
+        raw_date = found[0]
+        fmt = "%m/%d/%Y" if len(raw_date.rsplit("/", 1)[-1]) == 4 else "%m/%d/%y"
+        contract = pd.Timestamp(datetime.strptime(raw_date, fmt).date())
+        # P6 Finish: remain end is the scheduled finish for not-started /
+        # in-progress milestones; use Actual Finish when completed.
+        if item["Status"] == "Completed":
+            finish = pd.to_datetime(item.get("act_end_date"), errors="coerce")
+        else:
+            finish = pd.to_datetime(item.get("reend_date"), errors="coerce")
+            if pd.isna(finish):
+                finish = pd.to_datetime(item.get("target_end_date"), errors="coerce")
+        if pd.isna(finish):
+            raise ValueError(f"Missing P6 Finish for contractual HELIX milestone {item['task_code']}")
+        finish = finish.normalize()
+        delay = int((finish - contract).days)
+        group = "QC 2.2" if category.strip() == "QC 2.2" else "IST / L4 Cx" if category.strip() == "L4 Cx" else None
+        if group is None:
+            raise ValueError(f"Unrecognized dated HELIX contractual milestone WBS: {category}")
+        activity_id = str(item["task_code"])
+        area_match = re.match(r"^(?:M|IST)\.(\d{4})$", activity_id)
+        if area_match is None:
+            raise ValueError(f"Unrecognized HELIX contract milestone ID: {activity_id}")
+        area = "DH" + area_match.group(1)
+        if area not in HALLS:
+            raise ValueError(f"HELIX milestone area outside six Data Halls: {area}")
+        if not fullname.lstrip().upper().startswith(area):
+            raise ValueError(f"Milestone Activity Name/ID area mismatch: {activity_id}")
+        milestone_rows.append({
+            "Area": area,
+            "Milestone": group,
+            "Activity ID": activity_id,
+            "Activity Name": fullname,
+            "Contractual Date": contract,
+            "Baseline Finish": finish,
+            "Delay (days)": delay,
+            "Status": str(item["Status"]),
+            "Subcontractor": str(item["_Sub"]),
+            "Original P6 WBS": str(item["_WBS Path"]),
+        })
+    milestones = pd.DataFrame(milestone_rows)
+    if not milestones.empty:
+        milestones = milestones.sort_values(
+            ["Milestone", "Area"], key=lambda col: col.map(
+                {"QC 2.2": 0, "IST / L4 Cx": 1}
+            ) if col.name == "Milestone" else col
+        ).reset_index(drop=True)
+        if milestones["Activity ID"].duplicated().any():
+            raise ValueError("Repeated HELIX contract milestone Activity IDs")
+        if not milestones["Subcontractor"].eq("HELIX").all():
+            raise ValueError("Non-HELIX milestone in contractual variance report")
+        if milestones["Contractual Date"].isna().any() or milestones["Baseline Finish"].isna().any():
+            raise ValueError("Incomplete HELIX milestone date comparison")
+        if not milestones["Delay (days)"].eq(
+            (milestones["Baseline Finish"] - milestones["Contractual Date"]).dt.days
+        ).all():
+            raise ValueError("Milestone contractual delay calculation failed")
+    if len(task) == 4689:
+        if len(all_milestones) != 20 or len(milestones) != 10 or len(no_contract_date) != 10:
+            raise ValueError(
+                f"Unexpected official HELIX milestone audit: "
+                f"{len(all_milestones)} assigned; "
+                f"{len(milestones)} with contract date; {len(no_contract_date)} without"
+            )
+    out["_contract_milestones"] = milestones
+    out["_contract_milestone_audit"] = {
+        "helix_milestone_total": int(len(all_milestones)),
+        "contract_date_extracted": int(len(milestones)),
+        "no_contract_date_in_name": int(len(no_contract_date)),
+        "no_contract_date_ids": sorted(no_contract_date),
+        "schedule_source": "226021-HE.B independent baseline",
+    }
+
+    # Keep the Line-Up and MOH population separate from milestone audit.
     out["_audit"]=audit
     out["_internal_control"]={
         "total_source":int(len(task)),

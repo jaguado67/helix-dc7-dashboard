@@ -81,6 +81,33 @@ jobs:
           assert str(helix.auxiliary_project["add_date"]).startswith("2026-10-01")
           approved = helix.independent_helix_baseline()
           assert approved is not None
+          # Contractual milestone audit: only HELIX assignments to native
+          # Milestones WBS with literal dates inside Activity Names.
+          milestones = approved["_contract_milestones"]
+          audit = approved["_contract_milestone_audit"]
+          assert audit["helix_milestone_total"] == 20
+          assert audit["contract_date_extracted"] == 10
+          assert audit["no_contract_date_in_name"] == 10
+          assert len(audit["no_contract_date_ids"]) == 10
+          assert set(milestones["Milestone"]) == {"QC 2.2", "IST / L4 Cx"}
+          assert milestones["Activity ID"].is_unique
+          assert milestones["Subcontractor"].eq("HELIX").all()
+          assert milestones["Status"].eq("Not Started").all()
+          assert set(milestones["Area"]) == {"DH1200","DH1300","DH1400","DH1500","DH1600"}
+          assert not milestones["Activity ID"].str.contains("1100").any()
+          expected_delay = {
+              "M.1200":22,"M.1300":58,"M.1400":2,"M.1500":131,"M.1600":385,
+              "IST.1200":325,"IST.1300":322,"IST.1400":297,
+              "IST.1500":357,"IST.1600":331,
+          }
+          assert milestones.set_index("Activity ID")["Delay (days)"].to_dict() == expected_delay
+          assert (
+              milestones["Baseline Finish"] - milestones["Contractual Date"]
+          ).dt.days.eq(milestones["Delay (days)"]).all()
+          assert str(milestones.set_index("Activity ID").loc["IST.1400","Contractual Date"].date()) == "2026-04-22"
+          assert str(milestones.set_index("Activity ID").loc["IST.1400","Baseline Finish"].date()) == "2027-02-13"
+          assert str(milestones.set_index("Activity ID").loc["M.1600","Contractual Date"].date()) == "2026-02-17"
+          print("PASS: HELIX original named contract dates vs P6 Baseline Finish for 10 milestones, no other subcontractors")
           counts = lineup_activity_summary(approved).set_index("Area")
           assert list(counts.index) == list(HALLS)+["MOH"]
           assert "Commissioning" not in counts.columns
@@ -188,7 +215,20 @@ jobs:
           assert not any(line.lstrip().startswith("render_stats(helix") for line in helix_case.splitlines())
           assert "render_stats(suffolk" in dispatch
           assert 'wbs_lineup_hierarchy(data, area)' in view_text
-          detail_code = view_text.split('def render_helix_lineups(', 1)[1].split('def render_dashboard(', 1)[0]
+          detail_code = view_text.split('def render_helix_lineups(', 1)[1].split(
+              'def render_helix_contract_milestones(', 1
+          )[0]
+          milestone_view = view_text.split('def render_helix_contract_milestones(', 1)[1].split(
+              'def render_dashboard(', 1
+          )[0]
+          assert 'HELIX · CONTRACTUAL MILESTONE VARIANCE' in milestone_view
+          assert 'Contractual Date' in milestone_view
+          assert 'Baseline Finish' in milestone_view
+          assert 'Delay (days)' in milestone_view
+          assert 'not an independent HELIX Current forecast' in milestone_view
+          assert 'm.independent_helix_baseline()' in milestone_view
+          assert 'render_helix_contract_milestones(helix)' in helix_case
+          assert 'render_helix_contract_milestones(suffolk)' not in dispatch
           assert 'HELIX · DATA HALL / LINE-UP DETAIL</div>' in detail_code
           assert 'P6 BASELINE</div>' not in detail_code
           assert 'Original P6 WBS' not in detail_code
