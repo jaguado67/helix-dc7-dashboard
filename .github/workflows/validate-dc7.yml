@@ -2,7 +2,7 @@ name: Validate DC7 dashboard
 
 on:
   push:
-    branches: [main]
+    branches: [main, feat/dc7-helix-baseline-status-area-progress-v028]
     paths:
       - "DC7/**"
       - ".github/workflows/validate-dc7.yml"
@@ -65,7 +65,7 @@ jobs:
 
           # Independent HELIX BL: only HELIX-coded activities under
           # original Electrical Line-Ups and MOH/Equipment, never full-XER.
-          from src.helix_baseline import HALLS, lineup_order, baseline_outline, lineup_activity_summary, wbs_lineup_hierarchy
+          from src.helix_baseline import HALLS, lineup_order, baseline_outline, lineup_activity_summary, wbs_lineup_hierarchy, lineup_area_status_summary
           outline = baseline_outline()
           assert list(outline) == list(HALLS)+["MOH"]
           assert len(outline["DH1200"]) == 11
@@ -133,6 +133,29 @@ jobs:
           assert int(counts.loc["MOH","MOH Equipment"])==229
           assert int(counts.loc["MOH","Total Activities"])==229
           assert int(counts["Total Activities"].sum())==4153
+          # Equivalent to Suffolk's area-progress presentation, but with
+          # independent HELIX BASELINE statuses and different activity scope.
+          area_status = lineup_area_status_summary(approved)
+          assert area_status["Area"].tolist() == list(HALLS) + ["MOH"]
+          assert area_status.columns.tolist() == [
+              "Area","Total Tasks","Activity Completion %",
+              "Completed","In Progress","Not Started"
+          ]
+          assert area_status["Total Tasks"].tolist() == [654] * 6 + [229]
+          assert int(area_status["Total Tasks"].sum()) == 4153
+          assert int(area_status["Not Started"].sum()) == 4151
+          assert int(area_status["In Progress"].sum()) == 0
+          assert int(area_status["Completed"].sum()) == 2
+          assert all(
+              abs(row["Activity Completion %"] - 100 * row["Completed"] / row["Total Tasks"]) < 1e-10
+              for _, row in area_status.iterrows()
+          )
+          assert (area_status["Not Started"] + area_status["In Progress"]
+                  + area_status["Completed"]).eq(area_status["Total Tasks"]).all()
+          missing_summary = lineup_area_status_summary(None)
+          assert missing_summary["Area"].tolist() == list(HALLS) + ["MOH"]
+          assert missing_summary["Total Tasks"].isna().all()
+          print("PASS: HELIX 7-area Suffolk-style baseline status summary, 4153 total; 2 C, 0 IP, 4151 NS")
           audit=approved["_audit"]
           assert len(audit)==4153
           assert audit["Activity ID"].is_unique
@@ -195,7 +218,18 @@ jobs:
           assert labels == ["DH 1100", "DH 1200", "DH 1300", "DH 1400",
                             "DH 1500", "DH 1600", "MOH"]
           assert 'Total Activities", "Not Started", "In Progress", "Completed"' in view_text
-          assert "lineup_activity_summary(data)" in view_text
+          assert "lineup_area_status_summary(data)" in view_text
+          area_view = view_text.split("def render_helix_lineup_stats(", 1)[1].split(
+              "def render_helix_lineups(", 1
+          )[0]
+          assert "stats-table" in area_view
+          assert "Activity Completion %" in area_view
+          assert "Completed" in area_view and "Not Started" in area_view
+          assert "BASELINE STATUS</div>" in area_view
+          assert "226021-HE.B baseline snapshot, NOT a current HELIX update" in area_view
+          assert "Baseline Activity Completion %" in area_view
+          assert "0 < value < 1" in area_view
+          assert "Electrical Line-Ups\", st.column_config" not in area_view
           assert 'SUFFOLK DC7 BL / Current-C' in helix_case
           assert '226021-HE.B independent Baseline' in helix_case
           assert "render_windows(helix)" not in helix_case
