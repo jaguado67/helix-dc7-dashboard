@@ -55,6 +55,10 @@ jobs:
           assert not helix.scurve().empty, "HELIX S-curve missing"
           assert not suffolk.area_windows().empty, "SUFFOLK windows missing"
           assert not suffolk.area_stats().empty, "SUFFOLK area matrix missing"
+          for scope_model in (suffolk, helix):
+              matrix = scope_model.area_stats()
+              assert int(matrix["Total Tasks"].sum()) == 2545
+              assert "MOH" not in set(matrix["Area"]), "Auxiliary MOH must never enter the Suffolk construction totals"
           assert not helix.lineup_stats("DH1100").empty, "HELIX line-ups missing"
           assert helix.fte_ready_comparison().empty, "Archived FTE milestones leaked into active Construction"
 
