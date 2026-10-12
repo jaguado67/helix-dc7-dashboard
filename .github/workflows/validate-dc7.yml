@@ -199,7 +199,7 @@ jobs:
           assert 'for area in (*HALLS, "MOH"):' in view_text
           assert "helix_baseline_area" not in view_text
           assert 'lineup_order(area)' in view_text
-          assert 'MOH / Equipment' in view_text
+          assert 'heading = "MOH" if is_moh else f"DH {area[2:]}"' in view_text
           assert "CONCILIACIÓN DEL XER ORIGINAL" not in view_text
           assert "HELIX P6 BASELINE · 24 PROJECT MILESTONES" not in view_text
           assert '"Commissioning": st.column_config' not in view_text
