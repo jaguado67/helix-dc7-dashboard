@@ -52,6 +52,7 @@ jobs:
           suffolk = build_suffolk_model(helix)
 
           # HELIX is a baseline-only navigation, NOT a second SUFFOLK progress dashboard.
+          import pandas as pd
           from src.helix_baseline import HALLS, lineup_order, baseline_outline, summarize_approved_baseline
           outline = baseline_outline()
           assert list(outline.keys()) == list(HALLS) + ["MOH"]
