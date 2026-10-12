@@ -2,7 +2,7 @@
 
 Cloud-ready Streamlit package for the HELIX DC7 schedule dashboard.
 
-**Version:** 0.2.24
+**Version:** 0.2.25
 
 ## Data scope
 
@@ -13,6 +13,44 @@ This release has two selectable views. SUFFOLK displays the main DC7 project sco
 - No `DC7-MIL`
 - No `DC7.TFO-B`
 - No external-project relationships in dashboard analytics
+
+## v0.2.25 — HELIX WBS tree by Data Hall and individual Line-Up
+
+HELIX VIEW now follows the user's original P6 WBS display hierarchy,
+with seven independent expandable panels:
+
+- \`DH1100\` through \`DH1600\`, each showing a parent **DH ####**
+  subtotal, **Electrical** subtotal and its **eleven individually audited
+  Line-Ups** (A, B, C, D, E, F, G, H, J, K, R).
+- \`MOH\` → \`Equipment\`, with its own independent total.
+- P6 Line-Up order retained: **R is first** in DH1200, DH1400,
+  DH1600 and **last** in DH1100, DH1300, DH1500.
+- Every Data Hall can be expanded without changing a global selector;
+  DH1100 is open initially. Each expanded hall displays the WBS
+  activity-count table and a horizontal bar graph respecting the same
+  Line-Up sequence. The baseline start and finish dates are also shown.
+
+**Strict activity scope remains unchanged:** only P6 TASK Activity IDs
+assigned to \`QTS - Subcontractor = HELIX\` under the native independent
+\`226021-HE.B\` **Electrical / Line-Up** or **MOH / Equipment** WBS
+branches; no SUFFOLK substitutions and no RD-as-count shortcut.
+
+| P6 WBS | HELIX activities |
+|---|---:|
+| Each of six Data Halls, Electrical | 654 (ten × 58, R × 74) |
+| MOH, Equipment | 229 |
+| **Total distinct Activity IDs** | **4,153** |
+
+**Note:** DH and Electrical parent rows repeat the subtotal for WBS
+navigation and are **not** additive. Only Line-Up leaf counts and MOH
+Equipment are summed to 4,153. Commissioning, project milestones,
+FOH/BOH and other subcontractors are excluded in accordance with the
+agreed HELIX-only Line-Up/MOH audit.
+
+Automated regression verifies all 6 native Line-Up sequences,
+each 58/74 activity count, each WBS parent/leaf subtotal and original
+Activity ID uniqueness. Existing HELIX overview, FTE and full SUFFOLK
+view remain unmodified.
 
 ## v0.2.24 — HELIX-only activity-count audit (Line-Ups and MOH)
 
