@@ -177,10 +177,10 @@ def summarize_approved_baseline(tables: Mapping[str, pd.DataFrame], project_id: 
         all_task_rows.append({
             "Activity ID": str(item.get("task_code","")),
             "Activity Name": str(item.get("task_name","")),
-            "Data Hall": item["_Area"] or "",
+            "Data Hall": str(item["_Area"]) if pd.notna(item["_Area"]) else "",
             "P6 WBS": item["_P6 WBS"],
-            "Line-Up": item["_LineUp"] or "",
-            "Classification": "MAPPED" if item["_LineUp"] is not None else "NOT IN SELECTED LINE-UP WBS",
+            "Line-Up": str(item["_LineUp"]) if pd.notna(item["_LineUp"]) else "",
+            "Classification": "MAPPED" if pd.notna(item["_LineUp"]) else "NOT IN SELECTED LINE-UP WBS",
         })
     audit = pd.DataFrame(all_task_rows)
     if audit["Activity ID"].duplicated().any():
