@@ -51,6 +51,67 @@ jobs:
           helix = build_dc7_model(root)
           suffolk = build_suffolk_model(helix)
 
+          # HELIX is a baseline-only navigation, NOT a second SUFFOLK progress dashboard.
+          import pandas as pd
+          from src.helix_baseline import HALLS, lineup_order, baseline_outline, summarize_approved_baseline
+          outline = baseline_outline()
+          assert list(outline.keys()) == list(HALLS) + ["MOH"]
+          assert [x["Line-Up"] for x in outline["DH1100"][:2]] == ["A110", "B110"]
+          assert [x["Line-Up"] for x in outline["DH1200"][:2]] == ["R120", "A120"]
+          assert [x["Line-Up"] for x in outline["DH1300"][-2:]] == ["R130", "Commissioning"]
+          assert [x["Line-Up"] for x in outline["DH1400"][:2]] == ["R140", "A140"]
+          assert [x["Line-Up"] for x in outline["DH1500"][:2]] == ["A150", "B150"]
+          assert [x["Line-Up"] for x in outline["DH1600"][:2]] == ["R160", "A160"]
+          assert len(outline["DH1200"]) == 12
+          assert outline["MOH"] == [{"WBS Level": "Equipment", "Line-Up": "Equipment"}]
+          assert helix.independent_helix_baseline() is None
+          assert helix.auxiliary_path is None
+
+          # Native WBS fixture: ensure 1200 R before A, commissioning
+          # isolated from electrical; MOH is its own Equipment branch.
+          sample_wbs = [
+              {"wbs_id":"1","proj_id":"BL","wbs_name":"HELIX","parent_wbs_id":"0"},
+              {"wbs_id":"2","proj_id":"BL","wbs_name":"DH 1200","parent_wbs_id":"1"},
+              {"wbs_id":"3","proj_id":"BL","wbs_name":"Electrical","parent_wbs_id":"2"},
+              {"wbs_id":"4","proj_id":"BL","wbs_name":"R120","parent_wbs_id":"3"},
+              {"wbs_id":"5","proj_id":"BL","wbs_name":"A120","parent_wbs_id":"3"},
+              {"wbs_id":"6","proj_id":"BL","wbs_name":"Commissioning","parent_wbs_id":"2"},
+              {"wbs_id":"7","proj_id":"BL","wbs_name":"MOH","parent_wbs_id":"1"},
+              {"wbs_id":"8","proj_id":"BL","wbs_name":"Equipment","parent_wbs_id":"7"},
+          ]
+          sample_tasks = [
+              {"task_id":str(i),"proj_id":"BL","wbs_id":wbsid,
+               "task_code":code,"task_name":code,"status_code":"TK_NOTSTART",
+               "target_start_date":"2026-09-29 08:00",
+               "target_end_date":"2026-10-05 16:00"}
+              for i, (wbsid,code) in enumerate(
+                  [("4","R120-ACT"),("5","A120-ACT"),("6","CM-ACT"),("8","MOH-ACT")],1
+              )
+          ]
+          sample = summarize_approved_baseline(
+              {"PROJWBS":pd.DataFrame(sample_wbs),"TASK":pd.DataFrame(sample_tasks)},"BL"
+          )
+          dh1200 = sample["DH1200"]
+          assert dh1200.iloc[0]["Line-Up"] == "R120"
+          assert dh1200.iloc[0]["Baseline Tasks"] == 1
+          assert dh1200.iloc[1]["Line-Up"] == "A120"
+          assert dh1200.iloc[1]["Baseline Tasks"] == 1
+          assert dh1200.iloc[-1]["Line-Up"] == "Commissioning"
+          assert dh1200.iloc[-1]["Baseline Tasks"] == 1
+          assert sample["MOH"].iloc[0]["Baseline Tasks"] == 1
+          assert len(sample["_audit"]) == 4
+          assert all(sample["_audit"]["Classification"] == "MAPPED")
+
+          view_text = Path("DC7/src/dc7_view.py").read_text(encoding="utf-8")
+          dispatch = view_text.split("def render_dashboard(",1)[1]
+          assert 'if view == "HELIX":' in dispatch
+          assert "render_helix_lineups(helix)" in dispatch
+          assert dispatch.index("render_helix_lineups(helix)") < dispatch.index("render_kpis(suffolk")
+          assert "render_progress_detail(helix" not in dispatch
+          assert "render_scurve_and_status(helix)" not in dispatch
+          assert "render_gates(helix)" not in dispatch
+          print("PASS: HELIX baseline-only navigation and 6 DH line-up orders + MOH; no SUFFOLK progress duplication")
+
           h_total = helix.status_counts()["Total"]
           s_total = suffolk.status_counts()["Total"]
           assert h_total == 2545, f"HELIX count unexpectedly changed: {h_total}"

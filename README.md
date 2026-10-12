@@ -2,7 +2,7 @@
 
 Cloud-ready Streamlit package for the HELIX DC7 schedule dashboard.
 
-**Version:** 0.2.19
+**Version:** 0.2.20
 
 ## Data scope
 
@@ -13,6 +13,35 @@ This release has two selectable views. SUFFOLK displays the main DC7 project sco
 - No `DC7-MIL`
 - No `DC7.TFO-B`
 - No external-project relationships in dashboard analytics
+
+## v0.2.20 — HELIX VIEW: only independent electrical baseline Line-Ups and MOH
+
+The HELIX view no longer duplicates SUFFOLK project progress:
+no SUFFOLK-sourced KPIs, S-curve, activity area progress, FTE milestones,
+or the SUFFOLK HELIX Construction Audit are rendered in this view.
+**All SUFFOLK progress and its 2,545-activity audit remain in SUFFOLK VIEW.**
+
+HELIX VIEW is now a baseline-only WBS-navigation panel:
+
+- \`DH1100\`, \`DH1200\`, \`DH1300\`, \`DH1400\`, \`DH1500\`, \`DH1600\`,
+  with \`Electrical\` line-up children plus a sibling \`Commissioning\`.
+- Every hall has 11 equipment line-ups (A, B, C, D, E, F, G, H, J, K, R).
+  **R is first** in \`DH1200\`, \`DH1400\` and \`DH1600\` and **last**
+  in \`DH1100\`, \`DH1300\` and \`DH1500\`, matching P6 screenshot order.
+- \`MOH\` is an independent selection with WBS \`Equipment\`.
+- Without the official \`226021-HE.B.xer\`, only the WBS outline grounded
+  in P6 screenshots is shown; **no task counts, baseline dates, percent
+  complete, Current or forecast are manufactured**.
+- Once the official baseline is loaded and its internal
+  \`proj_short_name = 226021-HE.B\` has been validated, task counts and
+  original P6 baseline date ranges will be computed from actual \`PROJWBS\`
+  and \`TASK\` rows, and a complete Activity-ID/WBS CSV can be downloaded.
+  These are not current progress measurements.
+- The historical \`226021-HE.B-4.xer\` remains **disallowed**.
+
+CI exercises all six ordering rules, the standalone MOH branch, a
+synthetic original-P6 WBS fixture and regression assertions that the
+HELIX view never renders SUFFOLK's progress widgets.
 
 ## v0.2.19 — DC7 HELIX official baseline only; historical B-4 rejected
 
