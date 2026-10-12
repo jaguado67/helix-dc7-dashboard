@@ -2,7 +2,7 @@
 
 Cloud-ready Streamlit package for the HELIX DC7 schedule dashboard.
 
-**Version:** 0.2.27
+**Version:** 0.2.28
 
 ## Data scope
 
@@ -13,6 +13,37 @@ This release has two selectable views. SUFFOLK displays the main DC7 project sco
 - No `DC7-MIL`
 - No `DC7.TFO-B`
 - No external-project relationships in dashboard analytics
+
+## v0.2.28 — HELIX area status table and percentage chart like SUFFOLK
+
+The **PROJECT STATS · HELIX LINE-UPS & MOH** section now follows the
+same side-by-side display as `SUFFOLK PROJECT STATS · AREA PROGRESS`:
+area-by-area table and horizontal **Activity Completion %** bar chart.
+It shows six Data Halls and MOH, with original baseline activity statuses:
+
+- Columns: `Area`, `Total Tasks`, `Activity Completion %`,
+  `Completed`, `In Progress`, `Not Started`.
+- Six Data Halls have 654 HELIX Line-Up Activity IDs each, and MOH has
+  229 HELIX Equipment Activity IDs; total **4,153**.
+- Only the assigned `QTS - Subcontractor = HELIX` activity population
+  from the independent official `226021-HE.B` baseline is included.
+  No `FOH`, `BOH`, Commissioning, external subs or milestones.
+- Baseline snapshot statuses sum to **2 Completed**, **0 In Progress**
+  and **4,151 Not Started**, reconciled to the original Activity IDs.
+- Charts show **completion percentages**, not simply the number of
+  activities. Values between 0% and 1% display two decimals so small
+  nonzero fractions are not hidden; a TOTAL row provides overall
+  reconciliation (**2 / 4,153 = 0.05%** when rounded).
+- The section explicitly identifies the source as **BASELINE STATUS**,
+  not real-time or independent HELIX Current progress. This distinction
+  is essential: SUFFOLK's **2,545** activities are a different
+  construction universe and are not numerically interchangeable with
+  the **4,153** independent electrical Line-Up/MOH activities.
+
+All per-Line-Up tables, their bars and WBS ordering, existing project
+KPIs/S-curve, SUFFOLK VIEW and activity-source data remain unchanged.
+The regression suite tests all seven area/status counts, completion
+percent calculations and total Activity-ID reconciliation.
 
 ## v0.2.27 — Concise Data Hall / MOH controls; English-only HELIX Line-Up UI
 

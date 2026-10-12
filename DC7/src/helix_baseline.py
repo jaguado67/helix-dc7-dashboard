@@ -118,6 +118,58 @@ def wbs_lineup_hierarchy(data: Mapping[str, pd.DataFrame] | None, area: str) -> 
     return table
 
 
+
+def lineup_area_status_summary(data: Mapping[str, pd.DataFrame] | None) -> pd.DataFrame:
+    """Suffolk-style activity status summary, but for independent HELIX BL.
+
+    Exactly six Data Halls and MOH; no FOH/BOH, other subcontractors,
+    Commissioning or milestones. Statuses come ONLY from each official
+    baseline P6 TASK.status_code, never Suffolk Current-C.
+    """
+    areas = (*HALLS, "MOH")
+    columns = [
+        "Area", "Total Tasks", "Activity Completion %",
+        "Completed", "In Progress", "Not Started",
+    ]
+    rows = []
+    for area in areas:
+        detail = wbs_lineup_hierarchy(data, area)
+        if data is None:
+            rows.append({
+                "Area": area, **{name: None for name in columns[1:]}
+            })
+            continue
+        count = {name: int(detail[name].sum())
+                 for name in ("Total Activities", "Not Started", "In Progress", "Completed")}
+        total = count["Total Activities"]
+        completed = count["Completed"]
+        if count["Not Started"] + count["In Progress"] + completed != total:
+            raise ValueError(f"Official HELIX baseline status mismatch for {area}")
+        rows.append({
+            "Area": area,
+            "Total Tasks": total,
+            "Activity Completion %": (completed / total * 100) if total else 0.0,
+            "Completed": completed,
+            "In Progress": count["In Progress"],
+            "Not Started": count["Not Started"],
+        })
+
+    summary = pd.DataFrame(rows, columns=columns)
+    if data is not None:
+        audit = data["_audit"]
+        if len(audit) != int(summary["Total Tasks"].sum()):
+            raise ValueError("Summary total does not reconcile to original HELIX Activity IDs")
+        if not audit["Activity ID"].is_unique or not audit["QTS - Subcontractor"].eq("HELIX").all():
+            raise ValueError("Incorrect subcontractor or duplicate HELIX Activity ID in summary")
+        for display, audit_status in (
+            ("Completed", "Completed"),
+            ("In Progress", "In Progress"),
+            ("Not Started", "Not Started"),
+        ):
+            if int(summary[display].sum()) != int(audit["Status"].eq(audit_status).sum()):
+                raise ValueError(f"HELIX baseline {display} counts do not reconcile")
+    return summary
+
 def summarize_approved_baseline(tables: Mapping[str, pd.DataFrame], project_id: str) -> dict[str, pd.DataFrame]:
     """Audit real HELIX-coded P6 TASK/PROJWBS/TASKACTV associations."""
     required = ("PROJWBS","TASK","ACTVTYPE","ACTVCODE","TASKACTV")
