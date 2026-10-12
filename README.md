@@ -2,7 +2,7 @@
 
 Cloud-ready Streamlit package for the HELIX DC7 schedule dashboard.
 
-**Version:** 0.2.29
+**Version:** 0.2.30
 
 ## Data scope
 
@@ -13,6 +13,53 @@ This release has two selectable views. SUFFOLK displays the main DC7 project sco
 - No `DC7-MIL`
 - No `DC7.TFO-B`
 - No external-project relationships in dashboard analytics
+
+## v0.2.30 — HELIX-only contractual milestone date variance (QC 2.2 / IST)
+
+A new **HELIX · CONTRACTUAL MILESTONE VARIANCE** section in HELIX VIEW
+compares the **literal contractual date in the original Activity Name**
+with **P6 Finish in the approved independent HELIX baseline
+`226021-HE.B.xer`**. The signed metric is
+`Delay (calendar days) = Baseline Finish − Contractual Date`;
+positive is late, zero on date, negative early.
+
+The scope is strictly **Milestones WBS** where
+`QTS - Subcontractor = HELIX`; there are 20 coded milestone Activity
+IDs. Only **10** contain a literal contractual date in their names:
+five `QC 2.2` milestones `M.1200…M.1600` and five L4 Cx / IST
+milestones `IST.1200…IST.1600`. The other 10 HELIX Clean Walk / PEI
+milestones have no parenthesized contractual date and are excluded from
+numerical delay calculations, but their exclusion is audited. The four
+DH1100 milestone activities are coded to another subcontractor and are
+excluded. No dates are interpolated, renamed, or reassigned.
+
+| Activity ID | Contractual (name) | P6 Baseline Finish | Delay (calendar days) |
+|---|---|---|---:|
+| M.1200 | 13-Oct-2026 | 04-Nov-2026 | +22 |
+| M.1300 | 28-Sep-2026 | 25-Nov-2026 | +58 |
+| M.1400 | 02-Dec-2026 | 04-Dec-2026 | +2 |
+| M.1500 | 23-Oct-2026 | 03-Mar-2027 | +131 |
+| M.1600 | 17-Feb-2026 | 09-Mar-2027 | +385 |
+| IST.1200 | 23-Feb-2026 | 14-Jan-2027 | +325 |
+| IST.1300 | 22-Mar-2026 | 07-Feb-2027 | +322 |
+| IST.1400 | 22-Apr-2026 | 13-Feb-2027 | +297 |
+| IST.1500 | 21-May-2026 | 13-May-2027 | +357 |
+| IST.1600 | 22-Jun-2026 | 19-May-2027 | +331 |
+
+**Verification warning:** the written dates may contain contractual year
+mistakes, particularly `M.1600` and all `IST` dates entered as 2026
+even though the Baseline Finish is in 2027. The app uses them as-is;
+no automatic year correction is permissible without contractual
+evidence. All date differences are calendar days.
+
+**Source caution:** no independent HELIX Current schedule is present,
+so **Baseline Finish** must not be mislabeled Actual Finish or Current
+Finish. This is a baseline-versus-contract comparison, **not measured
+current delay**, and not a substitute for a later current update.
+
+The old archived SUFFOLK FTE Ready panel remains hidden in HELIX VIEW
+and is not revived by this feature. All other Line-Up/MOH, S-curves,
+SUFFOLK metrics, internal activity audits and XER inputs are unchanged.
 
 ## v0.2.29 — Remove annotated HELIX View display clutter; defer milestones
 
