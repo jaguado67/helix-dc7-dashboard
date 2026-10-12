@@ -476,6 +476,98 @@ class DC7Model:
             })
         return pd.DataFrame(rows)
 
+    def wbs_area_activities(self, area: str) -> pd.DataFrame:
+        """Map FOH/BOH HELIX Construction activities to original P6 WBS labels.
+
+        Classification uses the *actual* PROJWBS parent chain, never QTS-DASH,
+        activity-name keywords, or an invented reporting category. QTS - AREA
+        determines the FOH/BOH population, whose source HELIX/Construction
+        membership has already been independently verified by build_dc7_model.
+        Two underground HELIX tasks belong to Construction / Shell /
+        Foundations rather than House Systems; keep them visible as Foundations
+        so the sums match the higher-level scope and nothing is silently lost.
+        """
+        if area not in ("FOH", "BOH"):
+            raise ValueError(f"P6 WBS detail is supported only for FOH/BOH, got {area!r}")
+        source = self.current_tasks[self.current_tasks["Area"].astype(str).eq(area)].copy()
+        if source.empty:
+            return source.assign(**{"WBS Group": pd.Series(dtype=str), "WBS Path": pd.Series(dtype=str)})
+        project_id = str(self.update_project["proj_id"])
+        wbs = self.update_tables["PROJWBS"]
+        wbs = wbs[wbs["proj_id"].astype(str).eq(project_id)].copy()
+        names = dict(zip(wbs["wbs_id"].astype(str), wbs["wbs_name"].astype(str)))
+        parents = dict(zip(wbs["wbs_id"].astype(str), wbs["parent_wbs_id"].astype(str)))
+        marker = "Front of House (FOH)" if area == "FOH" else "Back of House (BOH)"
+
+        def resolve(wbs_id: str) -> tuple[str, str]:
+            node = str(wbs_id)
+            lineage = []
+            visited = set()
+            while node in names:
+                if node in visited:
+                    raise ValueError(f"P6 WBS circular ancestry at {node}")
+                visited.add(node)
+                lineage.append(names[node])
+                node = parents.get(node, "")
+            lineage.reverse()
+            if "Construction" not in lineage:
+                raise ValueError(f"Activity in {area} outside Construction WBS: {wbs_id}")
+            if marker in lineage:
+                at = lineage.index(marker)
+                if at + 1 >= len(lineage):
+                    raise ValueError(f"Activity has no grouping child under {marker}: {wbs_id}")
+                group = lineage[at + 1]
+            elif "Foundations" in lineage and "Shell" in lineage:
+                group = "Foundations"  # exact PROJWBS name, not a dashboard alias
+            else:
+                raise ValueError(
+                    f"{area} activity is coded outside its P6 WBS and not Foundations: "
+                    + " / ".join(lineage)
+                )
+            return group, " / ".join(lineage[1:])
+
+        resolved = [resolve(wbs_id) for wbs_id in source["wbs_id"].astype(str)]
+        source["WBS Group"] = [entry[0] for entry in resolved]
+        source["WBS Path"] = [entry[1] for entry in resolved]
+        if source["task_code"].astype(str).duplicated().any():
+            raise ValueError(f"Duplicate HELIX Construction Activity IDs in {area}")
+        return source
+
+    def wbs_area_stats(self, area: str) -> pd.DataFrame:
+        """FOH/BOH progress by the direct child WBS of the P6 FOH/BOH nodes."""
+        detail = self.wbs_area_activities(area)
+        rows = []
+        for group, activities in detail.groupby("WBS Group", sort=False):
+            counts = activities["Status"].value_counts()
+            rows.append({
+                "Area": str(group),
+                "Tasks": int(len(activities)),
+                "Activity Completion %": _activity_completion_pct(activities),
+                "Not Started": int(counts.get("Not Started", 0)),
+                "In Progress": int(counts.get("In Progress", 0)),
+                "Completed": int(counts.get("Completed", 0)),
+            })
+        # Native P6 FOH/BOH node ordering (PROJWBS.seq_num), not a new taxonomy.
+        wbs = self.update_tables["PROJWBS"]
+        wbs = wbs[wbs["proj_id"].astype(str).eq(str(self.update_project["proj_id"]))]
+        marker = "Front of House (FOH)" if area == "FOH" else "Back of House (BOH)"
+        parents = wbs[wbs["wbs_name"].astype(str).eq(marker)]
+        if len(parents) != 1:
+            raise ValueError(f"Expected one P6 WBS named {marker}, found {len(parents)}")
+        wbs_children = wbs[wbs["parent_wbs_id"].astype(str).eq(str(parents.iloc[0]["wbs_id"]))]
+        order = {
+            str(item["wbs_name"]): int(item["seq_num"])
+            for _, item in wbs_children.iterrows()
+        }
+        results = pd.DataFrame(rows)
+        if results.empty:
+            return results
+        results["_rank"] = results["Area"].map(order).fillna(999)
+        results = results.sort_values(["_rank", "Area"]).drop(columns=["_rank"]).reset_index(drop=True)
+        if results["Tasks"].sum() != len(detail):
+            raise ValueError(f"FOH/BOH WBS reconciliation failed for {area}")
+        return results
+
     def subarea_stats(self, area: str, helix_display: bool = False) -> pd.DataFrame:
         if area == "MOH" and self.auxiliary_tasks is not None:
             g = self.auxiliary_tasks[self.auxiliary_tasks["Area"].eq(area)].copy()
