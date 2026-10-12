@@ -2,7 +2,7 @@
 
 Cloud-ready Streamlit package for the HELIX DC7 schedule dashboard.
 
-**Version:** 0.2.17
+**Version:** 0.2.18
 
 ## Data scope
 
@@ -13,6 +13,55 @@ This release has two selectable views. SUFFOLK displays the main DC7 project sco
 - No `DC7-MIL`
 - No `DC7.TFO-B`
 - No external-project relationships in dashboard analytics
+
+## v0.2.18 — Seven native-P6 WBS groups for SUFFOLK Data Halls
+
+Within **SUFFOLK PROJECT PROGRESS DETAIL** for DH1100 through DH1600, 
+the previous QTS-DASH grouping was replaced by the following seven
+WBS-derived functional categories, in order:
+
+1. Electrical Yard — from P6 \`Exterior Build Out / Electrical Yard\`.
+2. Mechanical Yard — from P6 \`Exterior Build Out / Mechanical Yard\`.
+3. Electrical Rooms — all \`Electrical Room #...\` branches together
+   (including P6's \`Electrcal Room\` spelling).
+4. Data Hall — from the matching \`Interior Build Out / Data Hall ####\`.
+5. Galleries — consolidated \`PDU Gallery\` and \`CRAH/CDU Galleries\`.
+6. Corridors — the original \`Interior Build Out / Corridors\`.
+7. Energization, Start-up & Commissioning — original matching WBS branch,
+   displayed even when **zero** active HELIX Construction tasks are assigned.
+
+**Important scope control:** every count is restricted to active
+\`QTS - Subcontractor = HELIX\` activities under the SUFFOLK
+\`Construction\` WBS. No \`Procurement\` or archived tasks are included.
+The grouping uses **native P6 PROJWBS ancestry**, not activity-name
+keywords or reassignments of QTS-DASH codes.
+
+### Exact reconciliation (SUFFOLK Current-C, P6 Data Date 26-Aug-2026)
+
+| Area | Seven displayed WBS groups | WBS exceptions in audit | Original HELIX Construction |
+|---|---:|---:|---:|
+| DH1100 | 363 | 32 | 395 |
+| DH1200 | 340 | 32 | 372 |
+| DH1300 | 339 | 20 | 359 |
+| DH1400 | 346 | 20 | 366 |
+| DH1500 | 348 | 23 | 371 |
+| DH1600 | 337 | 20 | 357 |
+| **Total Data Halls** | **2073** | **147** | **2220** |
+
+The 147 other active HELIX Construction tasks have different original
+P6 WBS parents (e.g. \`Roof - RTUs\`, Flex, IDF, Preaction,
+Restroom-Dock & Janitor and Shell/Foundations). They are not falsely
+included in the seven requested categories, nor dropped from the original
+**2545** HELIX Construction source activities. They appear as a **separate
+Data Hall WBS classification-exceptions** table under
+**SUFFOLK · HELIX CONSTRUCTION | ACTIVITY AUDIT**, downloadable by
+exact Activity ID, P6 WBS path and current status. This is not the same
+as the 31 departed or archived activities.
+
+**Unchanged:** FOH/BOH WBS presentation (the two original FDN exceptions
+remain audited), SUFFOLK area summary and Start-Finish windows,
+HELIX VIEW, the dedicated Equipment Line-Ups and MOH, source XER
+records and P6 scheduling calculations.
 
 ## v0.2.17 — Full original P6 FOH/BOH WBS displayed
 

@@ -286,14 +286,21 @@ def render_progress_detail(m: DC7Model, view: str):
     area = st.selectbox("Area / Data Hall", m.areas(), index=0, key=f"dc7_area_{view.lower()}")
     consolidated = view == "HELIX" and area.upper().startswith("DH")
     p6_wbs = view == "SUFFOLK" and area in ("FOH", "BOH")
-    df = m.wbs_area_stats(area) if p6_wbs else m.subarea_stats(area, helix_display=consolidated)
+    dh_p6_wbs = view == "SUFFOLK" and area in (
+        "DH1100", "DH1200", "DH1300", "DH1400", "DH1500", "DH1600"
+    )
+    df = (
+        m.wbs_area_stats(area) if p6_wbs
+        else m.data_hall_wbs_stats(area) if dh_p6_wbs
+        else m.subarea_stats(area, helix_display=consolidated)
+    )
     c1, c2 = st.columns([1.15, 1], gap="large")
     with c1:
-        summary_title = ("SUMMARY BY P6 WBS" if p6_wbs else
+        summary_title = ("SUMMARY BY P6 WBS" if p6_wbs or dh_p6_wbs else
                          "FUNCTIONAL PACKAGE SUMMARY" if area == "MOH" else
                          "SUMMARY BY FUNCTIONAL GROUP" if consolidated else
                          "SUMMARY BY QTS - DASH")
-        first_column = "P6 WBS" if p6_wbs else "Area"
+        first_column = "P6 WBS GROUP" if p6_wbs or dh_p6_wbs else "Area"
         h = f'<div class="panel"><div class="panel-head"><div class="panel-title">{area} · {summary_title}</div></div><table class="detail-table"><thead><tr><th>{first_column}</th><th>Tasks</th><th>Activity Completion %</th><th>Not Started</th><th>In Progress</th><th>Completed</th></tr></thead><tbody>'
         for _, r in df.iterrows():
             label = _safe(r.Area)
@@ -302,12 +309,15 @@ def render_progress_detail(m: DC7Model, view: str):
     with c2:
         fig = go.Figure(go.Bar(x=df.Area, y=df["Activity Completion %"], text=[f"{x:.1f}%" for x in df["Activity Completion %"]], textposition="outside", textfont=dict(size=13, color=TEXT), marker=dict(color="#1f6d8a")))
         ymax = max(10, float(df["Activity Completion %"].max()) * 1.35 + 1) if not df.empty else 10
-        chart_title = (f"ACTIVITY COMPLETION BY WBS · {area}" if p6_wbs else
+        chart_title = (f"ACTIVITY COMPLETION BY WBS · {area}" if p6_wbs or dh_p6_wbs else
                        f"ACTIVITY COMPLETION · {area}" if area == "MOH" else
                        f"ACTIVITY COMPLETION BY AREA · {area}")
-        fig.update_layout(**_layout(410, 70, 115, 38), showlegend=False, title=chart_title, yaxis_title="Activity Completion %")
+        fig.update_layout(
+            **_layout(480 if dh_p6_wbs else 410, 70, 165 if dh_p6_wbs else 115, 38),
+            showlegend=False, title=chart_title, yaxis_title="Activity Completion %"
+        )
         fig.update_yaxes(range=[0, ymax], ticksuffix="%", gridcolor=GRID)
-        fig.update_xaxes(tickangle=-25)
+        fig.update_xaxes(tickangle=-28 if dh_p6_wbs else -25)
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
     if p6_wbs:
         st.caption(
@@ -331,6 +341,29 @@ def render_progress_detail(m: DC7Model, view: str):
             audit_export.to_csv(index=False).encode("utf-8-sig"),
             file_name=f"DC7_{area}_HELIX_Construction_WBS_Audit.csv",
             mime="text/csv", key=f"wbs_audit_{area}",
+        )
+    elif dh_p6_wbs:
+        full = m.data_hall_wbs_activities(area, include_exceptions=True)
+        rejected = int(full["WBS Group"].eq("WBS EXCEPTION").sum())
+        st.caption(
+            f"Se usan siete grupos derivados de la WBS original de P6 para {area}, "
+            "unificando Electrical Rooms y Galleries. Solo actividades HELIX "
+            "de Construction; las ramas no incluidas no se reasignan. "
+            f"Las {rejected} actividades de otras WBS permanecen en el alcance "
+            "original y se documentan por Activity ID en ACTIVITY AUDIT. "
+            "No se modificaron códigos, estados ni archivos XER."
+        )
+        detail = m.data_hall_wbs_activities(area)
+        audit_export = detail[["task_code", "task_name", "Area", "WBS Group", "WBS Path", "Status"]].copy()
+        audit_export.columns = [
+            "Activity ID", "Activity Name", "QTS - AREA", "P6 WBS Group",
+            "P6 WBS Path", "Current Status"
+        ]
+        st.download_button(
+            f"Download {area} HELIX Construction · P6 WBS audit (CSV)",
+            audit_export.to_csv(index=False).encode("utf-8-sig"),
+            file_name=f"DC7_{area}_HELIX_Construction_DH_WBS_Audit.csv",
+            mime="text/csv", key=f"dh_wbs_{area}",
         )
     elif consolidated:
         st.caption("HELIX Data Hall display groups consolidate Other Rooms and Electrical Rooms, and classify unassigned underslab electrical / RTU roof activities by function. Original QTS-DASH, task IDs, status, and XER data remain unchanged. Unrecognized activities remain unclassified.")
@@ -547,6 +580,24 @@ def render_dashboard(helix: DC7Model, suffolk: DC7Model):
                     wbs_exceptions.to_csv(index=False).encode("utf-8-sig"),
                     file_name="DC7_HELIX_FOH_BOH_WBS_exceptions_C.csv",
                     mime="text/csv", key=f"wbs_exceptions_{view}",
+                )
+            dh_wbs_exceptions = reports.get("dh_wbs_exceptions", pd.DataFrame())
+            if not dh_wbs_exceptions.empty:
+                st.markdown("**Data Halls · Original P6 WBS branches outside the seven displayed groups**")
+                st.caption(
+                    "Son actividades HELIX Construction activas en SUFFOLK, "
+                    "no actividades archivadas ni retiradas. Conservan sus "
+                    "Activity IDs y permanecen en el total original de 2.545, "
+                    "pero no se asignan artificialmente a las siete categorías."
+                )
+                st.dataframe(
+                    dh_wbs_exceptions, use_container_width=True, hide_index=True,
+                )
+                st.download_button(
+                    "Download Data Hall WBS exceptions (CSV)",
+                    dh_wbs_exceptions.to_csv(index=False).encode("utf-8-sig"),
+                    file_name="DC7_HELIX_Data_Hall_WBS_exceptions_C.csv",
+                    mime="text/csv", key=f"dh_wbs_exceptions_{view}",
                 )
             departed = reports["departures"]
             if not departed.empty:

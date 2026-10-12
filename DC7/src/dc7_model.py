@@ -586,6 +586,105 @@ class DC7Model:
             raise ValueError(f"FOH/BOH P6 WBS reconciliation failed for {area}")
         return result
 
+    def data_hall_wbs_activities(self, area: str, include_exceptions: bool = False) -> pd.DataFrame:
+        """Native WBS-based seven-group SUFFOLK Data Hall detail for HELIX only.
+
+        Read the original P6 WBS ancestry; no QTS-DASH renaming or activity
+        description matching. Other HELIX Construction tasks are retained in
+        the source model and its independent audit, never silently reassigned.
+        """
+        if area not in ("DH1100", "DH1200", "DH1300", "DH1400", "DH1500", "DH1600"):
+            raise ValueError(f"Unsupported Data Hall WBS detail: {area}")
+        source = self.current_tasks[self.current_tasks["Area"].astype(str).eq(area)].copy()
+        if source.empty:
+            raise ValueError(f"No active HELIX Construction tasks in {area}")
+        wbs = self.update_tables["PROJWBS"]
+        wbs = wbs[wbs["proj_id"].astype(str).eq(str(self.update_project["proj_id"]))]
+        names = dict(zip(wbs["wbs_id"].astype(str), wbs["wbs_name"].astype(str)))
+        parents = dict(zip(wbs["wbs_id"].astype(str), wbs["parent_wbs_id"].astype(str)))
+        expected_hall = f"Data Hall {area[2:]}"
+        groups = (
+            "Electrical Yard", "Mechanical Yard", "Electrical Rooms",
+            "Data Hall", "Galleries", "Corridors",
+            "Energization, Start-up & Commissioning",
+        )
+
+        def native_path(wbs_id: str) -> list[str]:
+            ancestry, node, visited = [], str(wbs_id), set()
+            while node in names:
+                if node in visited:
+                    raise ValueError(f"Cycle in PROJWBS at {node}")
+                visited.add(node)
+                ancestry.append(names[node])
+                node = parents.get(node, "")
+            ancestry.reverse()
+            if "Construction" not in ancestry:
+                raise ValueError(f"Out-of-Construction HELIX task WBS {wbs_id}")
+            return ancestry
+
+        def identify(wbs_id: str) -> tuple[str, str]:
+            path = native_path(wbs_id)
+            full_path = " / ".join(path[1:])
+            if expected_hall not in path or "Interior Build-Outs" not in path:
+                return "WBS EXCEPTION", full_path
+            offset = path.index(expected_hall)
+            relative = path[offset + 1:]
+            if len(relative) < 2:
+                return "WBS EXCEPTION", full_path
+            level, child = relative[:2]
+            if level == "Exterior Build Out" and child in ("Electrical Yard", "Mechanical Yard"):
+                return child, full_path
+            if level == "Interior Build Out":
+                if re.match(r"^Electr(?:i)?cal Room\s*#", child, re.I):
+                    return "Electrical Rooms", full_path
+                if child == expected_hall:
+                    return "Data Hall", full_path
+                if child in ("PDU Gallery", "CRAH/CDU Galleries"):
+                    return "Galleries", full_path
+                if child == "Corridors":
+                    return "Corridors", full_path
+                if re.search(r"\bEnergization\b.*\bStart[\s-]*up\b.*\bCommissioning\b", child, re.I):
+                    return "Energization, Start-up & Commissioning", full_path
+            return "WBS EXCEPTION", full_path
+
+        assigned = [identify(x) for x in source["wbs_id"].astype(str)]
+        source["WBS Group"] = [x[0] for x in assigned]
+        source["WBS Path"] = [x[1] for x in assigned]
+        if source["task_code"].astype(str).duplicated().any():
+            raise ValueError(f"Duplicate Activity ID in {area}")
+        classified = source[source["WBS Group"].isin(groups)]
+        excluded = source[source["WBS Group"].eq("WBS EXCEPTION")]
+        if len(classified) + len(excluded) != len(source):
+            raise ValueError(f"Unreconciled P6 WBS groups in {area}")
+        if include_exceptions:
+            return source
+        return classified.copy()
+
+    def data_hall_wbs_stats(self, area: str) -> pd.DataFrame:
+        """The seven requested categories in stable original-P6 WBS order."""
+        detail = self.data_hall_wbs_activities(area)
+        groups = (
+            "Electrical Yard", "Mechanical Yard", "Electrical Rooms",
+            "Data Hall", "Galleries", "Corridors",
+            "Energization, Start-up & Commissioning",
+        )
+        rows = []
+        for label in groups:
+            g = detail[detail["WBS Group"].eq(label)]
+            vc = g["Status"].value_counts()
+            rows.append({
+                "Area": label,
+                "Tasks": int(len(g)),
+                "Activity Completion %": _activity_completion_pct(g),
+                "Not Started": int(vc.get("Not Started", 0)),
+                "In Progress": int(vc.get("In Progress", 0)),
+                "Completed": int(vc.get("Completed", 0)),
+            })
+        summary = pd.DataFrame(rows)
+        if int(summary["Tasks"].sum()) != len(detail):
+            raise ValueError(f"Data Hall WBS aggregation mismatch in {area}")
+        return summary
+
     def subarea_stats(self, area: str, helix_display: bool = False) -> pd.DataFrame:
         if area == "MOH" and self.auxiliary_tasks is not None:
             g = self.auxiliary_tasks[self.auxiliary_tasks["Area"].eq(area)].copy()
@@ -953,6 +1052,43 @@ def build_dc7_model(data_dir: Path) -> DC7Model:
         pd.DataFrame([
             {"Metric": "FOH/BOH Shell-Foundations WBS exceptions (audit only)", "Value": 2},
             {"Metric": "FOH/BOH WBS detail activity count (combined)", "Value": 323},
+        ]),
+    ], ignore_index=True)
+
+    # Other native Data Hall WBS branches must not silently disappear.
+    # Export every excluded HELIX task by exact Activity ID and original WBS.
+    dh_parts = []
+    for hall in ("DH1100", "DH1200", "DH1300", "DH1400", "DH1500", "DH1600"):
+        detail = model.data_hall_wbs_activities(hall, include_exceptions=True)
+        for _, row in detail[detail["WBS Group"].eq("WBS EXCEPTION")].iterrows():
+            dh_parts.append({
+                "Activity ID": str(row["task_code"]),
+                "Activity Name": str(row.get("task_name", "")),
+                "QTS - AREA": hall,
+                "Original P6 WBS": str(row["WBS Path"]),
+                "Current Status": str(row.get("Status", "")),
+                "Reconciliation": "EXCLUDED FROM SEVEN-GROUP DATA HALL DETAIL · SOURCE INCLUDED",
+                "Reason": "WBS branch outside the seven selected Data Hall groups",
+            })
+    dh_exceptions = pd.DataFrame(dh_parts)
+    if len(dh_exceptions) != 147 or dh_exceptions["Activity ID"].nunique() != len(dh_exceptions):
+        raise ValueError(
+            f"Data Hall WBS exception population changed: {len(dh_exceptions)} "
+            "(expected 147); audit the source WBS before release."
+        )
+    if dh_exceptions["Activity ID"].isin(wbs_exceptions["Activity ID"]).any():
+        raise ValueError("Duplicate FOH/BOH and Data Hall WBS exceptions")
+    audit_reports["dh_wbs_exceptions"] = dh_exceptions
+    report = audit_reports["active"]
+    masked = report["Activity ID"].astype(str).isin(dh_exceptions["Activity ID"])
+    if masked.sum() != len(dh_exceptions):
+        raise ValueError("Data Hall WBS exceptions missing from complete HELIX source audit")
+    report.loc[masked, "Audit"] = "WBS EXCEPTION — DATA HALL DETAIL EXCLUDED; SOURCE INCLUDED"
+    audit_reports["summary"] = pd.concat([
+        audit_reports["summary"],
+        pd.DataFrame([
+            {"Metric": "Data Hall other P6 WBS branches (audit only)", "Value": len(dh_exceptions)},
+            {"Metric": "Data Hall seven-group displayed tasks", "Value": 2073},
         ]),
     ], ignore_index=True)
     return model

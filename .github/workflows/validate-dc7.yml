@@ -112,6 +112,59 @@ jobs:
           assert not helix.audit_reports["departures"]["Activity ID"].isin(special.values()).any()
           print("PASS: FOH/BOH WBS 190+133; two foundation IDs explicit audit exceptions, source still 2545")
 
+          # SUFFOLK Data Hall detail: seven user-approved P6 WBS groups,
+          # with Electrical Rooms / Galleries collapsed from original branches.
+          native_groups = (
+              "Electrical Yard", "Mechanical Yard", "Electrical Rooms",
+              "Data Hall", "Galleries", "Corridors",
+              "Energization, Start-up & Commissioning",
+          )
+          expected_dh = {
+              "DH1100": [28, 11, 51, 6, 249, 18, 0],
+              "DH1200": [26, 11, 50, 7, 234, 12, 0],
+              "DH1300": [24, 11, 46, 7, 234, 17, 0],
+              "DH1400": [24, 11, 52, 7, 234, 18, 0],
+              "DH1500": [24, 11, 54, 7, 234, 18, 0],
+              "DH1600": [24, 6, 48, 7, 234, 18, 0],
+          }
+          exceptions_per_hall = {
+              "DH1100": 32, "DH1200": 32, "DH1300": 20,
+              "DH1400": 20, "DH1500": 23, "DH1600": 20,
+          }
+          shown_all = set()
+          exceptions_all = set()
+          for hall, expected_counts in expected_dh.items():
+              source = suffolk.current_tasks[suffolk.current_tasks["Area"].eq(hall)]
+              full = suffolk.data_hall_wbs_activities(hall, include_exceptions=True)
+              chosen = suffolk.data_hall_wbs_activities(hall)
+              summary = suffolk.data_hall_wbs_stats(hall)
+              excluded = full[full["WBS Group"].eq("WBS EXCEPTION")]
+              assert list(summary["Area"]) == list(native_groups), hall
+              assert list(summary["Tasks"]) == expected_counts, (hall, summary)
+              assert int(summary["Tasks"].sum()) == len(chosen), hall
+              assert len(excluded) == exceptions_per_hall[hall], hall
+              assert len(source) == len(chosen) + len(excluded), hall
+              assert set(source["task_code"]) == set(full["task_code"]), hall
+              assert set(chosen["task_code"]).isdisjoint(set(excluded["task_code"])), hall
+              assert not chosen["WBS Path"].str.contains("Shell / Foundations").any()
+              assert chosen["WBS Path"].str.contains("Construction / Interior Build-Outs").all()
+              for col in ("Completed", "In Progress", "Not Started"):
+                  assert int(summary[col].sum()) == int(chosen["Status"].eq(col).sum()), (hall, col)
+              shown_all.update(chosen["task_code"])
+              exceptions_all.update(excluded["task_code"])
+          dh_ex = helix.audit_reports["dh_wbs_exceptions"]
+          assert len(dh_ex) == 147 and dh_ex["Activity ID"].nunique() == 147
+          assert set(dh_ex["Activity ID"]) == exceptions_all
+          assert len(shown_all) == 2073
+          assert len(shown_all | exceptions_all) == 2220
+          assert set(helix.audit_reports["wbs_exceptions"]["Activity ID"]).isdisjoint(exceptions_all)
+          flagged = helix.audit_reports["active"]
+          marked = flagged[flagged["Activity ID"].isin(exceptions_all)]
+          assert len(marked) == 147
+          assert marked["Audit"].str.contains("WBS EXCEPTION").all()
+          assert not dh_ex["Activity ID"].isin(helix.audit_reports["departures"]["Activity ID"]).any()
+          print("PASS: DH1100-DH1600 seven native WBS groups; 2073 shown, 147 audited exceptions; 2545 total unchanged")
+
           assert not helix.lineup_stats("DH1100").empty, "HELIX line-ups missing"
           assert helix.fte_ready_comparison().empty, "Archived FTE milestones leaked into active Construction"
 
