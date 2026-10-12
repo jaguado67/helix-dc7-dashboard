@@ -614,15 +614,18 @@ def render_helix_lineups(m: DC7Model):
     expected = outline[area]
     if data is None:
         st.info(
-            "La línea base HELIX 226021-HE.B.xer aún no está disponible. "
-            "Se muestra exclusivamente la estructura identificada en las "
-            "capturas de P6: sin fechas, cantidades ni porcentajes de avance. "
-            "El archivo 226021-HE.B-4.xer no se utilizará."
+            "La línea base HELIX 226021-HE.B.xer todavía no está disponible. "
+            "La columna Activities indica 'Pendiente BL' hasta poder "
+            "contar los Activity IDs reales dentro de cada Line-Up, "
+            "Commissioning y MOH Equipment. No se usa el XER -4."
         )
 
     if data is None:
         rows = pd.DataFrame([
-            {"P6 WBS": r["WBS Level"], "Line-Up": r["Line-Up"]}
+            {
+                "P6 WBS": r["WBS Level"], "Line-Up": r["Line-Up"],
+                "Activities": "Pendiente BL",
+            }
             for r in expected
         ])
     else:
@@ -637,23 +640,49 @@ def render_helix_lineups(m: DC7Model):
             "WBS Level": "P6 WBS", "Baseline Tasks": "Activities",
         })
     if area == "MOH":
-        st.markdown('<div class="section-caption">MOH · EQUIPMENT</div>', unsafe_allow_html=True)
+        st.markdown(
+            '<div class="section-caption">MOH · EQUIPMENT · ACTIVITY COUNT</div>',
+            unsafe_allow_html=True,
+        )
         st.dataframe(rows, use_container_width=True, hide_index=True)
     else:
         electrical = rows[rows["P6 WBS"].eq("Electrical")].copy()
         commissioning = rows[rows["P6 WBS"].eq("Commissioning")].copy()
         st.markdown(
-            f'<div class="section-caption">{_safe(area)} · ELECTRICAL LINE-UPS</div>',
+            f'<div class="section-caption">{_safe(area)} · ELECTRICAL LINE-UPS · ACTIVITY COUNT</div>',
             unsafe_allow_html=True,
         )
         st.dataframe(electrical, use_container_width=True, hide_index=True)
         st.markdown(
-            f'<div class="section-caption">{_safe(area)} · COMMISSIONING</div>',
+            f'<div class="section-caption">{_safe(area)} · COMMISSIONING · ACTIVITY COUNT</div>',
             unsafe_allow_html=True,
         )
         st.dataframe(commissioning, use_container_width=True, hide_index=True)
 
     if data is not None:
+        total_activities = int(data[area]["Baseline Tasks"].sum())
+        st.caption(
+            f"{area}: {total_activities:,} baseline activities "
+            "from the original approved HELIX P6 WBS."
+        )
+        counts = rows.copy()
+        fig = go.Figure(go.Bar(
+            x=counts["Line-Up"],
+            y=counts["Activities"],
+            marker_color=NAVY2,
+            text=counts["Activities"],
+            textposition="outside",
+            hovertemplate="%{x}: %{y:,.0f} baseline activities<extra></extra>",
+        ))
+        fig.update_layout(
+            **_layout(400, 60, 68, 55),
+            title=f"BASELINE ACTIVITY COUNT BY LINE-UP · {area}",
+            yaxis_title="Activities",
+            showlegend=False,
+        )
+        fig.update_yaxes(rangemode="tozero", gridcolor=GRID)
+        fig.update_xaxes(tickangle=-20)
+        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
         st.caption(
             "Las cantidades y fechas son exclusivamente de la línea base P6. "
             "No representan avance real, estado actual ni pronóstico de ejecución."
@@ -708,7 +737,7 @@ def render_dashboard(helix: DC7Model, suffolk: DC7Model):
         )
         render_kpis(helix, "HELIX")
         render_scurve_and_status(helix)
-        render_stats(helix, "PROJECT STATS · HELIX CONSTRUCTION IN SUFFOLK")
+        render_helix_lineup_stats(helix)
         # Do not call render_progress_detail(helix, view="HELIX"):
         # its QTS-DASH group breakdown duplicates the SUFFOLK view.
         render_helix_lineups(helix)
