@@ -2,7 +2,7 @@
 
 Cloud-ready Streamlit package for the HELIX DC7 schedule dashboard.
 
-**Version:** 0.2.16
+**Version:** 0.2.17
 
 ## Data scope
 
@@ -13,6 +13,30 @@ This release has two selectable views. SUFFOLK displays the main DC7 project sco
 - No `DC7-MIL`
 - No `DC7.TFO-B`
 - No external-project relationships in dashboard analytics
+
+## v0.2.17 — Full original P6 FOH/BOH WBS displayed
+
+**SUFFOLK PROJECT PROGRESS DETAIL** now displays **all four native direct
+child WBS branches** beneath both `Front of House (FOH)` and
+`Back of House (BOH)`, in original `PROJWBS.seq_num` order and
+with exact P6 names. Unlike the previous version, branches with zero
+HELIX Construction activities are **not hidden**.
+
+| Native P6 WBS child | FOH: HELIX Construction tasks | BOH: HELIX Construction tasks |
+|---|---:|---:|
+| Priority Walls | 34 | 35 |
+| Other Rooms | 145 | 81 |
+| Equipment | 11 | 13 |
+| Commissioning & Start Up | **0** | 4 |
+| **Visible native-WBS subtotals** | **190** | **133** |
+
+The WBS structure comes from P6; quantities are **only** HELIX-coded
+active `Construction` tasks, not all subcontractors in P6.
+`FDN.1296` (FOH) and `FDN.1300` (BOH) remain **outside these WBS
+rows** and are visible in **SUFFOLK · HELIX CONSTRUCTION | ACTIVITY AUDIT**
+under their actual `Construction / Shell / Foundations` ancestry.
+The global 2,545-activity universe, original status/date values,
+Line-Ups, DH sections and P6 source files remain unchanged.
 
 ## v0.2.16 — FOH/BOH Foundations WBS exceptions moved to Activity Audit
 

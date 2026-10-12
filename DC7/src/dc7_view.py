@@ -293,7 +293,8 @@ def render_progress_detail(m: DC7Model, view: str):
                          "FUNCTIONAL PACKAGE SUMMARY" if area == "MOH" else
                          "SUMMARY BY FUNCTIONAL GROUP" if consolidated else
                          "SUMMARY BY QTS - DASH")
-        h = f'<div class="panel"><div class="panel-head"><div class="panel-title">{area} · {summary_title}</div></div><table class="detail-table"><thead><tr><th>Area</th><th>Tasks</th><th>Activity Completion %</th><th>Not Started</th><th>In Progress</th><th>Completed</th></tr></thead><tbody>'
+        first_column = "P6 WBS" if p6_wbs else "Area"
+        h = f'<div class="panel"><div class="panel-head"><div class="panel-title">{area} · {summary_title}</div></div><table class="detail-table"><thead><tr><th>{first_column}</th><th>Tasks</th><th>Activity Completion %</th><th>Not Started</th><th>In Progress</th><th>Completed</th></tr></thead><tbody>'
         for _, r in df.iterrows():
             label = _safe(r.Area)
             h += f'<tr><td>{label}</td><td>{int(r.Tasks)}</td><td>{r["Activity Completion %"]:.1f}%</td><td>{int(r["Not Started"])} </td><td>{int(r["In Progress"])} </td><td>{int(r.Completed)}</td></tr>'
@@ -310,12 +311,14 @@ def render_progress_detail(m: DC7Model, view: str):
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
     if p6_wbs:
         st.caption(
-            "Original Primavera P6 PROJWBS names; scope: only activities coded "
-            "QTS - Subcontractor = HELIX within Construction, including its "
-            "commissioning. One QTS-AREA-coded Foundations activity is omitted "
-            f"from the {area} WBS detail and tracked in the SUFFOLK · HELIX "
-            "CONSTRUCTION | ACTIVITY AUDIT below. The overall 2,545 P6-scope "
-            "activities and original XER assignments remain unchanged."
+            "Se muestran todas las ramas originales de la WBS de P6 bajo "
+            f"{'Front of House (FOH)' if area == 'FOH' else 'Back of House (BOH)'}, "
+            "en el mismo orden, incluso si no contienen actividades de HELIX "
+            "(Tasks = 0). Los conteos incluyen solo HELIX Construction, "
+            "también comisionamiento. Una actividad clasificada QTS-AREA "
+            f"como {area} pertenece a Shell / Foundations y se registra "
+            "por separado en SUFFOLK · HELIX CONSTRUCTION | ACTIVITY AUDIT. "
+            "No se modifican los XER ni el universo original de 2.545 actividades."
         )
         details = m.wbs_area_activities(area)
         audit_export = details[["task_code", "task_name", "Area", "WBS Group", "WBS Path", "Status"]].copy()

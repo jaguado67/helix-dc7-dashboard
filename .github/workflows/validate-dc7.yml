@@ -64,7 +64,8 @@ jobs:
           # project population or its documented audit trail.
           expected = {
               "FOH": {
-                  "Priority Walls": 34, "Other Rooms": 145, "Equipment": 11,
+                  "Priority Walls": 34, "Other Rooms": 145,
+                  "Equipment": 11, "Commissioning & Start Up": 0,
               },
               "BOH": {
                   "Priority Walls": 35, "Other Rooms": 81,
@@ -78,7 +79,14 @@ jobs:
               report = suffolk.wbs_area_stats(area)
               source = suffolk.current_tasks[suffolk.current_tasks["Area"].eq(area)]
               assert dict(zip(report["Area"], report["Tasks"])) == grouping, (area, report)
+              assert report["Area"].tolist() == list(grouping), (area, report["Area"].tolist())
+              assert len(report) == 4, f"All four original P6 WBS branches must appear in {area}"
               assert report["Area"].is_unique
+              if area == "FOH":
+                  empty = report.set_index("Area").loc["Commissioning & Start Up"]
+                  assert int(empty["Tasks"]) == 0
+                  assert float(empty["Activity Completion %"]) == 0.0
+                  assert all(int(empty[k]) == 0 for k in ("Completed", "In Progress", "Not Started"))
               assert len(detail) == len(source) - 1 == sum(grouping.values())
               assert len(source_with_exceptions) == len(source)
               assert set(source["task_code"]) - set(detail["task_code"]) == {special[area]}
