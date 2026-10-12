@@ -181,7 +181,20 @@ jobs:
           assert "CONCILIACIÓN DEL XER ORIGINAL" not in view_text
           assert "HELIX P6 BASELINE · 24 PROJECT MILESTONES" not in view_text
           assert '"Commissioning": st.column_config' not in view_text
-          assert 'Descargar auditoría HELIX · Line-Ups y MOH (CSV)' in view_text
+          assert 'Download HELIX Line-Ups & MOH Audit (CSV)' in view_text
+          assert 'heading = "MOH" if is_moh else f"DH {area[2:]}"' in detail_code
+          assert "Electrical ·" not in detail_code
+          assert "Equipment ·" not in detail_code
+          assert "actividades HELIX" not in detail_code
+          assert "Solo actividades" not in detail_code
+          assert "Auditoría:" not in detail_code
+          assert "Descargar auditoría" not in detail_code
+          assert "xaxis_title=\"Activity Count\"" in detail_code
+          # All seven expander labels are bare P6 area names.
+          labels = [("MOH" if area == "MOH" else f"DH {area[2:]}") for area in (*HALLS, "MOH")]
+          assert labels == ["DH 1100", "DH 1200", "DH 1300", "DH 1400",
+                            "DH 1500", "DH 1600", "MOH"]
+          assert 'Total Activities", "Not Started", "In Progress", "Completed"' in view_text
           assert "lineup_activity_summary(data)" in view_text
           assert 'SUFFOLK DC7 BL / Current-C' in helix_case
           assert '226021-HE.B independent Baseline' in helix_case

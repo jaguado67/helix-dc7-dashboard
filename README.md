@@ -2,7 +2,7 @@
 
 Cloud-ready Streamlit package for the HELIX DC7 schedule dashboard.
 
-**Version:** 0.2.26
+**Version:** 0.2.27
 
 ## Data scope
 
@@ -13,6 +13,22 @@ This release has two selectable views. SUFFOLK displays the main DC7 project sco
 - No `DC7-MIL`
 - No `DC7.TFO-B`
 - No external-project relationships in dashboard analytics
+
+## v0.2.27 — Concise Data Hall / MOH controls; English-only HELIX Line-Up UI
+
+- Each expandable Data Hall label is simply **DH 1100**, **DH 1200**,
+  **DH 1300**, **DH 1400**, **DH 1500** or **DH 1600**. The MOH label
+  is exactly **MOH**, without the Electrical/Equipment or activity-count
+  suffix. All original activity totals remain in the Line-Up tables.
+- Standardize visible messages, chart axis labels, source captions,
+  audit notes and CSV download text of the HELIX Line-Up/MOH sections
+  to English, consistent with the dashboard's other UI labels.
+- Preserve exact HELIX-only activity scope: 4,153 original Activity
+  IDs within Line-Ups and MOH; task statuses come from independent
+  `226021-HE.B` Baseline and must never be advertised as current.
+- No change to numerical data, status classification, WBS Line-Up
+  order (including R-first even Data Halls), project KPIs, curve S,
+  SUFFOLK view or FTE milestones.
 
 ## v0.2.26 — HELIX Line-Up detail: P6 activity status instead of dates
 
