@@ -28,7 +28,9 @@ def _materialize_cloud_xers(data_root: Path) -> Path:
         "226021.010.MO-UP-C.xer",
     )
     previous = "226021.010.MO-UP.xer"
-    auxiliary = "226021-HE.B-4.xer"
+    # Only the official HELIX project baseline is authorized as a separate source.
+    # The historical "-4" copy must never be materialized or silently substituted.
+    helix_baseline = "226021-HE.B.xer"
     required = official + (previous,)
 
     runtime_root = Path(tempfile.gettempdir()) / "helix_dc7_runtime_data"
@@ -37,7 +39,7 @@ def _materialize_cloud_xers(data_root: Path) -> Path:
     manifest = dc7 / "226021.010.MO-UP-C.xer.sha256"
     if not manifest.exists():
         # Local development with raw XER files is allowed; cloud packaging is pinned.
-        if all((dc7 / name).is_file() for name in required) and (dc7 / auxiliary).is_file():
+        if all((dc7 / name).is_file() for name in required):
             return data_root
         raise FileNotFoundError("Missing verified Current-C manifest")
 
@@ -64,17 +66,18 @@ def _materialize_cloud_xers(data_root: Path) -> Path:
             if actual != expected:
                 raise ValueError(f"Current-C integrity error (SHA256 {actual})")
 
-    if (dc7 / auxiliary).is_file():
-        aux_bytes = (dc7 / auxiliary).read_bytes()
+    # Optional: load only the approved, exact P6 HELIX Baseline XER.
+    # It is currently absent from the connected Drive data folder and repo.
+    approved_baseline = dc7 / helix_baseline
+    if approved_baseline.is_file():
+        baseline_target = runtime_dc7 / helix_baseline
+        payload = approved_baseline.read_bytes()
+        if not baseline_target.is_file() or baseline_target.read_bytes() != payload:
+            baseline_target.write_bytes(payload)
     else:
-        aux_parts = sorted(dc7.glob(f"{auxiliary}.b64.part*"))
-        if not aux_parts:
-            raise FileNotFoundError("Missing dedicated HELIX line-up XER")
-        encoded = "".join(p.read_text(encoding="ascii").strip() for p in aux_parts)
-        aux_bytes = base64.b64decode(encoded)
-    aux_target = runtime_dc7 / auxiliary
-    if not aux_target.is_file() or aux_target.read_bytes() != aux_bytes:
-        aux_target.write_bytes(aux_bytes)
+        # Temp directories persist between Streamlit reruns; never reuse a stale
+        # independent HELIX baseline from an earlier deployment.
+        (runtime_dc7 / helix_baseline).unlink(missing_ok=True)
     return runtime_root
 
 source_data_dir = Path(os.environ.get("HELIX_PROJECT_DATA_DIR", str(DATA_DIR)))
@@ -88,7 +91,7 @@ if not source_data_dir.exists():
 
 data_dir = _materialize_cloud_xers(source_data_dir)
 
-MODEL_VERSION = "dc7-2026-10-12-suffolk-current-c-helix-construction-audit-v1"
+MODEL_VERSION = "dc7-2026-10-12-approved-helix-baseline-only-no-b4-v1"
 
 @st.cache_resource(show_spinner="Reading DC7 baseline/update XER and building HELIX scope…")
 def load_model(path_text: str, model_version: str):

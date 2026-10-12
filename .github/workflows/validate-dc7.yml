@@ -39,11 +39,14 @@ jobs:
               assert parts, f"No parts for {name}"
               encoded = "".join(p.read_text(encoding="ascii").strip() for p in parts)
               (root / name).write_bytes(gzip.decompress(base64.b64decode(encoded)))
-          aux_name = "226021-HE.B-4.xer"
-          parts = sorted(raw.glob(f"{aux_name}.b64.part*"))
-          assert parts, "No dedicated HELIX data parts"
+          # Deliberately place the now-rejected historical HELIX export in
+          # the runtime folder: this must NEVER be loaded as the official BL.
+          historical_name = "226021-HE.B-4.xer"
+          parts = sorted(raw.glob(f"{historical_name}.b64.part*"))
+          assert parts, "Historical fixture is missing"
           encoded = "".join(p.read_text(encoding="ascii").strip() for p in parts)
-          (root / aux_name).write_bytes(base64.b64decode(encoded))
+          (root / historical_name).write_bytes(base64.b64decode(encoded))
+          assert not (root / "226021-HE.B.xer").exists()
 
           helix = build_dc7_model(root)
           suffolk = build_suffolk_model(helix)
@@ -165,7 +168,13 @@ jobs:
           assert not dh_ex["Activity ID"].isin(helix.audit_reports["departures"]["Activity ID"]).any()
           print("PASS: DH1100-DH1600 seven native WBS groups; 2073 shown, 147 audited exceptions; 2545 total unchanged")
 
-          assert not helix.lineup_stats("DH1100").empty, "HELIX line-ups missing"
+          assert helix.auxiliary_path is None, "Rejected -4 source incorrectly loaded"
+          assert helix.auxiliary_tasks is not None and helix.auxiliary_tasks.empty
+          assert helix.lineup_stats("DH1100").empty, "Line-Ups cannot use rejected B-4 or SUFFOLK fallback"
+          assert "MOH" not in helix.areas(), "MOH must not be generated from rejected B-4"
+          assert "Not loaded" in helix.diagnostics()["Line-Up / MOH Source"]
+          assert helix.current_tasks["task_code"].nunique() == 2545
+          print("PASS: official HELIX baseline is not loaded; historical B-4 rejected; Line-Ups/MOH unavailable without unauthorized fallback")
           assert helix.fte_ready_comparison().empty, "Archived FTE milestones leaked into active Construction"
 
           # Consolidation is a view-only transformation for HELIX Data Halls.

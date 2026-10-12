@@ -2,7 +2,7 @@
 
 Cloud-ready Streamlit package for the HELIX DC7 schedule dashboard.
 
-**Version:** 0.2.18
+**Version:** 0.2.19
 
 ## Data scope
 
@@ -13,6 +13,36 @@ This release has two selectable views. SUFFOLK displays the main DC7 project sco
 - No `DC7-MIL`
 - No `DC7.TFO-B`
 - No external-project relationships in dashboard analytics
+
+## v0.2.19 — DC7 HELIX official baseline only; historical B-4 rejected
+
+The independent electrical DC7 HELIX reference must be the actual
+Primavera P6 **`226021-HE.B` Baseline**, exported as the exact
+`226021-HE.B.xer` file. The historical
+`226021-HE.B-4.xer` copy is explicitly **not authorized**.
+
+At the time of this release, the connected Drive folder
+`DASHBOARD HELIX / DH / DC7` has **only the B-4 XER**, not the exact
+original B XER. Until the official baseline is supplied, the dashboard:
+
+- Does **not** ingest the historical B-4 file or its encoded repo chunks;
+- Does **not** infer Line-Ups or MOH from the SUFFOLK update as fallback;
+- Omits standalone MOH and marks Equipment Line-Ups **unavailable until
+  official HELIX Baseline is loaded**;
+- Labels HELIX current progress as the **HELIX-coded Construction slice
+  from SUFFOLK Current-C**, not a standalone HELIX schedule update;
+- Restricts any future independent HELIX import to the exact filename
+  `226021-HE.B.xer` and the exact Primavera project
+  `proj_short_name = 226021-HE.B`. The baseline cannot be substituted
+  with a renamed B-4 file.
+
+The 2,545 SUFFOLK HELIX Construction activities, 31 historical
+departures, 149 classified-WBS display exceptions, FOH/BOH, Data Halls,
+date comparisons and all other SUFFOLK analyses are unchanged.
+There is **no independent HELIX Current** and **no independent HELIX
+Baseline XER yet loaded in the published deployment**. A P6 screenshot
+showing Data Date 29-Sep-2026 and Date Added 01-Oct-2026 is not by itself
+sufficient to authenticate a substitute XER.
 
 ## v0.2.18 — Seven native-P6 WBS groups for SUFFOLK Data Halls
 

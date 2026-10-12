@@ -368,7 +368,7 @@ def render_progress_detail(m: DC7Model, view: str):
     elif consolidated:
         st.caption("HELIX Data Hall display groups consolidate Other Rooms and Electrical Rooms, and classify unassigned underslab electrical / RTU roof activities by function. Original QTS-DASH, task IDs, status, and XER data remain unchanged. Unrecognized activities remain unclassified.")
     elif area == "MOH":
-        st.caption("MOH is sourced from 226021-HE.B-4.xer. That file does not contain QTS-DASH, so MOH is grouped by equipment identifiers in the activity names; the original XER coding remains unchanged.")
+        st.caption("MOH is sourced only from the official independent HELIX baseline 226021-HE.B.xer, when loaded. No HELIX Current is available.")
     elif "Other HELIX Electrical Scope" in set(df["Area"].astype(str)):
         st.caption("Other HELIX Electrical Scope contains only activities coded QTS - Subcontractor = HELIX that have no QTS-DASH assignment; the original XER coding remains unchanged.")
     # Dedicated HELIX Line-Ups are rendered separately in HELIX VIEW only.
@@ -378,8 +378,13 @@ def render_lineups_detail(m: DC7Model, area: str):
     df = m.lineup_stats(area)
     if df.empty:
         return
-    st.markdown(f'<div class="section-caption">EQUIPMENT LINE-UPS PROGRESS DETAIL · {area}</div>', unsafe_allow_html=True)
-    st.markdown('<div class="small-note">Activity-count status for Equipment Line-Ups sourced from the dedicated HELIX electrical schedule 226021-HE.B-4.xer. Activity Completion % = Completed / Tasks.</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="section-caption">EQUIPMENT LINE-UPS · HELIX BASELINE · {area}</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="small-note">Only source: official independent HELIX baseline '
+        '226021-HE.B.xer. These are baseline activity statuses, '
+        'not a measured HELIX Current or current project progress.</div>',
+        unsafe_allow_html=True,
+    )
     c1, c2 = st.columns([1.15, 1], gap="large")
     with c1:
         h = f'<div class="panel"><div class="panel-head"><div class="panel-title">{area} · SUMMARY BY LINE-UP</div></div><table class="detail-table"><thead><tr><th>Line-Up</th><th>Tasks</th><th>Activity Completion %</th><th>Not Started</th><th>In Progress</th><th>Completed</th></tr></thead><tbody>'
@@ -507,7 +512,11 @@ def render_gates(m: DC7Model):
 def render_helix_lineups(m: DC7Model):
     halls = [a for a in m.areas() if a.startswith("DH") and not m.lineup_stats(a).empty]
     if not halls:
-        st.info("No dedicated HELIX equipment line-ups were found.")
+        st.info(
+            "Equipment Line-Ups / MOH: línea base independiente HELIX "
+            "(226021-HE.B.xer) todavía no cargada. No se utilizará "
+            "226021-HE.B-4.xer ni se sustituirá con actividades de SUFFOLK."
+        )
         return
     st.markdown('<div class="section-caption">HELIX · EQUIPMENT LINE-UPS</div>', unsafe_allow_html=True)
     area = st.selectbox("Data Hall · Equipment Line-Ups", halls, key="helix_lineup_area")
@@ -540,16 +549,23 @@ def render_dashboard(helix: DC7Model, suffolk: DC7Model):
         render_windows(suffolk)
         render_progress_detail(suffolk, view="SUFFOLK")
     else:
+        st.caption(
+            "El avance constructivo de esta vista se obtiene exclusivamente "
+            "del cronograma SUFFOLK (QTS - Subcontractor = HELIX, Construction). "
+            "La línea base independiente HELIX 226021-HE.B.xer está pendiente "
+            "de incorporación; no existe un Current independiente de HELIX."
+        )
         render_scurve_and_status(helix)
         render_stats(helix, "PROJECT STATS · HELIX SCOPE")
         render_progress_detail(helix, view="HELIX")
         render_helix_lineups(helix)
         render_gates(helix)
         st.caption(
-            "Source note: HELIX KPIs, S-curve and FTE comparison retain the existing "
-            "QTS - Subcontractor = HELIX selection from the SUFFOLK BL/UP schedule. "
-            "Equipment Line-Ups and MOH use 226021-HE.B-4.xer. "
-            "The independent HELIX baseline XER is not loaded."
+            "Source note: HELIX construction KPIs and S-curve are derived "
+            "from the SUFFOLK Baseline / Current-C under QTS - Subcontractor = HELIX. "
+            "Only the official independent HELIX baseline 226021-HE.B.xer "
+            "is authorized for MOH and Equipment Line-Ups; it is not yet loaded. "
+            "No independent HELIX update is available."
         )
 
     reports = helix.audit_reports or {}
