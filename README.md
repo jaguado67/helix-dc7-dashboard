@@ -2,7 +2,7 @@
 
 Cloud-ready Streamlit package for the HELIX DC7 schedule dashboard.
 
-**Version:** 0.2.20
+**Version:** 0.2.21
 
 ## Data scope
 
@@ -13,6 +13,35 @@ This release has two selectable views. SUFFOLK displays the main DC7 project sco
 - No `DC7-MIL`
 - No `DC7.TFO-B`
 - No external-project relationships in dashboard analytics
+
+## v0.2.21 — Restore HELIX dashboard sections (only duplicate Detail removed)
+
+The prior v0.2.20 release accidentally removed the full HELIX progress
+overview. This patch corrects the scope of the user-requested change.
+
+**HELIX VIEW retains:**
+- **Project Status Summary / Schedule Performance** cards;
+- **Activity S-Curve** (Baseline / Current forecast / Actual Completed);
+- **Overall Activity Status** and **Project Stats by Area**;
+- **Equipment Line-Ups** for DH1100 through DH1600 and **MOH**;
+- **Project Key Milestones / FTE Ready** (currently informs that
+  the previous IST.6100 milestones are archived, no fictitious current milestones).
+
+Only **HELIX PROJECT PROGRESS DETAIL**, the redundant QTS-DASH
+FOH/BOH/Data Hall activity breakdown, is excluded. It remains available
+in SUFFOLK VIEW under original P6 WBS display rules.
+
+**Source transparency:** HELIX construction KPIs, dates, status, S-curve,
+area stats and milestones are still derived from **SUFFOLK BL / Current-C**
+filtered to HELIX-coded Construction. They are NOT a standalone HELIX
+update. Equipment Line-Ups / MOH remain limited to the independent official
+`226021-HE.B.xer` baseline, which is not yet available; the historical
+`-4` file stays rejected. Without that XER, Line-Up labels/order are
+shown as a screenshot-grounded WBS skeleton, without invented metrics.
+
+**Unchanged:** 2,545 source HELIX-coded Construction activities, all
+SUFFOLK view calculations/visuals, MOH and line-up ordering (R first in
+DH1200, DH1400 and DH1600), XER file integrity and activity audits.
 
 ## v0.2.20 — HELIX VIEW: only independent electrical baseline Line-Ups and MOH
 
