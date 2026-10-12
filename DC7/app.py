@@ -66,18 +66,27 @@ def _materialize_cloud_xers(data_root: Path) -> Path:
             if actual != expected:
                 raise ValueError(f"Current-C integrity error (SHA256 {actual})")
 
-    # Optional: load only the approved, exact P6 HELIX Baseline XER.
-    # It is currently absent from the connected Drive data folder and repo.
+    # Import SHA-verified original HELIX P6 Baseline; never the rejected -4.
     approved_baseline = dc7 / helix_baseline
+    approved_manifest = dc7 / f"{helix_baseline}.sha256"
+    pinned = "1057564634e2392de2f5a3f825d15363a50f5a8f9b152bc1733c128dbf1d8d2b"
+    if not approved_manifest.is_file():
+        raise FileNotFoundError("Official HELIX Baseline checksum manifest missing")
+    if approved_manifest.read_text(encoding="ascii").split()[0] != pinned:
+        raise ValueError("HELIX baseline SHA-256 manifest mismatch")
     if approved_baseline.is_file():
-        baseline_target = runtime_dc7 / helix_baseline
         payload = approved_baseline.read_bytes()
-        if not baseline_target.is_file() or baseline_target.read_bytes() != payload:
-            baseline_target.write_bytes(payload)
     else:
-        # Temp directories persist between Streamlit reruns; never reuse a stale
-        # independent HELIX baseline from an earlier deployment.
-        (runtime_dc7 / helix_baseline).unlink(missing_ok=True)
+        parts = sorted(dc7.glob(f"{helix_baseline}.gz.b64.part*"))
+        if not parts:
+            raise FileNotFoundError("Official HELIX baseline encoded XER package missing")
+        encoded = "".join(p.read_text(encoding="ascii").strip() for p in parts)
+        payload = gzip.decompress(base64.b64decode(encoded))
+    if len(payload) != 3042495 or hashlib.sha256(payload).hexdigest() != pinned:
+        raise ValueError("Official HELIX Baseline failed size or SHA-256 verification")
+    baseline_target = runtime_dc7 / helix_baseline
+    if not baseline_target.is_file() or baseline_target.read_bytes() != payload:
+        baseline_target.write_bytes(payload)
     return runtime_root
 
 source_data_dir = Path(os.environ.get("HELIX_PROJECT_DATA_DIR", str(DATA_DIR)))
@@ -91,7 +100,7 @@ if not source_data_dir.exists():
 
 data_dir = _materialize_cloud_xers(source_data_dir)
 
-MODEL_VERSION = "dc7-2026-10-12-approved-helix-baseline-only-no-b4-v1"
+MODEL_VERSION = "dc7-2026-10-12-helix-approved-baseline-activity-counts-v1"
 
 @st.cache_resource(show_spinner="Reading DC7 baseline/update XER and building HELIX scope…")
 def load_model(path_text: str, model_version: str):
