@@ -312,10 +312,10 @@ def render_progress_detail(m: DC7Model, view: str):
         st.caption(
             "Original Primavera P6 PROJWBS names; scope: only activities coded "
             "QTS - Subcontractor = HELIX within Construction, including its "
-            "commissioning. Foundations is shown separately because one "
-            f"HELIX activity assigned to {area} by QTS-AREA is in Construction "
-            "/ Shell / Foundations, not in the House Systems WBS branch. "
-            "No P6 activity codes or WBS assignments were changed."
+            "commissioning. One QTS-AREA-coded Foundations activity is omitted "
+            f"from the {area} WBS detail and tracked in the SUFFOLK · HELIX "
+            "CONSTRUCTION | ACTIVITY AUDIT below. The overall 2,545 P6-scope "
+            "activities and original XER assignments remain unchanged."
         )
         details = m.wbs_area_activities(area)
         audit_export = details[["task_code", "task_name", "Area", "WBS Group", "WBS Path", "Status"]].copy()
@@ -527,6 +527,24 @@ def render_dashboard(helix: DC7Model, suffolk: DC7Model):
             )
             summary = reports["summary"]
             st.dataframe(summary, use_container_width=True, hide_index=True)
+            wbs_exceptions = reports.get("wbs_exceptions", pd.DataFrame())
+            if not wbs_exceptions.empty:
+                st.markdown("**FOH / BOH · WBS classification exceptions**")
+                st.caption(
+                    "These two active HELIX Construction activities remain in "
+                    "the P6 source and full scope count, but are excluded from "
+                    "the FOH/BOH WBS breakdown because their original parent "
+                    "is Construction / Shell / Foundations."
+                )
+                st.dataframe(
+                    wbs_exceptions, use_container_width=True, hide_index=True,
+                )
+                st.download_button(
+                    "Download FOH/BOH WBS exceptions (CSV)",
+                    wbs_exceptions.to_csv(index=False).encode("utf-8-sig"),
+                    file_name="DC7_HELIX_FOH_BOH_WBS_exceptions_C.csv",
+                    mime="text/csv", key=f"wbs_exceptions_{view}",
+                )
             departed = reports["departures"]
             if not departed.empty:
                 st.warning(
