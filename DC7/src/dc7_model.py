@@ -9,6 +9,7 @@ import pandas as pd
 
 from config import AREA_ORDER, CONTROL_GATE_KEYWORDS, HOURS_PER_DAY
 from src.xer import parse_xer, to_task_frame
+from src.construction_audit import construction_wbs_ids, scoped_helix_construction, build_activity_audit
 
 WANTED = ["PROJECT", "TASK", "PROJWBS", "ACTVTYPE", "ACTVCODE", "TASKACTV"]
 
@@ -49,7 +50,9 @@ def _find_files(data_dir: Path) -> tuple[Path, Path]:
         raise FileNotFoundError(f"No XER files found below data directory: {data_dir}")
 
     exact_bl = [p for p in all_xer if p.name.casefold() == "226021.005.mo-bl.xer"]
-    exact_up = [p for p in all_xer if p.name.casefold() == "226021.010.mo-up.xer"]
+    if not any(p.name.casefold() == "226021.010.mo-up-c.xer" for p in all_xer):
+        raise FileNotFoundError("Required verified Current-C XER was not found; refusing to load an older update.")
+    exact_up = [p for p in all_xer if p.name.casefold() == "226021.010.mo-up-c.xer"]
 
     if exact_bl and exact_up:
         pairs = [(b, u) for b in exact_bl for u in exact_up if b.parent == u.parent]
@@ -102,7 +105,7 @@ def _find_files(data_dir: Path) -> tuple[Path, Path]:
         suffix = " ..." if len(all_xer) > 20 else ""
         raise FileNotFoundError(
             "DC7 BL/UP pair not found. Expected official files "
-            "226021.005.MO-BL.xer and 226021.010.MO-UP.xer either directly "
+            "226021.005.MO-BL.xer and 226021.010.MO-UP-C.xer either directly "
             f"inside {data_dir} or in a DC7 subfolder. XERs seen: {names}{suffix}"
         )
 
@@ -312,6 +315,7 @@ class DC7Model:
     auxiliary_path: Optional[Path] = None
     auxiliary_tasks: Optional[pd.DataFrame] = None
     auxiliary_project: Optional[pd.Series] = None
+    audit_reports: Optional[dict[str, pd.DataFrame]] = None
 
     @property
     def data_date(self):
@@ -748,7 +752,7 @@ def build_dc7_model(data_dir: Path) -> DC7Model:
     cur_all = to_task_frame(ut["TASK"])
     cur_all = cur_all[cur_all["proj_id"].astype(str).eq(upid)].copy()
     helix_ids = _helix_task_ids(ut, upid)
-    current = cur_all[cur_all["task_id"].astype(str).isin(helix_ids)].copy()
+    current = scoped_helix_construction(ut, upid, helix_ids)
     if current.empty:
         raise ValueError("HELIX scope contains zero activities in the DC7 update.")
 
@@ -761,6 +765,8 @@ def build_dc7_model(data_dir: Path) -> DC7Model:
         raise ValueError("Duplicate task_code values found inside current HELIX scope; baseline matching is not unique.")
     base_all = to_task_frame(bt["TASK"])
     base_all = base_all[base_all["proj_id"].astype(str).eq(bpid)].copy()
+    base_wbs = construction_wbs_ids(bt, bpid)
+    base_all = base_all[base_all["wbs_id"].astype(str).isin(base_wbs)].copy()
     mapping = current[["task_code", "Area", "Subarea"]].drop_duplicates("task_code")
     baseline = base_all.merge(mapping, on="task_code", how="inner")
 
@@ -780,6 +786,18 @@ def build_dc7_model(data_dir: Path) -> DC7Model:
         aux_tasks["Area"] = aux_tasks["task_id"].astype(str).map(a_area_map).fillna("Unclassified")
         aux_tasks["Subarea"] = "Other HELIX Electrical Scope"
 
+    # Trace the exact source activities, including the previous active update.
+    previous_active = None
+    previous_path = next(iter(sorted(Path(data_dir).rglob("226021.010.MO-UP.xer"))), None)
+    if previous_path is not None:
+        pt = parse_xer(previous_path, WANTED)
+        pp = _project_row(pt, previous_path)
+        previous_pid = str(pp["proj_id"])
+        previous_active = scoped_helix_construction(pt, previous_pid, _helix_task_ids(pt, previous_pid))
+    audit_reports = build_activity_audit(cur_all, helix_ids, current, baseline, previous_active)
+    if audit_reports["summary"].loc[audit_reports["summary"]["Metric"].eq("Matched to Baseline by Activity ID"), "Value"].iloc[0] != len(current):
+        raise ValueError("HELIX construction is not fully matched to the Baseline; audit required.")
+
     # Updates may add, split, replace, or recode activities.
     # Baseline-vs-current comparisons use matched task_codes only,
     # while current-status analytics retain the full current HELIX scope.
@@ -788,37 +806,21 @@ def build_dc7_model(data_dir: Path) -> DC7Model:
         auxiliary_path=aux_path,
         auxiliary_tasks=aux_tasks,
         auxiliary_project=aux_project,
+        audit_reports=audit_reports,
     )
 
 
 def build_suffolk_model(helix_model: DC7Model) -> DC7Model:
-    """View of the SUFFOLK main project using the same XER files.
+    """SUFFOLK Construction scope performed by HELIX, not procurement.
 
-    HELIX filters are deliberately not applied to this view. Only activities
-    assigned to the dashboard's approved QTS-AREA list are presented in the
-    FOH/BOH/Data Hall summary; the project-level finish remains the official
-    SUFFOLK project finish. No XER or scheduling calculations are changed.
+    Uses the already audited HELIX construction task IDs from the Suffolk XER.
+    SUFFOLK contractual finish dates still come from the full P6 PROJECT row.
     """
     update_project_id = str(helix_model.update_project["proj_id"])
     baseline_project_id = str(helix_model.baseline_project["proj_id"])
-    current_all = to_task_frame(helix_model.update_tables["TASK"])
-    current_all = current_all[
-        current_all["proj_id"].astype(str).eq(update_project_id)
-    ].copy()
-
-    area_codes = _assignment_map(
-        helix_model.update_tables, update_project_id, "QTS - AREA", "short_name"
-    )
-    dash_codes = _assignment_map(
-        helix_model.update_tables, update_project_id, "QTS - DASH", "actv_code_name"
-    )
-    current_all["Area"] = current_all["task_id"].astype(str).map(area_codes)
-    current_all = current_all[current_all["Area"].isin(AREA_ORDER)].copy()
-    current_all["Subarea"] = (
-        current_all["task_id"].astype(str)
-        .map(dash_codes).map(_clean_subarea)
-        .replace("Other HELIX Electrical Scope", "Other SUFFOLK Scope")
-    )
+    current_all = helix_model.current_tasks.copy()
+    # Already coded QTS - Subcontractor = HELIX and descended from Construction.
+    # Keep QTS-AREA and original QTS-DASH assignment in their existing columns.
     if current_all.empty:
         raise ValueError("No SUFFOLK activities matched QTS - AREA.")
     if current_all["task_code"].duplicated().any():
@@ -828,6 +830,8 @@ def build_suffolk_model(helix_model: DC7Model) -> DC7Model:
     baseline_all = baseline_all[
         baseline_all["proj_id"].astype(str).eq(baseline_project_id)
     ].copy()
+    baseline_wbs = construction_wbs_ids(helix_model.baseline_tables, baseline_project_id)
+    baseline_all = baseline_all[baseline_all["wbs_id"].astype(str).isin(baseline_wbs)].copy()
     area_mapping = current_all[["task_code", "Area", "Subarea"]].drop_duplicates("task_code")
     baseline = baseline_all.merge(area_mapping, on="task_code", how="inner")
 
@@ -836,4 +840,5 @@ def build_suffolk_model(helix_model: DC7Model) -> DC7Model:
         helix_model.baseline_project, helix_model.update_project,
         baseline, current_all,
         helix_model.baseline_tables, helix_model.update_tables,
+        audit_reports=helix_model.audit_reports,
     )

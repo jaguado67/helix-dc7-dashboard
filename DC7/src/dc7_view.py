@@ -94,7 +94,7 @@ def render_header(m: DC7Model, view: str):
       <div class="header-meta">
         <div class="line">Latest Data Date&nbsp;&nbsp;<span class="value">{_fmt_date(m.data_date)}</span></div>
         <div class="line">Current Update&nbsp;&nbsp;<span class="value">{_safe(m.update_path.stem)}</span></div>
-        <div class="line">Scope&nbsp;&nbsp;<span class="value">{_safe("SUFFOLK QTS-AREA" if view == "SUFFOLK" else "HELIX Electric")}</span></div>
+        <div class="line">Scope&nbsp;&nbsp;<span class="value">{_safe("SUFFOLK / HELIX Construction" if view == "SUFFOLK" else "HELIX Construction")}</span></div>
       </div>
       <div class="logo-card"><img src="{_logo('helix')}"></div>
     </div>
@@ -107,7 +107,7 @@ def render_kpis(m: DC7Model, view: str):
     counts = m.status_counts()
     p = m.status_percentages()
     st.markdown('<div class="section-caption">PROJECT STATUS SUMMARY</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="panel schedule"><div class="panel-head"><div><span class="time-pill">TIME</span><span class="panel-title">SCHEDULE PERFORMANCE</span></div><div class="panel-note">{_safe("SUFFOLK project finish · QTS-AREA task status" if view == "SUFFOLK" else "SUFFOLK project finish · HELIX subcontractor-coded status")}</div></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="panel schedule"><div class="panel-head"><div><span class="time-pill">TIME</span><span class="panel-title">SCHEDULE PERFORMANCE</span></div><div class="panel-note">{_safe("SUFFOLK project finish · HELIX construction activity scope" if view == "SUFFOLK" else "SUFFOLK project finish · HELIX construction activity scope")}</div></div>', unsafe_allow_html=True)
     cards = [
         ("Baseline Completion", _fmt_date(m.baseline_finish), m.baseline_path.stem, ""),
         ("Current Forecast Finish", _fmt_date(m.current_finish), _fmt_days(fv) + " vs Baseline", _var_class(fv)),
@@ -128,7 +128,7 @@ def render_scurve_and_status(m: DC7Model):
     st.markdown('<div class="section-caption">ACTIVITY PERFORMANCE</div>', unsafe_allow_html=True)
     c1, c2 = st.columns([1.7, 0.8], gap="large")
     with c1:
-        st.markdown('<div class="panel"><div class="panel-head"><div class="panel-title">ACTIVITY S-CURVE · HELIX SCOPE</div><div class="panel-note">Cumulative activity count · baseline / current forecast / actual completions</div></div>', unsafe_allow_html=True)
+        st.markdown('<div class="panel"><div class="panel-head"><div class="panel-title">ACTIVITY S-CURVE · HELIX CONSTRUCTION</div><div class="panel-note">Cumulative activity count · baseline / current forecast / actual completions</div></div>', unsafe_allow_html=True)
         df = m.scurve()
         if df.empty:
             st.info("Activity S-curve could not be constructed from the XER finish dates.")
@@ -194,7 +194,7 @@ def render_fte_ready(m: DC7Model):
     st.markdown('<div class="small-note">Main DC7 project only. Gray diamond = Baseline FTE Ready. Colored circle = Current FTE Ready. Date Shift = Baseline − Current. Green/positive = earlier than Baseline, red/negative = later than Baseline, blue/zero = no date change. No external-project milestones or external relationships are used.</div>', unsafe_allow_html=True)
     df = m.fte_ready_comparison()
     if df.empty:
-        st.info("No comparable FTE Ready milestones were identified in the DC7 main project.")
+        st.info("No active FTE Ready milestones remain in Construction. The previous IST.6100 family has been archived in P6; consult the Activity Audit for their IDs.")
         return
 
     fig = go.Figure()
@@ -360,7 +360,7 @@ def render_gates(m: DC7Model):
 
     reg = m.fte_ready_comparison().copy()
     if reg.empty:
-        st.info("No comparable FTE Ready milestones were identified in the DC7 main project.")
+        st.info("No active FTE Ready milestones remain in Construction. The previous IST.6100 family has been archived in P6; consult the Activity Audit for their IDs.")
         return
 
     f1, f2 = st.columns([1, 1], gap="small")
@@ -470,7 +470,7 @@ def render_dashboard(helix: DC7Model, suffolk: DC7Model):
                 default="SUFFOLK", key="dc7_schedule_view",
                 label_visibility="collapsed",
             )
-    note = "SUFFOLK main project · QTS-AREA" if view == "SUFFOLK" else "HELIX subcontractor-coded progress · dedicated electrical line-ups"
+    note = "SUFFOLK contractual dates · HELIX Construction only" if view == "SUFFOLK" else "HELIX Construction · commissioning included · procurement excluded"
     st.markdown(f'<div class="project-strip"><span>{view} VIEW</span><span class="right">{_safe(note)}</span></div>', unsafe_allow_html=True)
     render_kpis(model, view)
 
@@ -490,6 +490,39 @@ def render_dashboard(helix: DC7Model, suffolk: DC7Model):
             "Equipment Line-Ups and MOH use 226021-HE.B-4.xer. "
             "The independent HELIX baseline XER is not loaded."
         )
+
+    reports = helix.audit_reports or {}
+    if reports:
+        with st.expander("SUFFOLK · HELIX CONSTRUCTION | ACTIVITY AUDIT", expanded=True):
+            st.caption(
+                "Source: 226021.005.MO-BL (Baseline) / 226021.010.MO-UP "
+                "(Previous) / 226021.010.MO-UP-C (Current). Only QTS - "
+                "Subcontractor = HELIX under Construction WBS, including "
+                "commissioning. Procurement and archived activities excluded."
+            )
+            summary = reports["summary"]
+            st.dataframe(summary, use_container_width=True, hide_index=True)
+            departed = reports["departures"]
+            if not departed.empty:
+                st.warning(
+                    f"{len(departed)} previously active HELIX activities no "
+                    "longer appear in active Construction. Review archived and "
+                    "reassigned Activity IDs before approving progress figures."
+                )
+                st.dataframe(departed, use_container_width=True, hide_index=True)
+                st.download_button(
+                    "Download departed activities (CSV)",
+                    departed.to_csv(index=False).encode("utf-8-sig"),
+                    file_name="DC7_HELIX_departed_activities_C.csv",
+                    mime="text/csv", key=f"departures_{view}",
+                )
+            active = reports["active"]
+            st.download_button(
+                "Download full HELIX construction audit (CSV)",
+                active.to_csv(index=False).encode("utf-8-sig"),
+                file_name="DC7_HELIX_construction_audit_C.csv",
+                mime="text/csv", key=f"activities_{view}",
+            )
 
     with st.expander(f"Diagnostics · DC7 {view} XER / Scope Audit", expanded=False):
         st.dataframe(pd.DataFrame([model.diagnostics()]), use_container_width=True, hide_index=True)
