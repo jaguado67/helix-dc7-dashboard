@@ -1054,6 +1054,43 @@ def build_dc7_model(data_dir: Path) -> DC7Model:
             {"Metric": "FOH/BOH WBS detail activity count (combined)", "Value": 323},
         ]),
     ], ignore_index=True)
+
+    # Other native Data Hall WBS branches must not silently disappear.
+    # Export every excluded HELIX task by exact Activity ID and original WBS.
+    dh_parts = []
+    for hall in ("DH1100", "DH1200", "DH1300", "DH1400", "DH1500", "DH1600"):
+        detail = model.data_hall_wbs_activities(hall, include_exceptions=True)
+        for _, row in detail[detail["WBS Group"].eq("WBS EXCEPTION")].iterrows():
+            dh_parts.append({
+                "Activity ID": str(row["task_code"]),
+                "Activity Name": str(row.get("task_name", "")),
+                "QTS - AREA": hall,
+                "Original P6 WBS": str(row["WBS Path"]),
+                "Current Status": str(row.get("Status", "")),
+                "Reconciliation": "EXCLUDED FROM SEVEN-GROUP DATA HALL DETAIL · SOURCE INCLUDED",
+                "Reason": "WBS branch outside the seven selected Data Hall groups",
+            })
+    dh_exceptions = pd.DataFrame(dh_parts)
+    if len(dh_exceptions) != 147 or dh_exceptions["Activity ID"].nunique() != len(dh_exceptions):
+        raise ValueError(
+            f"Data Hall WBS exception population changed: {len(dh_exceptions)} "
+            "(expected 147); audit the source WBS before release."
+        )
+    if dh_exceptions["Activity ID"].isin(wbs_exceptions["Activity ID"]).any():
+        raise ValueError("Duplicate FOH/BOH and Data Hall WBS exceptions")
+    audit_reports["dh_wbs_exceptions"] = dh_exceptions
+    report = audit_reports["active"]
+    masked = report["Activity ID"].astype(str).isin(dh_exceptions["Activity ID"])
+    if masked.sum() != len(dh_exceptions):
+        raise ValueError("Data Hall WBS exceptions missing from complete HELIX source audit")
+    report.loc[masked, "Audit"] = "WBS EXCEPTION — DATA HALL DETAIL EXCLUDED; SOURCE INCLUDED"
+    audit_reports["summary"] = pd.concat([
+        audit_reports["summary"],
+        pd.DataFrame([
+            {"Metric": "Data Hall other P6 WBS branches (audit only)", "Value": len(dh_exceptions)},
+            {"Metric": "Data Hall seven-group displayed tasks", "Value": 2073},
+        ]),
+    ], ignore_index=True)
     return model
 
 
