@@ -2,7 +2,7 @@
 
 Cloud-ready Streamlit package for the HELIX DC7 schedule dashboard.
 
-**Version:** 0.2.13
+**Version:** 0.2.14
 
 ## Data scope
 
@@ -13,6 +13,54 @@ This release has two selectable views. SUFFOLK displays the main DC7 project sco
 - No `DC7-MIL`
 - No `DC7.TFO-B`
 - No external-project relationships in dashboard analytics
+
+## v0.2.14 — Verified SUFFOLK Current-C with auditable HELIX Construction
+
+**Data sources (same independent Primavera P6 project):**
+
+- Baseline: `226021.005.MO-BL.xer`.
+- Previous: `226021.010.MO-UP.xer`.
+- Current: `226021.010.MO-UP-C.xer`, verified SHA-256:
+  `91bc8183e75b0e02b130a2eee512d68c054b49deeedf24e0bc07beea67839b2d`.
+- Dedicated HELIX electrical line-ups/MOH: `226021-HE.B-4.xer` (unchanged).
+
+**Strict activity selection in the SUFFOLK and HELIX views:** P6 Activity Code
+`QTS - Subcontractor = HELIX` AND membership in the WBS `Construction`
+or any descendant. This includes construction commissioning, excludes
+Procurement, Preconstruction, BIM, milestones outside Construction, and
+Archived (Deleted) Activities. Both views present **HELIX execution within
+the SUFFOLK schedule**; the project finish KPI continues to read the complete
+SUFFOLK PROJECT finish, and is labelled accordingly.
+
+**Control totals at P6 Data Date 26-Aug-2026:**
+
+| Audit | Count |
+|---|---:|
+| Previous HELIX Construction activities | 2576 |
+| Current HELIX active Construction activities | 2545 |
+| Completed | 187 |
+| In Progress | 32 |
+| Not Started | 2326 |
+| Matched to Baseline by exact Activity ID | 2545 |
+| Departed active scope | 31 |
+| Of departed, now archived/outside Construction | 18 |
+| Of departed, no longer in HELIX active Construction/current | 13 |
+| Newly added HELIX active IDs | 0 |
+
+Six prior `*.IST.6100` FTE milestones are now located in archived WBS;
+they are **not drawn as current construction milestones**. The FTE panel
+reports that comparable active milestones are missing, rather than silently
+using archived data.
+
+A new **SUFFOLK · HELIX CONSTRUCTION | ACTIVITY AUDIT** panel displays
+reconciliation metrics and exports two CSV audit files:
+the full 2545-Activity construction listing (BL/Previous/Current dates and
+status) and 31 exited Activity IDs with their reason. No changes to P6 XER
+records, codes or calendars were made.
+
+**Important:** The file arrived in Google Drive on 12-Oct-2026, but its P6
+Data Date is **26-Aug-2026**. It must never be labelled as an October
+progress cutoff solely because of the upload timestamp.
 
 ## v0.2.13 — Consolidated HELIX Data Hall functional groups
 
