@@ -2,7 +2,7 @@ name: Validate DC7 dashboard
 
 on:
   push:
-    branches: [main]
+    branches: [main, audit/foh-boh-foundations-exceptions-20261012]
     paths:
       - "DC7/**"
       - ".github/workflows/validate-dc7.yml"
@@ -59,39 +59,50 @@ jobs:
               matrix = scope_model.area_stats()
               assert int(matrix["Total Tasks"].sum()) == 2545
               assert "MOH" not in set(matrix["Area"]), "Auxiliary MOH must never enter the Suffolk construction totals"
-          # Suffolk FOH/BOH use the original P6 PROJWBS grouping, not QTS-DASH.
-          # Keep the two QTS-AREA-coded foundation activities visible and auditable.
+          # Original FOH/BOH WBS labels; two Shell/Foundation activities
+          # are EXCLUDED from the area WBS tables/plots, not from the source
+          # project population or its documented audit trail.
           expected = {
               "FOH": {
-                  "Priority Walls": 34, "Other Rooms": 145,
-                  "Equipment": 11, "Foundations": 1,
+                  "Priority Walls": 34, "Other Rooms": 145, "Equipment": 11,
               },
               "BOH": {
                   "Priority Walls": 35, "Other Rooms": 81,
                   "Equipment": 13, "Commissioning & Start Up": 4,
-                  "Foundations": 1,
               },
           }
+          special = {"FOH": "FDN.1296", "BOH": "FDN.1300"}
           for area, grouping in expected.items():
               detail = suffolk.wbs_area_activities(area)
+              source_with_exceptions = suffolk.wbs_area_activities(area, include_exceptions=True)
               report = suffolk.wbs_area_stats(area)
               source = suffolk.current_tasks[suffolk.current_tasks["Area"].eq(area)]
               assert dict(zip(report["Area"], report["Tasks"])) == grouping, (area, report)
               assert report["Area"].is_unique
-              assert len(detail) == len(source) == sum(grouping.values())
-              assert set(detail["task_code"]) == set(source["task_code"])
+              assert len(detail) == len(source) - 1 == sum(grouping.values())
+              assert len(source_with_exceptions) == len(source)
+              assert set(source["task_code"]) - set(detail["task_code"]) == {special[area]}
+              assert "Foundations" not in set(report["Area"]), area
+              assert set(detail["task_code"]) == set(source["task_code"]) - {special[area]}
               assert len(detail["task_code"]) == detail["task_code"].nunique()
               for field in ("Completed", "In Progress", "Not Started"):
-                  assert int(report[field].sum()) == int(source["Status"].eq(field).sum())
-              assert detail.loc[detail["WBS Group"].eq("Foundations"), "task_code"].tolist() == [
-                  "FDN.1296" if area == "FOH" else "FDN.1300"
-              ], area
+                  assert int(report[field].sum()) == int(detail["Status"].eq(field).sum())
               assert detail["WBS Path"].str.contains("Construction / ").all()
               assert not detail["WBS Path"].str.contains("Procurement").any()
-              # This is a read-only grouping: no side effects on either view.
-              assert suffolk.subarea_stats(area)["Tasks"].sum() == len(detail)
-          assert sum(sum(groups.values()) for groups in expected.values()) == 325
-          print("PASS: FOH/BOH native P6 WBS labels; 191 + 134 HELIX Construction; 2 foundations audited")
+              # Existing original P6 data is not modified.
+              assert suffolk.subarea_stats(area)["Tasks"].sum() == len(source)
+          assert sum(sum(groups.values()) for groups in expected.values()) == 323
+          exception_report = helix.audit_reports["wbs_exceptions"]
+          assert set(exception_report["Activity ID"]) == set(special.values())
+          assert len(exception_report) == 2
+          assert set(exception_report["QTS - AREA"]) == {"FOH", "BOH"}
+          assert exception_report["Original P6 WBS"].str.contains("Shell / Foundations").all()
+          report = helix.audit_reports["active"]
+          flagged = report[report["Activity ID"].isin(special.values())]
+          assert len(flagged) == 2
+          assert flagged["Audit"].str.contains("WBS EXCEPTION").all()
+          assert not helix.audit_reports["departures"]["Activity ID"].isin(special.values()).any()
+          print("PASS: FOH/BOH WBS 190+133; two foundation IDs explicit audit exceptions, source still 2545")
 
           assert not helix.lineup_stats("DH1100").empty, "HELIX line-ups missing"
           assert helix.fte_ready_comparison().empty, "Archived FTE milestones leaked into active Construction"
