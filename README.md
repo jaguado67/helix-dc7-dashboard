@@ -2,7 +2,7 @@
 
 Cloud-ready Streamlit package for the HELIX DC7 schedule dashboard.
 
-**Version:** 0.2.14
+**Version:** 0.2.15
 
 ## Data scope
 
@@ -13,6 +13,37 @@ This release has two selectable views. SUFFOLK displays the main DC7 project sco
 - No `DC7-MIL`
 - No `DC7.TFO-B`
 - No external-project relationships in dashboard analytics
+
+## v0.2.15 — FOH/BOH original P6 WBS grouping
+
+**SUFFOLK PROJECT PROGRESS DETAIL** uses original Primavera P6 `PROJWBS`
+names for **FOH** and **BOH**, rather than QTS-DASH, with no changes to
+source P6 activity coding. The activity inclusion rule remains **strictly
+`QTS - Subcontractor = HELIX` within `Construction` WBS and descendants**,
+including commissioning and excluding procurement and archived activities.
+
+| Exact P6 WBS name | FOH tasks | BOH tasks |
+|---|---:|---:|
+| Priority Walls | 34 | 35 |
+| Other Rooms | 145 | 81 |
+| Equipment | 11 | 13 |
+| Commissioning & Start Up | 0 | 4 |
+| Foundations | 1 | 1 |
+| **Total** | **191** | **134** |
+
+The `Foundations` row preserves two HELIX underslab electrical tasks
+(`FDN.1296` in FOH and `FDN.1300` in BOH). Their `QTS - AREA` coding
+is FOH/BOH, but their native WBS ancestry is under
+`Construction / Shell / Foundations`, **not** within the P6 House Systems
+FOH/BOH WBS. The dashboard makes this exception explicit rather than silently
+dropping activities or renaming their original P6 WBS.
+
+Each area offers a downloadable CSV containing all relevant Activity IDs,
+P6 WBS group, full WBS path, original QTS - AREA and current P6 status.
+FOH/BOH task counts and overall 2,545 HELIX Construction scope are unchanged.
+All Data Halls, HELIX view, Line-Ups, and contractual finish logic remain
+unchanged. CI tests verify totals, unique IDs, status reconciliation, and
+the two Foundation Activity IDs.
 
 ## v0.2.14 — Verified SUFFOLK Current-C with auditable HELIX Construction
 
