@@ -687,6 +687,88 @@ def render_helix_lineups(m: DC7Model):
                 )
 
 
+
+def render_helix_contract_milestones(m: DC7Model):
+    """Contractual milestone deviation in the standalone HELIX baseline.
+
+    Contract Date is parsed ONLY from the original Activity Name and is
+    compared to the P6 Finish stored in 226021-HE.B Baseline. No attempt
+    is made to invent independent HELIX Current dates.
+    """
+    data = m.independent_helix_baseline()
+    st.markdown(
+        '<div class="section-caption">HELIX · CONTRACTUAL MILESTONE VARIANCE</div>',
+        unsafe_allow_html=True,
+    )
+    st.caption(
+        "Contractual Date = date in Activity Name · Baseline Finish = "
+        "P6 226021-HE.B · Delay = Baseline Finish − Contractual Date "
+        "(calendar days). Positive = late. These are baseline dates, "
+        "not an independent HELIX Current forecast."
+    )
+    if data is None:
+        st.info("Official independent HELIX baseline not available.")
+        return
+
+    detail = data["_contract_milestones"]
+    source_audit = data["_contract_milestone_audit"]
+    if detail.empty:
+        st.info("No HELIX-coded contractual milestones contain a date in their Activity Name.")
+        return
+    if int(source_audit["contract_date_extracted"]) != len(detail):
+        raise ValueError("Contractual milestone count does not reconcile with the P6 audit")
+
+    display = detail[[
+        "Area", "Milestone", "Activity ID",
+        "Contractual Date", "Baseline Finish", "Delay (days)",
+    ]].copy()
+    display["Contractual Date"] = display["Contractual Date"].apply(_fmt_date)
+    display["Baseline Finish"] = display["Baseline Finish"].apply(_fmt_date)
+
+    left, right = st.columns([1.36, 1], gap="large")
+    with left:
+        st.dataframe(
+            display, use_container_width=True, hide_index=True, height=450,
+            column_config={
+                "Area": st.column_config.TextColumn("Data Hall"),
+                "Milestone": st.column_config.TextColumn("Milestone"),
+                "Activity ID": st.column_config.TextColumn("Activity ID"),
+                "Contractual Date": st.column_config.TextColumn("Contractual Date"),
+                "Baseline Finish": st.column_config.TextColumn("Baseline Finish"),
+                "Delay (days)": st.column_config.NumberColumn("Delay (days)", format="%+d"),
+            },
+        )
+    with right:
+        labels = [f"{r['Area']} · {r['Milestone']}" for _, r in detail.iterrows()]
+        days = detail["Delay (days)"].astype(int).tolist()
+        colors = [RED if v > 0 else GREEN if v < 0 else BLUE for v in days]
+        descriptions = [
+            f"{r['Activity ID']}<br>Contractual: {_fmt_date(r['Contractual Date'])}"
+            f"<br>Baseline Finish: {_fmt_date(r['Baseline Finish'])}"
+            for _, r in detail.iterrows()
+        ]
+        fig = go.Figure(go.Bar(
+            y=labels, x=days, orientation="h",
+            marker_color=colors,
+            text=[f"{v:+d} d" for v in days],
+            textposition="outside",
+            customdata=descriptions,
+            hovertemplate="<b>%{y}</b><br>%{customdata}<br>Delay: %{x:+d} days<extra></extra>",
+        ))
+        fig.update_layout(
+            **_layout(450, 155, 82, 35),
+            title="CONTRACTUAL DATE DEVIATION · DAYS",
+            showlegend=False,
+            xaxis_title="Delay vs Contract (calendar days)",
+        )
+        low = min(0, *days)
+        high = max(0, *days)
+        margin = max(15, int((high - low) * 0.15))
+        fig.update_xaxes(range=[low - margin if low < 0 else 0, high + margin],
+                         zeroline=True, zerolinecolor=GRID, gridcolor=GRID)
+        fig.update_yaxes(autorange="reversed")
+        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+
 def render_dashboard(helix: DC7Model, suffolk: DC7Model):
     view = st.session_state.get("dc7_schedule_view", "SUFFOLK")
     if view not in ("SUFFOLK", "HELIX"):
@@ -724,8 +806,9 @@ def render_dashboard(helix: DC7Model, suffolk: DC7Model):
         # Do not call render_progress_detail(helix, view="HELIX"):
         # its QTS-DASH group breakdown duplicates the SUFFOLK view.
         render_helix_lineups(helix)
-        # FTE / project milestone panel intentionally hidden until a
-        # separate milestone scope is agreed. Its calculations remain intact.
+        # New independent HELIX contractual-date comparison. Do not restore
+        # the former SUFFOLK/FTE-Ready logic or label baseline as Current.
+        render_helix_contract_milestones(helix)
         return
 
     render_kpis(suffolk, "SUFFOLK")
