@@ -182,6 +182,31 @@ def summarize_approved_baseline(tables: Mapping[str, pd.DataFrame], project_id: 
             "Line-Up": item["_LineUp"] or "",
             "Classification": "MAPPED" if item["_LineUp"] is not None else "NOT IN SELECTED LINE-UP WBS",
         })
-    grouped["_audit"] = pd.DataFrame(all_task_rows)
-    # The baseline cannot be treated as a Current.
+    audit = pd.DataFrame(all_task_rows)
+    if audit["Activity ID"].duplicated().any():
+        raise ValueError("Duplicate Activity IDs in official HELIX P6 baseline")
+    unmatched = audit[audit["Classification"].ne("MAPPED")].copy()
+    # Original XER contains exactly 24 Milestones (L3 Cx, PEI, L4 Cx,
+    # QC 2.2, etc.), separate from the Line-Ups and MOH.
+    if not unmatched["P6 WBS"].str.contains(" / Milestones / ", regex=False).all():
+        raise ValueError("Unclassified HELIX baseline activities outside Milestones")
+    if len(unmatched) != 24:
+        raise ValueError(f"Expected 24 original HELIX project milestones, got {len(unmatched)}")
+    unmatched["Classification"] = "PROJECT MILESTONE (not Line-Up / MOH)"
+    audit.loc[unmatched.index, "Classification"] = unmatched["Classification"]
+    counted = int(audit["Classification"].eq("MAPPED").sum())
+    if counted != 4665 or len(audit) != 4689:
+        raise ValueError(f"Baseline reconciliation failed: {counted} mapped, {len(audit)} total")
+    grouped["_audit"] = audit
+    grouped["_milestones"] = unmatched
+    grouped["_reconciliation"] = pd.DataFrame([
+        {"Category": "Data Hall Electrical Line-Ups (6 × 11)", "Activities": 4392},
+        {"Category": "Data Hall Commissioning (6 × 4)", "Activities": 24},
+        {"Category": "MOH Equipment", "Activities": 249},
+        {"Category": "Project Milestones (outside Line-Ups/MOH)", "Activities": len(unmatched)},
+        {"Category": "P6 HELIX Baseline Total", "Activities": len(audit)},
+    ])
+    if 4392 + 24 + 249 + len(unmatched) != len(audit):
+        raise ValueError("Baseline WBS reconciliation failed at project total")
+    # No baseline-only record is interpreted as Current progress.
     return grouped
