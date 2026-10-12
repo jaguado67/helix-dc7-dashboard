@@ -39,6 +39,54 @@ def baseline_outline() -> dict[str, list[dict]]:
     return result
 
 
+def lineup_activity_summary(data: Mapping[str, pd.DataFrame] | None) -> pd.DataFrame:
+    """Seven-row HELIX baseline activity-count overview (6 Data Halls + MOH).
+
+    The values are deliberately unknown until the original HELIX baseline XER
+    is available. Never infer independent HELIX counts from SUFFOLK progress,
+    P6 duration/float numbers, or the rejected B-4 file.
+    """
+    rows = []
+    outline = baseline_outline()
+    for area in list(HALLS) + ["MOH"]:
+        if data is None:
+            rows.append({
+                "Area": area,
+                "Electrical Line-Ups": "—",
+                "Commissioning": "—",
+                "MOH Equipment": "—",
+                "Total Activities": "Pendiente BL",
+            })
+            continue
+        if area not in data:
+            raise ValueError(f"Missing approved HELIX baseline WBS summary for {area}")
+        frame = data[area]
+        expected = [(r["WBS Level"], r["Line-Up"]) for r in outline[area]]
+        if list(zip(frame["WBS Level"], frame["Line-Up"])) != expected:
+            raise ValueError(f"HELIX original line-up order changed for {area}")
+        if frame["Baseline Tasks"].isna().any() or (frame["Baseline Tasks"] < 0).any():
+            raise ValueError(f"Invalid independent baseline activity counts in {area}")
+        electrical = int(frame.loc[frame["WBS Level"].eq("Electrical"), "Baseline Tasks"].sum())
+        commissioning = int(frame.loc[frame["WBS Level"].eq("Commissioning"), "Baseline Tasks"].sum())
+        moh = int(frame.loc[frame["WBS Level"].eq("Equipment"), "Baseline Tasks"].sum())
+        rows.append({
+            "Area": area,
+            "Electrical Line-Ups": electrical,
+            "Commissioning": commissioning,
+            "MOH Equipment": moh,
+            "Total Activities": electrical + commissioning + moh,
+        })
+    summary = pd.DataFrame(rows)
+    if data is not None and "_audit" in data:
+        actual = int(data["_audit"]["Classification"].eq("MAPPED").sum())
+        shown = int(summary["Total Activities"].sum())
+        if actual != shown:
+            raise ValueError(
+                f"HELIX baseline line-up count audit mismatch: {shown} shown, {actual} mapped"
+            )
+    return summary
+
+
 def summarize_approved_baseline(tables: Mapping[str, pd.DataFrame], project_id: str) -> dict[str, pd.DataFrame]:
     """Resolve the exact original WBS of the approved HELIX independent baseline.
 

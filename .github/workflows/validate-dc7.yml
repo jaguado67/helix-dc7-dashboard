@@ -53,7 +53,7 @@ jobs:
 
           # HELIX is a baseline-only navigation, NOT a second SUFFOLK progress dashboard.
           import pandas as pd
-          from src.helix_baseline import HALLS, lineup_order, baseline_outline, summarize_approved_baseline
+          from src.helix_baseline import HALLS, lineup_order, baseline_outline, summarize_approved_baseline, lineup_activity_summary
           outline = baseline_outline()
           assert list(outline.keys()) == list(HALLS) + ["MOH"]
           assert [x["Line-Up"] for x in outline["DH1100"][:2]] == ["A110", "B110"]
@@ -66,6 +66,11 @@ jobs:
           assert outline["MOH"] == [{"WBS Level": "Equipment", "Line-Up": "Equipment"}]
           assert helix.independent_helix_baseline() is None
           assert helix.auxiliary_path is None
+          pending = lineup_activity_summary(None)
+          assert pending["Area"].tolist() == list(HALLS) + ["MOH"]
+          assert not set(pending["Area"]).intersection({"FOH", "BOH"})
+          assert (pending["Total Activities"] == "Pendiente BL").all()
+          assert (pending["Electrical Line-Ups"] == "—").all()
 
           # Native WBS fixture: ensure 1200 R before A, commissioning
           # isolated from electrical; MOH is its own Equipment branch.
@@ -101,6 +106,21 @@ jobs:
           assert sample["MOH"].iloc[0]["Baseline Tasks"] == 1
           assert len(sample["_audit"]) == 4
           assert all(sample["_audit"]["Classification"] == "MAPPED")
+          official_counts = lineup_activity_summary(sample)
+          assert official_counts["Area"].tolist() == list(HALLS) + ["MOH"]
+          assert len(official_counts) == 7
+          assert not set(official_counts["Area"]).intersection({"FOH", "BOH"})
+          actual_dh = official_counts.set_index("Area").loc["DH1200"]
+          assert actual_dh["Electrical Line-Ups"] == 2
+          assert actual_dh["Commissioning"] == 1
+          assert actual_dh["Total Activities"] == 3
+          actual_moh = official_counts.set_index("Area").loc["MOH"]
+          assert actual_moh["MOH Equipment"] == 1
+          assert actual_moh["Electrical Line-Ups"] == 0
+          assert int(official_counts["Total Activities"].sum()) == 4
+          assert int(official_counts["Total Activities"].sum()) == int(
+              sample["_audit"]["Classification"].eq("MAPPED").sum()
+          )
 
           view_text = Path("DC7/src/dc7_view.py").read_text(encoding="utf-8")
           dispatch = view_text.split("def render_dashboard(",1)[1]
@@ -112,16 +132,21 @@ jobs:
           for required in (
               'render_kpis(helix, "HELIX")',
               'render_scurve_and_status(helix)',
-              'render_stats(helix, "PROJECT STATS',
+              'render_helix_lineup_stats(helix)',
               'render_helix_lineups(helix)',
               'render_gates(helix)',
           ):
               assert required in helix_case, f"Missing restored HELIX section: {required}"
           assert not any(line.lstrip().startswith("render_progress_detail(helix") for line in helix_case.splitlines())
+          assert not any(line.lstrip().startswith("render_stats(helix") for line in helix_case.splitlines())
+          assert "render_stats(suffolk" in dispatch
+          assert '"Activities": "Pendiente BL"' in view_text
+          assert '"MOH Equipment"' in view_text
+          assert "lineup_activity_summary(data)" in view_text
           assert 'SUFFOLK DC7 BL / Current-C' in helix_case
           assert '226021-HE.B baseline (pending)' in helix_case
           assert "render_windows(helix)" not in helix_case
-          print("PASS: restored HELIX KPI, S-curve, status, FTE, Line-Ups and MOH; duplicate QTS-DASH only in SUFFOLK")
+          print("PASS: HELIX Line-Ups/Commissioning/MOH count summary without FOH/BOH; prior overview and FTE preserved")
 
           h_total = helix.status_counts()["Total"]
           s_total = suffolk.status_counts()["Total"]

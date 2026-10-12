@@ -2,7 +2,7 @@
 
 Cloud-ready Streamlit package for the HELIX DC7 schedule dashboard.
 
-**Version:** 0.2.21
+**Version:** 0.2.22
 
 ## Data scope
 
@@ -13,6 +13,40 @@ This release has two selectable views. SUFFOLK displays the main DC7 project sco
 - No `DC7-MIL`
 - No `DC7.TFO-B`
 - No external-project relationships in dashboard analytics
+
+## v0.2.22 — HELIX Project Stats count Line-Ups, Commissioning and MOH
+
+The **HELIX VIEW Project Stats** summary no longer displays the
+\`FOH\`/\`BOH\` activity-progress table or the SUFFOLK Construction
+count-by-Data-Hall plot. In its place are exactly seven rows:
+\`DH1100\`, \`DH1200\`, \`DH1300\`, \`DH1400\`, \`DH1500\`, \`DH1600\`, and
+\`MOH\`, with separate columns for:
+
+- **Electrical Line-Ups:** sum of each hall's eleven native WBS electrical
+  Line-Up activity counts, preserving P6 line-up order (R first for
+  DH1200/DH1400/DH1600).
+- **Commissioning:** baseline activities under each hall's distinct
+  Commissioning WBS.
+- **MOH Equipment:** activity count under the original MOH / Equipment WBS.
+- **Total Activities:** reconciled sum of these three categories.
+
+The independent Line-Up detail now has an explicit **Activities** column
+for every A/B/.../R Line-Up, each hall's **Commissioning** and MOH
+**Equipment**, plus a per-Line-Up activity-count graph whenever data
+is available. An audit checks the visible counts against the original
+baseline Activity IDs classified to these WBS nodes.
+
+**Source control:** the authoritative independent HELIX baseline
+\`226021-HE.B.xer\` is still not available in the connected Drive folder
+or deployment. Therefore HELIX baseline activity counts explicitly show
+\`Pendiente BL\`, not invented zeros, SUFFOLK numbers, or values from the
+rejected \`226021-HE.B-4.xer\`. Count charts appear only when the
+official P6 baseline is loaded and validated. The currently present
+SUFFOLK-derived KPIs and S-curve remain visibly labelled as separate
+construction-scope analytics; no independent HELIX Current exists.
+
+**Unchanged:** SUFFOLK VIEW, the complete 2,545 activity construction
+scope and its audit, FTE notices, and baseline Line-Up ordering.
 
 ## v0.2.21 — Restore HELIX dashboard sections (only duplicate Detail removed)
 
