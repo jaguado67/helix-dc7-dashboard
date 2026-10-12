@@ -2,7 +2,7 @@ name: Validate DC7 dashboard
 
 on:
   push:
-    branches: [main, audit/foh-boh-foundations-exceptions-20261012]
+    branches: [main]
     paths:
       - "DC7/**"
       - ".github/workflows/validate-dc7.yml"
