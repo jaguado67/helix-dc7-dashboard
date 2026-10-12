@@ -384,12 +384,14 @@ class DC7Model:
         return ordered + sorted(have - set(ordered))
 
     def area_stats(self) -> pd.DataFrame:
+        """Summary of the audited Suffolk Construction universe only.
+
+        Auxiliary MOH and dedicated HELIX Line-Ups are displayed separately;
+        neither can be counted in Suffolk project scope KPIs or this matrix.
+        """
         rows = []
-        for area in self.areas():
-            if area == "MOH" and self.auxiliary_tasks is not None:
-                g = self.auxiliary_tasks[self.auxiliary_tasks["Area"].eq(area)].copy()
-            else:
-                g = self.current_tasks[self.current_tasks["Area"].eq(area)].copy()
+        for area in self._main_areas():
+            g = self.current_tasks[self.current_tasks["Area"].eq(area)].copy()
             vc = g["Status"].value_counts()
             rows.append({
                 "Area": area,
