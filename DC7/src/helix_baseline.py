@@ -66,6 +66,75 @@ def lineup_activity_summary(data: Mapping[str, pd.DataFrame] | None) -> pd.DataF
     return summary
 
 
+
+def wbs_lineup_hierarchy(data: Mapping[str, pd.DataFrame] | None, area: str) -> pd.DataFrame:
+    """Data Hall -> Electrical -> ordered Line-Ups, or MOH -> Equipment.
+
+    This is a presentation hierarchy, not a reclassification: each leaf
+    corresponds to the original P6 PROJWBS assignment and its HELIX-coded
+    Activity IDs. Parent totals are computed from children, never counted
+    as additional tasks. No Commissioning / milestone / external scope.
+    """
+    outline = baseline_outline()
+    if area not in outline:
+        raise ValueError(f"Unknown Data Hall / MOH: {area}")
+    requested = [(x["WBS Level"], x["Line-Up"]) for x in outline[area]]
+    if data is None:
+        leaf_counts = ["Pendiente BL"] * len(requested)
+        leaf_start = [pd.NaT] * len(requested)
+        leaf_finish = [pd.NaT] * len(requested)
+        parent_count = "Pendiente BL"
+        start = pd.NaT
+        finish = pd.NaT
+    else:
+        if area not in data or "_audit" not in data:
+            raise ValueError(f"Missing official HELIX baseline detail/audit for {area}")
+        raw = data[area]
+        observed = list(zip(raw["WBS Level"], raw["Line-Up"]))
+        if observed != requested:
+            raise ValueError(f"Original P6 WBS order differs for {area}")
+        if raw["Baseline Tasks"].isna().any() or (raw["Baseline Tasks"] < 0).any():
+            raise ValueError(f"Invalid HELIX Line-Up counts: {area}")
+        audit = data["_audit"]
+        area_audit = audit[audit["Data Hall / MOH"].eq(area)]
+        if not area_audit["Activity ID"].is_unique:
+            raise ValueError(f"Duplicated original Activity ID under {area}")
+        if not area_audit["QTS - Subcontractor"].eq("HELIX").all():
+            raise ValueError(f"Out-of-scope subcontractor in {area}")
+        expected_count = int(raw["Baseline Tasks"].sum())
+        if len(area_audit) != expected_count:
+            raise ValueError(f"Data Hall/MOH count differs from Activity ID audit: {area}")
+        for _, item in raw.iterrows():
+            matches = area_audit["Line-Up"].eq(item["Line-Up"])
+            if int(matches.sum()) != int(item["Baseline Tasks"]):
+                raise ValueError(f"Line-Up audit mismatch: {area} / {item['Line-Up']}")
+        leaf_counts = raw["Baseline Tasks"].astype(int).tolist()
+        leaf_start = raw["Baseline Start"].tolist()
+        leaf_finish = raw["Baseline Finish"].tolist()
+        parent_count = expected_count
+        start = pd.to_datetime(raw["Baseline Start"], errors="coerce").min()
+        finish = pd.to_datetime(raw["Baseline Finish"], errors="coerce").max()
+
+    parent_label = f"DH {area[2:]}" if area != "MOH" else "MOH"
+    branch_label = "Electrical" if area != "MOH" else "Equipment"
+    rows = [
+        {"Level": 0, "P6 WBS": parent_label, "Activities": parent_count,
+         "Baseline Start": start, "Baseline Finish": finish},
+        {"Level": 1, "P6 WBS": branch_label, "Activities": parent_count,
+         "Baseline Start": start, "Baseline Finish": finish},
+    ]
+    if area != "MOH":
+        for i, ((_, lineup), count, begin, end) in enumerate(
+            zip(requested, leaf_counts, leaf_start, leaf_finish)
+        ):
+            rows.append({
+                "Level": 2, "P6 WBS": lineup, "Activities": count,
+                "Baseline Start": begin, "Baseline Finish": end,
+            })
+    # MOH / Equipment is itself a countable leaf; the Equipment row is
+    # already displayed at Level 1. No duplicate third-level row.
+    return pd.DataFrame(rows)
+
 def summarize_approved_baseline(tables: Mapping[str, pd.DataFrame], project_id: str) -> dict[str, pd.DataFrame]:
     """Audit real HELIX-coded P6 TASK/PROJWBS/TASKACTV associations."""
     required = ("PROJWBS","TASK","ACTVTYPE","ACTVCODE","TASKACTV")
