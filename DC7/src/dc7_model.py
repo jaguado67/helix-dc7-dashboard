@@ -811,33 +811,16 @@ def build_dc7_model(data_dir: Path) -> DC7Model:
 
 
 def build_suffolk_model(helix_model: DC7Model) -> DC7Model:
-    """View of the SUFFOLK main project using the same XER files.
+    """SUFFOLK Construction scope performed by HELIX, not procurement.
 
-    HELIX filters are deliberately not applied to this view. Only activities
-    assigned to the dashboard's approved QTS-AREA list are presented in the
-    FOH/BOH/Data Hall summary; the project-level finish remains the official
-    SUFFOLK project finish. No XER or scheduling calculations are changed.
+    Uses the already audited HELIX construction task IDs from the Suffolk XER.
+    SUFFOLK contractual finish dates still come from the full P6 PROJECT row.
     """
     update_project_id = str(helix_model.update_project["proj_id"])
     baseline_project_id = str(helix_model.baseline_project["proj_id"])
-    current_all = to_task_frame(helix_model.update_tables["TASK"])
-    current_all = current_all[
-        current_all["proj_id"].astype(str).eq(update_project_id)
-    ].copy()
-
-    area_codes = _assignment_map(
-        helix_model.update_tables, update_project_id, "QTS - AREA", "short_name"
-    )
-    dash_codes = _assignment_map(
-        helix_model.update_tables, update_project_id, "QTS - DASH", "actv_code_name"
-    )
-    current_all["Area"] = current_all["task_id"].astype(str).map(area_codes)
-    current_all = current_all[current_all["Area"].isin(AREA_ORDER)].copy()
-    current_all["Subarea"] = (
-        current_all["task_id"].astype(str)
-        .map(dash_codes).map(_clean_subarea)
-        .replace("Other HELIX Electrical Scope", "Other SUFFOLK Scope")
-    )
+    current_all = helix_model.current_tasks.copy()
+    # Already coded QTS - Subcontractor = HELIX and descended from Construction.
+    # Keep QTS-AREA and original QTS-DASH assignment in their existing columns.
     if current_all.empty:
         raise ValueError("No SUFFOLK activities matched QTS - AREA.")
     if current_all["task_code"].duplicated().any():
@@ -847,6 +830,8 @@ def build_suffolk_model(helix_model: DC7Model) -> DC7Model:
     baseline_all = baseline_all[
         baseline_all["proj_id"].astype(str).eq(baseline_project_id)
     ].copy()
+    baseline_wbs = construction_wbs_ids(helix_model.baseline_tables, baseline_project_id)
+    baseline_all = baseline_all[baseline_all["wbs_id"].astype(str).isin(baseline_wbs)].copy()
     area_mapping = current_all[["task_code", "Area", "Subarea"]].drop_duplicates("task_code")
     baseline = baseline_all.merge(area_mapping, on="task_code", how="inner")
 
@@ -855,4 +840,5 @@ def build_suffolk_model(helix_model: DC7Model) -> DC7Model:
         helix_model.baseline_project, helix_model.update_project,
         baseline, current_all,
         helix_model.baseline_tables, helix_model.update_tables,
+        audit_reports=helix_model.audit_reports,
     )
