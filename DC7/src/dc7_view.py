@@ -536,12 +536,6 @@ def render_helix_lineup_stats(m: DC7Model):
         '<div class="section-caption">PROJECT STATS · HELIX LINE-UPS & MOH · BASELINE STATUS</div>',
         unsafe_allow_html=True,
     )
-    st.caption(
-        "Only QTS - Subcontractor = HELIX in six Data Hall Electrical Line-Ups "
-        "and MOH / Equipment. Status and completion percentages reflect the "
-        "official 226021-HE.B baseline snapshot, NOT a current HELIX update. "
-        "SUFFOLK tracks a different activity universe."
-    )
     if data is None:
         st.info("Official HELIX baseline pending; no activity counts or current progress inferred.")
         return
@@ -574,13 +568,6 @@ def render_helix_lineup_stats(m: DC7Model):
         not_started = int(df["Not Started"].sum())
         if total_tasks != completed + in_progress + not_started:
             raise ValueError("HELIX baseline status totals do not reconcile")
-        total_percent = (completed / total_tasks * 100) if total_tasks else 0.0
-        h += (
-            f'<tr><td><b>TOTAL</b></td><td><b>{total_tasks:,}</b></td>'
-            f'<td><b>{percent_label(total_percent)}</b></td>'
-            f'<td><b>{completed:,}</b></td><td><b>{in_progress:,}</b></td>'
-            f'<td><b>{not_started:,}</b></td></tr>'
-        )
         st.markdown(h + '</tbody></table></div>', unsafe_allow_html=True)
         st.caption(
             f"HELIX Line-Ups and MOH: {total_tasks:,} unique baseline Activity IDs. "
@@ -625,12 +612,6 @@ def render_helix_lineups(m: DC7Model):
     st.markdown(
         '<div class="section-caption">HELIX · DATA HALL / LINE-UP DETAIL</div>',
         unsafe_allow_html=True,
-    )
-    st.caption(
-        "Only QTS - Subcontractor = HELIX activities in the DH1100–DH1600 "
-        "Line-Ups and MOH / Equipment. Activity counts and statuses come from "
-        "the 226021-HE.B baseline XER, not a current progress update. "
-        "R is first in DH1200, DH1400 and DH1600."
     )
 
     for area in (*HALLS, "MOH"):
@@ -705,19 +686,6 @@ def render_helix_lineups(m: DC7Model):
                     "activities only; other subcontractors are excluded."
                 )
 
-    if data is not None:
-        audit = data["_audit"]
-        st.caption(
-            f"Audit: {len(audit):,} unique Activity IDs with "
-            "QTS - Subcontractor = HELIX in Line-Ups and MOH. "
-            "Statuses reflect the baseline, not a current update."
-        )
-        st.download_button(
-            "Download HELIX Line-Ups & MOH Audit (CSV)",
-            audit.to_csv(index=False).encode("utf-8-sig"),
-            file_name="DC7_HELIX_Only_Lineups_MOH_Baseline_Audit.csv",
-            mime="text/csv", key="helix_baseline_audit_csv",
-        )
 
 def render_dashboard(helix: DC7Model, suffolk: DC7Model):
     view = st.session_state.get("dc7_schedule_view", "SUFFOLK")
@@ -750,21 +718,14 @@ def render_dashboard(helix: DC7Model, suffolk: DC7Model):
         # HELIX PROJECT PROGRESS DETAIL (FOH / BOH / DH QTS-DASH breakdown).
         # The progress widgets below use HELIX-coded SUFFOLK Construction,
         # while Line-Ups/MOH use ONLY the independent approved HELIX baseline.
-        st.caption(
-            "**SOURCE OF PROGRESS:** SUFFOLK DC7 BL / Current-C, "
-            "filtered to HELIX Construction activities, including commissioning. "
-            "**ELECTRICAL LINE-UPS & MOH:** verified official HELIX "
-            "226021-HE.B independent Baseline: HELIX-subcontractor activities "
-            "in Electrical Line-Ups and MOH only. There is no independent "
-            "HELIX Current. These two data sources are not interchangeable."
-        )
         render_kpis(helix, "HELIX")
         render_scurve_and_status(helix)
         render_helix_lineup_stats(helix)
         # Do not call render_progress_detail(helix, view="HELIX"):
         # its QTS-DASH group breakdown duplicates the SUFFOLK view.
         render_helix_lineups(helix)
-        render_gates(helix)
+        # FTE / project milestone panel intentionally hidden until a
+        # separate milestone scope is agreed. Its calculations remain intact.
         return
 
     render_kpis(suffolk, "SUFFOLK")
