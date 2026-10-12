@@ -11,12 +11,41 @@ from __future__ import annotations
 import re
 from typing import Mapping
 
+import numpy as np
 import pandas as pd
+from pandas.tseries.holiday import USFederalHolidayCalendar
 
 from src.xer import to_task_frame
 
 HALLS = tuple(f"DH{n}00" for n in range(11, 17))
 LETTERS = ("A", "B", "C", "D", "E", "F", "G", "H", "J", "K")
+
+
+
+def us_federal_workday_delay(contractual_date, finish_date) -> int:
+    """Signed Mon–Fri US federal working-day displacement, OPM holidays.
+
+    Exclude the contractual boundary day and include the finish boundary
+    only when it is a workday. For earlier finishes, reverse the interval
+    and return a negative displacement. No site-specific P6 exceptions are
+    silently assumed. Uses observed US federal holidays, not weekday-only
+    approximations; do not call this P6 resource/contract calendar.
+    """
+    contract = pd.Timestamp(contractual_date).normalize()
+    finish = pd.Timestamp(finish_date).normalize()
+    if pd.isna(contract) or pd.isna(finish):
+        raise ValueError("Both contractual and P6 Finish dates are required")
+    if contract == finish:
+        return 0
+    earlier, later = sorted((contract, finish))
+    holidays = USFederalHolidayCalendar().holidays(
+        start=earlier - pd.DateOffset(years=1),
+        end=later + pd.DateOffset(years=1),
+    ).to_numpy(dtype="datetime64[D]")
+    low = np.datetime64(earlier.date(), "D") + np.timedelta64(1, "D")
+    high = np.datetime64(later.date(), "D") + np.timedelta64(1, "D")
+    count = int(np.busday_count(low, high, holidays=holidays))
+    return count if finish > contract else -count
 
 
 def lineup_order(area: str) -> tuple[str, ...]:
@@ -317,7 +346,7 @@ def summarize_approved_baseline(tables: Mapping[str, pd.DataFrame], project_id: 
         if pd.isna(finish):
             raise ValueError(f"Missing P6 Finish for contractual HELIX milestone {item['task_code']}")
         finish = finish.normalize()
-        delay = int((finish - contract).days)
+        delay = us_federal_workday_delay(contract, finish)
         group = "QC 2.2" if category.strip() == "QC 2.2" else "IST / L4 Cx" if category.strip() == "L4 Cx" else None
         if group is None:
             raise ValueError(f"Unrecognized dated HELIX contractual milestone WBS: {category}")
@@ -337,7 +366,7 @@ def summarize_approved_baseline(tables: Mapping[str, pd.DataFrame], project_id: 
             "Activity Name": fullname,
             "Contractual Date": contract,
             "Baseline Finish": finish,
-            "Delay (days)": delay,
+            "Delay (US working days)": delay,
             "Status": str(item["Status"]),
             "Subcontractor": str(item["_Sub"]),
             "Original P6 WBS": str(item["_WBS Path"]),
@@ -355,10 +384,13 @@ def summarize_approved_baseline(tables: Mapping[str, pd.DataFrame], project_id: 
             raise ValueError("Non-HELIX milestone in contractual variance report")
         if milestones["Contractual Date"].isna().any() or milestones["Baseline Finish"].isna().any():
             raise ValueError("Incomplete HELIX milestone date comparison")
-        if not milestones["Delay (days)"].eq(
-            (milestones["Baseline Finish"] - milestones["Contractual Date"]).dt.days
-        ).all():
-            raise ValueError("Milestone contractual delay calculation failed")
+        computed_workdays = milestones.apply(
+            lambda row: us_federal_workday_delay(
+                row["Contractual Date"], row["Baseline Finish"]
+            ), axis=1
+        )
+        if not milestones["Delay (US working days)"].eq(computed_workdays).all():
+            raise ValueError("US federal working-day contractual delay audit failed")
     if len(task) == 4689:
         if len(all_milestones) != 20 or len(milestones) != 10 or len(no_contract_date) != 10:
             raise ValueError(

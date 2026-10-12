@@ -65,7 +65,7 @@ jobs:
 
           # Independent HELIX BL: only HELIX-coded activities under
           # original Electrical Line-Ups and MOH/Equipment, never full-XER.
-          from src.helix_baseline import HALLS, lineup_order, baseline_outline, lineup_activity_summary, wbs_lineup_hierarchy, lineup_area_status_summary
+          from src.helix_baseline import HALLS, lineup_order, baseline_outline, lineup_activity_summary, wbs_lineup_hierarchy, lineup_area_status_summary, us_federal_workday_delay
           outline = baseline_outline()
           assert list(outline) == list(HALLS)+["MOH"]
           assert len(outline["DH1200"]) == 11
@@ -96,18 +96,27 @@ jobs:
           assert set(milestones["Area"]) == {"DH1200","DH1300","DH1400","DH1500","DH1600"}
           assert not milestones["Activity ID"].str.contains("1100").any()
           expected_delay = {
-              "M.1200":22,"M.1300":58,"M.1400":2,"M.1500":131,"M.1600":385,
-              "IST.1200":325,"IST.1300":322,"IST.1400":297,
-              "IST.1500":357,"IST.1600":331,
+              "M.1200":16,"M.1300":40,"M.1400":2,"M.1500":87,"M.1600":264,
+              "IST.1200":224,"IST.1300":220,"IST.1400":202,
+              "IST.1500":244,"IST.1600":228,
           }
-          assert milestones.set_index("Activity ID")["Delay (days)"].to_dict() == expected_delay
-          assert (
-              milestones["Baseline Finish"] - milestones["Contractual Date"]
-          ).dt.days.eq(milestones["Delay (days)"]).all()
+          assert milestones.set_index("Activity ID")["Delay (US working days)"].to_dict() == expected_delay
+          assert milestones.apply(
+              lambda row: us_federal_workday_delay(row["Contractual Date"], row["Baseline Finish"])
+              == row["Delay (US working days)"], axis=1
+          ).all()
+          # The observed US federal holiday must be excluded, with the
+          # contractual boundary omitted and the finish date included.
+          assert us_federal_workday_delay("2026-10-09","2026-10-13") == 1  # Columbus Day observed
+          assert us_federal_workday_delay("2026-11-25","2026-11-27") == 1  # Thanksgiving
+          assert us_federal_workday_delay("2026-12-31","2027-01-04") == 1  # New Year
+          assert us_federal_workday_delay("2026-10-13","2026-10-09") == -1
+          assert us_federal_workday_delay("2026-10-12","2026-10-12") == 0
+          assert us_federal_workday_delay("2026-05-22","2026-05-26") == 1  # Memorial Day
           assert str(milestones.set_index("Activity ID").loc["IST.1400","Contractual Date"].date()) == "2026-04-22"
           assert str(milestones.set_index("Activity ID").loc["IST.1400","Baseline Finish"].date()) == "2027-02-13"
           assert str(milestones.set_index("Activity ID").loc["M.1600","Contractual Date"].date()) == "2026-02-17"
-          print("PASS: HELIX original named contract dates vs P6 Baseline Finish for 10 milestones, no other subcontractors")
+          print("PASS: HELIX 10 contract milestone variances use US Mon-Fri federal holidays, not calendar days")
           counts = lineup_activity_summary(approved).set_index("Area")
           assert list(counts.index) == list(HALLS)+["MOH"]
           assert "Commissioning" not in counts.columns
@@ -224,7 +233,10 @@ jobs:
           assert 'HELIX · CONTRACTUAL MILESTONE VARIANCE' in milestone_view
           assert 'Contractual Date' in milestone_view
           assert 'Baseline Finish' in milestone_view
-          assert 'Delay (days)' in milestone_view
+          assert 'Delay (US working days)' in milestone_view
+          assert 'Delay (days)' not in milestone_view
+          assert 'calendar days' not in milestone_view
+          assert 'US federal working days' in milestone_view
           assert 'not an independent HELIX Current forecast' in milestone_view
           assert 'm.independent_helix_baseline()' in milestone_view
           assert 'render_helix_contract_milestones(helix)' in helix_case
