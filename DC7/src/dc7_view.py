@@ -91,16 +91,13 @@ def render_header(m: DC7Model, view: str):
         current_label, current_value = "Current Update", m.update_path.stem
         source_label = "SUFFOLK · HELIX Construction"
     else:
-        independent = m.auxiliary_project
-        from src.dc7_model import _project_date
-        baseline_date = (
-            _project_date(independent, "data_date", "last_recalc_date")
-            if independent is not None else None
-        )
-        date_label = "HELIX BL Data Date"
-        date_value = _fmt_date(baseline_date)
-        current_label, current_value = "HELIX Current", "Not available"
-        source_label = "Independent HELIX baseline · Line-Ups/MOH"
+        # In HELIX VIEW, construction KPI/S-curve/FTE are a HELIX-coded
+        # scope filtered from SUFFOLK's current update, not a HELIX Current.
+        # The independent HELIX electrical baseline is used ONLY for Line-Ups.
+        date_label = "SUFFOLK Data Date"
+        date_value = _fmt_date(m.data_date)
+        current_label, current_value = "SUFFOLK Current", m.update_path.stem
+        source_label = "HELIX construction / SUFFOLK source"
 
     st.markdown(f"""
     <div class="helix-header">
@@ -609,7 +606,7 @@ def render_dashboard(helix: DC7Model, suffolk: DC7Model):
         view = "SUFFOLK"
     model = suffolk if view == "SUFFOLK" else helix
     st.markdown(CSS, unsafe_allow_html=True)
-    st.markdown(f'<div class="schedule-view-caption">{_safe("DC7 Suffolk Schedule" if view == "SUFFOLK" else "DC7 HELIX BASELINE · LINE-UPS & MOH")}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="schedule-view-caption">{_safe("DC7 Suffolk Schedule" if view == "SUFFOLK" else "DC7 HELIX PROGRESS VIEW")}</div>', unsafe_allow_html=True)
     render_header(model, view)
     # Keep the native control in its own Streamlit layout row, separated from the HTML header.
     with st.container(border=True):
@@ -623,15 +620,31 @@ def render_dashboard(helix: DC7Model, suffolk: DC7Model):
     note = (
         "SUFFOLK contractual dates · HELIX Construction only"
         if view == "SUFFOLK"
-        else "P6 HELIX Baseline · Electrical Line-Ups · Commissioning · MOH"
+        else "HELIX construction (SUFFOLK update) · Electrical BL Line-Ups & MOH"
     )
     st.markdown(
         f'<div class="project-strip"><span>{view} VIEW</span><span class="right">{_safe(note)}</span></div>',
         unsafe_allow_html=True,
     )
     if view == "HELIX":
-        # No SUFFOLK progress, KPIs, dates, gates, area stats or scope audit here.
+        # Keep all pre-v0.2.20 dashboard sections except the duplicated
+        # HELIX PROJECT PROGRESS DETAIL (FOH / BOH / DH QTS-DASH breakdown).
+        # The progress widgets below use HELIX-coded SUFFOLK Construction,
+        # while Line-Ups/MOH use ONLY the independent approved HELIX baseline.
+        st.caption(
+            "**SOURCE OF PROGRESS:** SUFFOLK DC7 BL / Current-C, "
+            "filtered to HELIX Construction activities, including commissioning. "
+            "**ELECTRICAL LINE-UPS & MOH:** independent HELIX "
+            "226021-HE.B baseline (pending); there is no independent "
+            "HELIX Current. These two data sources are not interchangeable."
+        )
+        render_kpis(helix, "HELIX")
+        render_scurve_and_status(helix)
+        render_stats(helix, "PROJECT STATS · HELIX CONSTRUCTION IN SUFFOLK")
+        # Do not call render_progress_detail(helix, view="HELIX"):
+        # its QTS-DASH group breakdown duplicates the SUFFOLK view.
         render_helix_lineups(helix)
+        render_gates(helix)
         return
 
     render_kpis(suffolk, "SUFFOLK")
