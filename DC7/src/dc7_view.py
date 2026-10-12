@@ -537,9 +537,9 @@ def render_helix_lineup_stats(m: DC7Model):
         unsafe_allow_html=True,
     )
     st.caption(
-        "Solo actividades codificadas QTS - Subcontractor = HELIX "
-        "dentro de los 11 Electrical Line-Ups por Data Hall y MOH / Equipment. "
-        "FOH, BOH, Commissioning, hitos y otros subcontratistas quedan fuera."
+        "Only activities coded QTS - Subcontractor = HELIX within the "
+        "11 Electrical Line-Ups of each Data Hall and MOH / Equipment. "
+        "FOH, BOH, Commissioning, milestones and other subcontractors are excluded."
     )
     left, right = st.columns([1.25, 1], gap="large")
     with left:
@@ -554,15 +554,15 @@ def render_helix_lineup_stats(m: DC7Model):
         )
         if data is not None:
             st.caption(
-                f"Total HELIX en Line-Ups y MOH: "
-                f"{int(summary['Total Activities'].sum()):,} actividades únicas, "
-                "auditadas por Activity ID y QTS - Subcontractor."
+                f"Total HELIX activities in Line-Ups and MOH: "
+                f"{int(summary['Total Activities'].sum()):,} unique activities, "
+                "audited by Activity ID and QTS - Subcontractor."
             )
     with right:
         if data is None:
             st.info(
-                "Pendiente la línea base oficial HELIX: no se utilizan "
-                "cantidades de SUFFOLK ni de otros subcontratistas."
+                "Official HELIX baseline pending. No activity quantities "
+                "are taken from SUFFOLK or other subcontractors."
             )
         else:
             fig = go.Figure()
@@ -602,30 +602,20 @@ def render_helix_lineups(m: DC7Model):
         unsafe_allow_html=True,
     )
     st.caption(
-        "Solo actividades con QTS - Subcontractor = HELIX en los Line-Ups "
-        "de DH1100–DH1600 y MOH / Equipment. Total Activities y estados "
-        "tomados del XER de línea base 226021-HE.B; no son avance Current. "
-        "R primero en DH1200, DH1400 y DH1600."
+        "Only QTS - Subcontractor = HELIX activities in the DH1100–DH1600 "
+        "Line-Ups and MOH / Equipment. Activity counts and statuses come from "
+        "the 226021-HE.B baseline XER, not a current progress update. "
+        "R is first in DH1200, DH1400 and DH1600."
     )
 
     for area in (*HALLS, "MOH"):
         statuses = wbs_lineup_hierarchy(data, area)
         is_moh = area == "MOH"
-        total = (int(statuses["Total Activities"].sum())
-                 if data is not None else "Pendiente BL")
-        heading = (
-            f"MOH · Equipment · {total:,} actividades HELIX"
-            if is_moh and data is not None
-            else "MOH · Equipment · Pendiente BL"
-            if is_moh
-            else f"DH {area[2:]} · Electrical · {total:,} actividades HELIX"
-            if data is not None
-            else f"DH {area[2:]} · Electrical · Pendiente BL"
-        )
+        heading = "MOH" if is_moh else f"DH {area[2:]}"
         with st.expander(heading, expanded=(area == "DH1100")):
             table = statuses.copy()
             if data is None:
-                st.info("Cantidades y estados pendientes de la línea base HELIX.")
+                st.info("Activity counts and statuses are pending the official HELIX baseline.")
             column_config = {
                 "Line-Up": st.column_config.TextColumn(
                     "Line-Up" if not is_moh else "MOH Area"
@@ -651,7 +641,7 @@ def render_helix_lineups(m: DC7Model):
                     )
                 with right:
                     if data is None:
-                        st.info("Gráfica pendiente de la línea base HELIX.")
+                        st.info("The chart is pending the official HELIX baseline.")
                     else:
                         if table["Line-Up"].tolist() != list(lineup_order(area)):
                             raise ValueError(f"Line-Up P6 order mismatch: {area}")
@@ -661,13 +651,13 @@ def render_helix_lineups(m: DC7Model):
                             y=names, x=values, orientation="h",
                             marker_color=NAVY2,
                             text=values, textposition="outside",
-                            hovertemplate="%{y}<br>%{x:,} actividades HELIX<extra></extra>",
+                            hovertemplate="%{y}<br>%{x:,} HELIX activities<extra></extra>",
                         ))
                         fig.update_layout(
                             **_layout(450, 46, 55, 50),
                             title=f"HELIX ACTIVITIES BY LINE-UP · {area}",
                             showlegend=False,
-                            xaxis_title="Cantidad de actividades",
+                            xaxis_title="Activity Count",
                         )
                         fig.update_yaxes(
                             autorange="reversed", categoryorder="array",
@@ -681,24 +671,24 @@ def render_helix_lineups(m: DC7Model):
                         )
                 if data is not None:
                     st.caption(
-                        f"{area}: {total:,} actividades HELIX. "
+                        f"{area}: {int(table['Total Activities'].sum()):,} HELIX activities. "
                         "Not Started + In Progress + Completed = Total Activities."
                     )
             if data is not None and is_moh:
                 st.caption(
-                    "MOH Equipment: estados de las actividades asignadas a HELIX "
-                    "en la línea base, sin mezclar otros subcontratistas."
+                    "MOH Equipment: baseline statuses for HELIX-assigned "
+                    "activities only; other subcontractors are excluded."
                 )
 
     if data is not None:
         audit = data["_audit"]
         st.caption(
-            f"Auditoría: {len(audit):,} Activity IDs únicos con "
-            "QTS - Subcontractor = HELIX, en los Line-Ups y MOH. "
-            "Los estados son los registrados en la línea base, no una actualización."
+            f"Audit: {len(audit):,} unique Activity IDs with "
+            "QTS - Subcontractor = HELIX in Line-Ups and MOH. "
+            "Statuses reflect the baseline, not a current update."
         )
         st.download_button(
-            "Descargar auditoría HELIX · Line-Ups y MOH (CSV)",
+            "Download HELIX Line-Ups & MOH Audit (CSV)",
             audit.to_csv(index=False).encode("utf-8-sig"),
             file_name="DC7_HELIX_Only_Lineups_MOH_Baseline_Audit.csv",
             mime="text/csv", key="helix_baseline_audit_csv",
