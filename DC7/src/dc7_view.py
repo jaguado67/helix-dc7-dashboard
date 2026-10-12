@@ -523,69 +523,94 @@ def render_gates(m: DC7Model):
     st.caption("Key milestones are restricted to FTE Ready milestones from the DC7 main project. External projects and cross-project relationships are excluded.")
 
 def render_helix_lineup_stats(m: DC7Model):
-    """Replace the SUFFOLK-derived FOH/BOH/DH statistics in HELIX VIEW.
+    """Suffolk-style activity status panel for the standalone HELIX baseline.
 
-    Only independent HELIX baseline WBS activity quantities belong here.
-    No completion percentages are computed from a baseline-only schedule.
+    Same visual language as SUFFOLK PROJECT STATS, but independent P6
+    baseline status is NOT the live project progress from SUFFOLK.
     """
-    from src.helix_baseline import lineup_activity_summary
+    from src.helix_baseline import lineup_area_status_summary
 
     data = m.independent_helix_baseline()
-    summary = lineup_activity_summary(data)
+    df = lineup_area_status_summary(data)
     st.markdown(
-        '<div class="section-caption">PROJECT STATS · HELIX LINE-UPS & MOH · BASELINE ACTIVITIES</div>',
+        '<div class="section-caption">PROJECT STATS · HELIX LINE-UPS & MOH · BASELINE STATUS</div>',
         unsafe_allow_html=True,
     )
     st.caption(
-        "Only activities coded QTS - Subcontractor = HELIX within the "
-        "11 Electrical Line-Ups of each Data Hall and MOH / Equipment. "
-        "FOH, BOH, Commissioning, milestones and other subcontractors are excluded."
+        "Only QTS - Subcontractor = HELIX in six Data Hall Electrical Line-Ups "
+        "and MOH / Equipment. Status and completion percentages reflect the "
+        "official 226021-HE.B baseline snapshot, NOT a current HELIX update. "
+        "SUFFOLK tracks a different activity universe."
     )
-    left, right = st.columns([1.25, 1], gap="large")
+    if data is None:
+        st.info("Official HELIX baseline pending; no activity counts or current progress inferred.")
+        return
+
+    def percent_label(value: float) -> str:
+        # Display small, non-zero completion rates rather than rounding them
+        # to 0.0%, particularly the project-wide 2 / 4153 activities.
+        return f"{value:.2f}%" if 0 < value < 1 else f"{value:.1f}%"
+
+    left, right = st.columns([1.45, 1], gap="large")
     with left:
-        st.dataframe(
-            summary, use_container_width=True, hide_index=True,
-            column_config={
-                "Area": st.column_config.TextColumn("Data Hall / MOH"),
-                "Electrical Line-Ups": st.column_config.TextColumn("Electrical Line-Ups") if data is None else st.column_config.NumberColumn("Electrical Line-Ups", format="%d"),
-                "MOH Equipment": st.column_config.TextColumn("MOH Equipment") if data is None else st.column_config.NumberColumn("MOH Equipment", format="%d"),
-                "Total Activities": st.column_config.TextColumn("Total Activities") if data is None else st.column_config.NumberColumn("Total Activities", format="%d"),
-            },
+        h = (
+            '<div class="panel"><table class="stats-table"><thead><tr>'
+            '<th>Area</th><th>Total Tasks</th><th>Activity Completion %</th>'
+            '<th>Completed</th><th>In Progress</th><th>Not Started</th>'
+            '</tr></thead><tbody>'
         )
-        if data is not None:
-            st.caption(
-                f"Total HELIX activities in Line-Ups and MOH: "
-                f"{int(summary['Total Activities'].sum()):,} unique activities, "
-                "audited by Activity ID and QTS - Subcontractor."
+        for _, record in df.iterrows():
+            h += (
+                f'<tr><td>{_safe(record["Area"])}</td>'
+                f'<td>{int(record["Total Tasks"]):,}</td>'
+                f'<td>{percent_label(float(record["Activity Completion %"]))}</td>'
+                f'<td>{int(record["Completed"]):,}</td>'
+                f'<td>{int(record["In Progress"]):,}</td>'
+                f'<td>{int(record["Not Started"]):,}</td></tr>'
             )
+        total_tasks = int(df["Total Tasks"].sum())
+        completed = int(df["Completed"].sum())
+        in_progress = int(df["In Progress"].sum())
+        not_started = int(df["Not Started"].sum())
+        if total_tasks != completed + in_progress + not_started:
+            raise ValueError("HELIX baseline status totals do not reconcile")
+        total_percent = (completed / total_tasks * 100) if total_tasks else 0.0
+        h += (
+            f'<tr><td><b>TOTAL</b></td><td><b>{total_tasks:,}</b></td>'
+            f'<td><b>{percent_label(total_percent)}</b></td>'
+            f'<td><b>{completed:,}</b></td><td><b>{in_progress:,}</b></td>'
+            f'<td><b>{not_started:,}</b></td></tr>'
+        )
+        st.markdown(h + '</tbody></table></div>', unsafe_allow_html=True)
+        st.caption(
+            f"HELIX Line-Ups and MOH: {total_tasks:,} unique baseline Activity IDs. "
+            "Baseline statuses are not actual current progress."
+        )
     with right:
-        if data is None:
-            st.info(
-                "Official HELIX baseline pending. No activity quantities "
-                "are taken from SUFFOLK or other subcontractors."
-            )
-        else:
-            fig = go.Figure()
-            for label, color in (
-                ("Electrical Line-Ups", NAVY2),
-                ("MOH Equipment", GREEN),
-            ):
-                fig.add_trace(go.Bar(
-                    y=summary["Area"], x=summary[label],
-                    orientation="h", name=label, marker_color=color,
-                    hovertemplate="%{y}<br>%{x:,.0f} activities<extra>" + label + "</extra>",
-                ))
-            layout = _layout(385, 80, 55, 38)
-            layout["legend"] = dict(orientation="h", y=-0.20, x=0)
-            fig.update_layout(
-                **layout,
-                barmode="stack",
-                title="BASELINE ACTIVITY COUNT · DATA HALL & MOH",
-                xaxis_title="Activities",
-            )
-            fig.update_yaxes(autorange="reversed")
-            fig.update_xaxes(rangemode="tozero")
-            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+        fig = go.Figure(go.Bar(
+            x=df["Activity Completion %"],
+            y=df["Area"],
+            orientation="h",
+            text=[percent_label(float(v)) for v in df["Activity Completion %"]],
+            textposition="outside",
+            textfont=dict(size=13, color=TEXT),
+            marker=dict(color="#1f6d8a"),
+            hovertemplate="%{y}<br>Baseline completed: %{x:.3f}%<extra></extra>",
+        ))
+        highest = float(df["Activity Completion %"].max()) if not df.empty else 0.0
+        fig.update_layout(
+            **_layout(max(355, 44 * len(df) + 95), 90, 40, 28),
+            showlegend=False,
+            xaxis_title="Baseline Activity Completion %",
+            yaxis_title="",
+            title=dict(text=""),
+        )
+        fig.update_xaxes(
+            range=[0, max(1.0, highest * 1.35 + 0.2)],
+            ticksuffix="%", gridcolor=GRID,
+        )
+        fig.update_yaxes(autorange="reversed", gridcolor="#fff")
+        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
 
 def render_helix_lineups(m: DC7Model):
