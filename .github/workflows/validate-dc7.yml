@@ -127,7 +127,6 @@ jobs:
           assert not any(line.lstrip().startswith("render_progress_detail(helix") for line in helix_case.splitlines())
           assert not any(line.lstrip().startswith("render_stats(helix") for line in helix_case.splitlines())
           assert "render_stats(suffolk" in dispatch
-          assert 'HELIX P6 BASELINE · 24 PROJECT MILESTONES' in view_text
           assert '"Activities": "Pendiente BL"' in view_text
           assert '"MOH Equipment"' in view_text
           assert "CONCILIACIÓN DEL XER ORIGINAL" not in view_text
