@@ -542,39 +542,49 @@ class DC7Model:
         return source
 
     def wbs_area_stats(self, area: str) -> pd.DataFrame:
-        """FOH/BOH original P6 WBS detail, excluding audited Shell/Foundation exceptions."""
+        """Display EVERY direct child of the original FOH/BOH WBS in P6 order.
+
+        Native PROJWBS is authoritative for names and ordering, including
+        branches with zero HELIX-assigned Construction tasks. The numeric
+        results still come solely from audited, active HELIX Construction
+        activities, excluding the two separately audited Shell/Foundations
+        coding exceptions. No dummy P6 tasks are created for empty branches.
+        """
         detail = self.wbs_area_activities(area)
+        wbs = self.update_tables["PROJWBS"].copy()
+        wbs = wbs[wbs["proj_id"].astype(str).eq(str(self.update_project["proj_id"]))]
+        marker = "Front of House (FOH)" if area == "FOH" else "Back of House (BOH)"
+        parents = wbs[wbs["wbs_name"].astype(str).eq(marker)]
+        if len(parents) != 1:
+            raise ValueError(f"Expected one P6 WBS named {marker}, found {len(parents)}")
+        children = wbs[wbs["parent_wbs_id"].astype(str).eq(str(parents.iloc[0]["wbs_id"]))].copy()
+        if children.empty:
+            raise ValueError(f"No P6 WBS children found under {marker}")
+        children["_p6_sequence"] = pd.to_numeric(children["seq_num"], errors="raise")
+        children = children.sort_values(["_p6_sequence", "wbs_id"], kind="stable")
+        native_labels = children["wbs_name"].astype(str).tolist()
+        if len(set(native_labels)) != len(native_labels):
+            raise ValueError(f"Duplicate native P6 WBS names beneath {marker}")
+        unexpected = set(detail["WBS Group"].astype(str)) - set(native_labels)
+        if unexpected:
+            raise ValueError(f"HELIX activities not mapped to native {area} P6 WBS children: {sorted(unexpected)}")
+
         rows = []
-        for group, activities in detail.groupby("WBS Group", sort=False):
+        for native_name in native_labels:
+            activities = detail[detail["WBS Group"].eq(native_name)]
             counts = activities["Status"].value_counts()
             rows.append({
-                "Area": str(group),
+                "Area": native_name,
                 "Tasks": int(len(activities)),
                 "Activity Completion %": _activity_completion_pct(activities),
                 "Not Started": int(counts.get("Not Started", 0)),
                 "In Progress": int(counts.get("In Progress", 0)),
                 "Completed": int(counts.get("Completed", 0)),
             })
-        # Native P6 FOH/BOH node ordering (PROJWBS.seq_num), not a new taxonomy.
-        wbs = self.update_tables["PROJWBS"]
-        wbs = wbs[wbs["proj_id"].astype(str).eq(str(self.update_project["proj_id"]))]
-        marker = "Front of House (FOH)" if area == "FOH" else "Back of House (BOH)"
-        parents = wbs[wbs["wbs_name"].astype(str).eq(marker)]
-        if len(parents) != 1:
-            raise ValueError(f"Expected one P6 WBS named {marker}, found {len(parents)}")
-        wbs_children = wbs[wbs["parent_wbs_id"].astype(str).eq(str(parents.iloc[0]["wbs_id"]))]
-        order = {
-            str(item["wbs_name"]): int(item["seq_num"])
-            for _, item in wbs_children.iterrows()
-        }
-        results = pd.DataFrame(rows)
-        if results.empty:
-            return results
-        results["_rank"] = results["Area"].map(order).fillna(999)
-        results = results.sort_values(["_rank", "Area"]).drop(columns=["_rank"]).reset_index(drop=True)
-        if results["Tasks"].sum() != len(detail):
-            raise ValueError(f"FOH/BOH WBS reconciliation failed for {area}")
-        return results
+        result = pd.DataFrame(rows)
+        if int(result["Tasks"].sum()) != len(detail):
+            raise ValueError(f"FOH/BOH P6 WBS reconciliation failed for {area}")
+        return result
 
     def subarea_stats(self, area: str, helix_display: bool = False) -> pd.DataFrame:
         if area == "MOH" and self.auxiliary_tasks is not None:
