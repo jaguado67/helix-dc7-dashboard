@@ -702,9 +702,9 @@ def render_helix_contract_milestones(m: DC7Model):
     )
     st.caption(
         "Contractual Date = date in Activity Name · Baseline Finish = "
-        "P6 226021-HE.B · Delay = Baseline Finish − Contractual Date "
-        "(calendar days). Positive = late. These are baseline dates, "
-        "not an independent HELIX Current forecast."
+        "P6 226021-HE.B · Delay in US federal working days (Monday–Friday, "
+        "excluding observed federal holidays). Positive = late. "
+        "Baseline comparison only, not an independent HELIX Current forecast."
     )
     if data is None:
         st.info("Official independent HELIX baseline not available.")
@@ -720,7 +720,7 @@ def render_helix_contract_milestones(m: DC7Model):
 
     display = detail[[
         "Area", "Milestone", "Activity ID",
-        "Contractual Date", "Baseline Finish", "Delay (days)",
+        "Contractual Date", "Baseline Finish", "Delay (US working days)",
     ]].copy()
     display["Contractual Date"] = display["Contractual Date"].apply(_fmt_date)
     display["Baseline Finish"] = display["Baseline Finish"].apply(_fmt_date)
@@ -735,12 +735,12 @@ def render_helix_contract_milestones(m: DC7Model):
                 "Activity ID": st.column_config.TextColumn("Activity ID"),
                 "Contractual Date": st.column_config.TextColumn("Contractual Date"),
                 "Baseline Finish": st.column_config.TextColumn("Baseline Finish"),
-                "Delay (days)": st.column_config.NumberColumn("Delay (days)", format="%+d"),
+                "Delay (US working days)": st.column_config.NumberColumn("Delay (US working days)", format="%+d"),
             },
         )
     with right:
         labels = [f"{r['Area']} · {r['Milestone']}" for _, r in detail.iterrows()]
-        days = detail["Delay (days)"].astype(int).tolist()
+        days = detail["Delay (US working days)"].astype(int).tolist()
         colors = [RED if v > 0 else GREEN if v < 0 else BLUE for v in days]
         descriptions = [
             f"{r['Activity ID']}<br>Contractual: {_fmt_date(r['Contractual Date'])}"
@@ -750,16 +750,16 @@ def render_helix_contract_milestones(m: DC7Model):
         fig = go.Figure(go.Bar(
             y=labels, x=days, orientation="h",
             marker_color=colors,
-            text=[f"{v:+d} d" for v in days],
+            text=[f"{v:+d} wd" for v in days],
             textposition="outside",
             customdata=descriptions,
-            hovertemplate="<b>%{y}</b><br>%{customdata}<br>Delay: %{x:+d} days<extra></extra>",
+            hovertemplate="<b>%{y}</b><br>%{customdata}<br>Delay: %{x:+d} US working days<extra></extra>",
         ))
         fig.update_layout(
             **_layout(450, 155, 82, 35),
-            title="CONTRACTUAL DATE DEVIATION · DAYS",
+            title="CONTRACTUAL DATE DEVIATION · US WORKING DAYS",
             showlegend=False,
-            xaxis_title="Delay vs Contract (calendar days)",
+            xaxis_title="Delay vs Contract (US working days)",
         )
         low = min(0, *days)
         high = max(0, *days)
