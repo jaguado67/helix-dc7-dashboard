@@ -733,14 +733,16 @@ class DC7Model:
         return out.sort_values(["_rank", "Area"]).drop(columns="_rank").reset_index(drop=True)
 
     def lineup_stats(self, area: str) -> pd.DataFrame:
-        """Activity-count status by Equipment Line-Up.
+        """Equipment Line-Ups from the exact HELIX baseline, if available.
 
-        DC7 line-up detail is sourced from the dedicated HELIX electrical
-        schedule (226021-HE.B-4.xer) when available. This avoids the incomplete
-        Activity Code assignment seen in the main project update.
+        Never fall back to SUFFOLK-coded activities and never use a superseded
+        HELIX export as a stand-in for the official independent P6 baseline.
         """
-        source = self.auxiliary_tasks if self.auxiliary_tasks is not None and not self.auxiliary_tasks.empty else self.current_tasks
-        g = source[source["Area"].eq(area)].copy()
+        if self.auxiliary_path is None or self.auxiliary_tasks is None or self.auxiliary_tasks.empty:
+            return pd.DataFrame()
+        if self.auxiliary_path.name != "226021-HE.B.xer":
+            raise ValueError("Unauthorized independent HELIX line-up source")
+        g = self.auxiliary_tasks[self.auxiliary_tasks["Area"].eq(area)].copy()
         if g.empty or not str(area).upper().startswith("DH"):
             return pd.DataFrame()
 
@@ -946,9 +948,9 @@ class DC7Model:
             "HELIX Activities without QTS-DASH": len(unassigned),
             "HELIX without QTS-DASH IDs": ", ".join(unassigned_ids[:30]) if unassigned_ids else "None",
             "Areas": ", ".join(self.areas()),
-            "Line-Up / MOH Source": self.auxiliary_path.name if self.auxiliary_path is not None else "Main DC7 update fallback",
+            "Line-Up / MOH Source": self.auxiliary_path.name if self.auxiliary_path is not None else "Not loaded: official 226021-HE.B.xer pending",
             "MOH HELIX Activities": int((self.auxiliary_tasks["Area"].eq("MOH")).sum()) if self.auxiliary_tasks is not None and not self.auxiliary_tasks.empty else 0,
-            "Scope Rule": "Main DC7 BL/UP drives project analytics; dedicated HELIX electrical schedule drives Line-Ups and MOH when available",
+            "Scope Rule": "SUFFOLK BL/Current-C drives HELIX-coded construction progress; only approved HELIX 226021-HE.B baseline may drive standalone Line-Ups/MOH",
         }
 
 
@@ -981,13 +983,25 @@ def build_dc7_model(data_dir: Path) -> DC7Model:
     mapping = current[["task_code", "Area", "Subarea"]].drop_duplicates("task_code")
     baseline = base_all.merge(mapping, on="task_code", how="inner")
 
-    # Dedicated HELIX electrical source for Line-Ups and MOH.
-    aux_path = next(iter(sorted(Path(data_dir).rglob("226021-HE.B-4.xer"))), None)
+    # Only official independent HELIX Baseline. Never use historical B-4.
+    # Matching must be exact; wildcard/rglob aliasing of B-4 is prohibited.
+    candidates = sorted(Path(data_dir).rglob("226021-HE.B.xer"))
+    if len(candidates) > 1:
+        raise ValueError("Multiple HELIX official baseline files: resolve before use")
+    aux_path = candidates[0] if candidates else None
     aux_tasks = pd.DataFrame()
     aux_project = None
     if aux_path is not None:
         at = parse_xer(aux_path, WANTED)
-        aux_project = _project_row(at, aux_path)
+        projects = at["PROJECT"]
+        if "proj_short_name" not in projects.columns:
+            raise ValueError("Independent HELIX baseline is missing proj_short_name")
+        approved = projects[
+            projects["proj_short_name"].fillna("").astype(str).str.strip().str.upper().eq("226021-HE.B")
+        ]
+        if len(approved) != 1:
+            raise ValueError("Official HELIX Baseline must contain exactly one project with ID 226021-HE.B")
+        aux_project = approved.iloc[0]
         apid = str(aux_project["proj_id"])
         a_all = to_task_frame(at["TASK"])
         a_all = a_all[a_all["proj_id"].astype(str).eq(apid)].copy()
