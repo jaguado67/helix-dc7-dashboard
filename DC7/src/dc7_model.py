@@ -10,6 +10,7 @@ import pandas as pd
 from config import AREA_ORDER, CONTROL_GATE_KEYWORDS, HOURS_PER_DAY
 from src.xer import parse_xer, to_task_frame
 from src.construction_audit import construction_wbs_ids, scoped_helix_construction, build_activity_audit
+from src.helix_baseline import summarize_approved_baseline
 
 WANTED = ["PROJECT", "TASK", "PROJWBS", "ACTVTYPE", "ACTVCODE", "TASKACTV"]
 
@@ -315,6 +316,7 @@ class DC7Model:
     auxiliary_path: Optional[Path] = None
     auxiliary_tasks: Optional[pd.DataFrame] = None
     auxiliary_project: Optional[pd.Series] = None
+    auxiliary_tables: Optional[dict[str, pd.DataFrame]] = None
     audit_reports: Optional[dict[str, pd.DataFrame]] = None
 
     @property
@@ -732,6 +734,16 @@ class DC7Model:
         out["_rank"] = out["Area"].map(rank).fillna(50)
         return out.sort_values(["_rank", "Area"]).drop(columns="_rank").reset_index(drop=True)
 
+    def independent_helix_baseline(self) -> Optional[dict[str, pd.DataFrame]]:
+        """Only the approved independent HELIX baseline, no SUFFOLK fallback."""
+        if self.auxiliary_path is None or self.auxiliary_tables is None:
+            return None
+        if self.auxiliary_path.name != "226021-HE.B.xer":
+            raise ValueError("Only official independent HELIX baseline is supported")
+        return summarize_approved_baseline(
+            self.auxiliary_tables, str(self.auxiliary_project["proj_id"])
+        )
+
     def lineup_stats(self, area: str) -> pd.DataFrame:
         """Equipment Line-Ups from the exact HELIX baseline, if available.
 
@@ -991,8 +1003,10 @@ def build_dc7_model(data_dir: Path) -> DC7Model:
     aux_path = candidates[0] if candidates else None
     aux_tasks = pd.DataFrame()
     aux_project = None
+    aux_tables = None
     if aux_path is not None:
         at = parse_xer(aux_path, WANTED)
+        aux_tables = at
         projects = at["PROJECT"]
         if "proj_short_name" not in projects.columns:
             raise ValueError("Independent HELIX baseline is missing proj_short_name")
@@ -1005,8 +1019,10 @@ def build_dc7_model(data_dir: Path) -> DC7Model:
         apid = str(aux_project["proj_id"])
         a_all = to_task_frame(at["TASK"])
         a_all = a_all[a_all["proj_id"].astype(str).eq(apid)].copy()
-        a_helix_ids = _helix_task_ids(at, apid)
-        aux_tasks = a_all[a_all["task_id"].astype(str).isin(a_helix_ids)].copy()
+        # This is a standalone HELIX-owned P6 project: do not require a
+        # SUFFOLK QTS-Subcontractor code inside HELIX's own baseline.
+        # P6 PROJWBS classification is authoritative for electrical line-ups.
+        aux_tasks = a_all.copy()
         a_area_map = _assignment_map(at, apid, "QTS - AREA", "short_name")
         aux_tasks["Area"] = aux_tasks["task_id"].astype(str).map(a_area_map).fillna("Unclassified")
         aux_tasks["Subarea"] = "Other HELIX Electrical Scope"
@@ -1031,6 +1047,7 @@ def build_dc7_model(data_dir: Path) -> DC7Model:
         auxiliary_path=aux_path,
         auxiliary_tasks=aux_tasks,
         auxiliary_project=aux_project,
+        auxiliary_tables=aux_tables,
         audit_reports=audit_reports,
     )
 
