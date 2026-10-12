@@ -285,10 +285,12 @@ def render_progress_detail(m: DC7Model, view: str):
     st.markdown(f'<div class="section-caption">{view} PROJECT PROGRESS DETAIL</div>', unsafe_allow_html=True)
     area = st.selectbox("Area / Data Hall", m.areas(), index=0, key=f"dc7_area_{view.lower()}")
     consolidated = view == "HELIX" and area.upper().startswith("DH")
-    df = m.subarea_stats(area, helix_display=consolidated)
+    p6_wbs = view == "SUFFOLK" and area in ("FOH", "BOH")
+    df = m.wbs_area_stats(area) if p6_wbs else m.subarea_stats(area, helix_display=consolidated)
     c1, c2 = st.columns([1.15, 1], gap="large")
     with c1:
-        summary_title = ("FUNCTIONAL PACKAGE SUMMARY" if area == "MOH" else
+        summary_title = ("SUMMARY BY P6 WBS" if p6_wbs else
+                         "FUNCTIONAL PACKAGE SUMMARY" if area == "MOH" else
                          "SUMMARY BY FUNCTIONAL GROUP" if consolidated else
                          "SUMMARY BY QTS - DASH")
         h = f'<div class="panel"><div class="panel-head"><div class="panel-title">{area} · {summary_title}</div></div><table class="detail-table"><thead><tr><th>Area</th><th>Tasks</th><th>Activity Completion %</th><th>Not Started</th><th>In Progress</th><th>Completed</th></tr></thead><tbody>'
@@ -299,12 +301,35 @@ def render_progress_detail(m: DC7Model, view: str):
     with c2:
         fig = go.Figure(go.Bar(x=df.Area, y=df["Activity Completion %"], text=[f"{x:.1f}%" for x in df["Activity Completion %"]], textposition="outside", textfont=dict(size=13, color=TEXT), marker=dict(color="#1f6d8a")))
         ymax = max(10, float(df["Activity Completion %"].max()) * 1.35 + 1) if not df.empty else 10
-        chart_title = f"ACTIVITY COMPLETION · {area}" if area == "MOH" else f"ACTIVITY COMPLETION BY AREA · {area}"
+        chart_title = (f"ACTIVITY COMPLETION BY WBS · {area}" if p6_wbs else
+                       f"ACTIVITY COMPLETION · {area}" if area == "MOH" else
+                       f"ACTIVITY COMPLETION BY AREA · {area}")
         fig.update_layout(**_layout(410, 70, 115, 38), showlegend=False, title=chart_title, yaxis_title="Activity Completion %")
         fig.update_yaxes(range=[0, ymax], ticksuffix="%", gridcolor=GRID)
         fig.update_xaxes(tickangle=-25)
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
-    if consolidated:
+    if p6_wbs:
+        st.caption(
+            "Original Primavera P6 PROJWBS names; scope: only activities coded "
+            "QTS - Subcontractor = HELIX within Construction, including its "
+            "commissioning. Foundations is shown separately because one "
+            f"HELIX activity assigned to {area} by QTS-AREA is in Construction "
+            "/ Shell / Foundations, not in the House Systems WBS branch. "
+            "No P6 activity codes or WBS assignments were changed."
+        )
+        details = m.wbs_area_activities(area)
+        audit_export = details[["task_code", "task_name", "Area", "WBS Group", "WBS Path", "Status"]].copy()
+        audit_export.columns = [
+            "Activity ID", "Activity Name", "QTS - AREA", "P6 WBS Group",
+            "P6 WBS Path", "Current Status"
+        ]
+        st.download_button(
+            f"Download {area} HELIX Construction · WBS audit (CSV)",
+            audit_export.to_csv(index=False).encode("utf-8-sig"),
+            file_name=f"DC7_{area}_HELIX_Construction_WBS_Audit.csv",
+            mime="text/csv", key=f"wbs_audit_{area}",
+        )
+    elif consolidated:
         st.caption("HELIX Data Hall display groups consolidate Other Rooms and Electrical Rooms, and classify unassigned underslab electrical / RTU roof activities by function. Original QTS-DASH, task IDs, status, and XER data remain unchanged. Unrecognized activities remain unclassified.")
     elif area == "MOH":
         st.caption("MOH is sourced from 226021-HE.B-4.xer. That file does not contain QTS-DASH, so MOH is grouped by equipment identifiers in the activity names; the original XER coding remains unchanged.")
