@@ -2,7 +2,7 @@
 
 Cloud-ready Streamlit package for the HELIX DC7 schedule dashboard.
 
-**Version:** 0.2.28
+**Version:** 0.2.29
 
 ## Data scope
 
@@ -13,6 +13,32 @@ This release has two selectable views. SUFFOLK displays the main DC7 project sco
 - No `DC7-MIL`
 - No `DC7.TFO-B`
 - No external-project relationships in dashboard analytics
+
+## v0.2.29 — Remove annotated HELIX View display clutter; defer milestones
+
+Presentation-only changes in HELIX VIEW, exactly matching the user’s
+annotated screenshots:
+
+- Hide the explanatory paragraph under the HELIX view navigation strip.
+- Hide the explanatory paragraph under **PROJECT STATS · HELIX LINE-UPS & MOH**
+  while retaining its per-area table and horizontal baseline percentage chart.
+- Remove the **TOTAL** table row; the seven independently audited area rows
+  DH1100–DH1600 and MOH are unchanged.
+- Remove the explanatory paragraph directly beneath
+  **HELIX · DATA HALL / LINE-UP DETAIL**, but preserve all seven expanders,
+  their Line-Up activity/status tables and bar charts.
+- Remove the trailing standalone audit caption and the **Download HELIX
+  Line-Ups & MOH Audit (CSV)** button from HELIX VIEW. Internal source
+  auditing and the SUFFOLK activity audit remain fully operational.
+- Hide **PROJECT KEY MILESTONES · FTE READY** in HELIX VIEW for now. Do not
+  rewrite, delete or reinterpret the milestone computation; its return to
+  the dashboard will be decided separately.
+
+Data and logic are NOT altered: 4,153 independent approved HELIX baseline
+Line-Up/MOH Activity IDs, baseline status by area (4,151 NS, 0 IP, 2 C),
+SUFFOLK Construction Current-C (2,545 activities), all six hall Line-Up
+sequences, and the existing Source XER remain unchanged. Existing
+header labels and retained section titles still identify the source/scope.
 
 ## v0.2.28 — HELIX area status table and percentage chart like SUFFOLK
 
