@@ -476,16 +476,15 @@ class DC7Model:
             })
         return pd.DataFrame(rows)
 
-    def wbs_area_activities(self, area: str) -> pd.DataFrame:
-        """Map FOH/BOH HELIX Construction activities to original P6 WBS labels.
+    def wbs_area_activities(self, area: str, include_exceptions: bool = False) -> pd.DataFrame:
+        """Return FOH/BOH HELIX Construction grouped by the genuine P6 WBS.
 
-        Classification uses the *actual* PROJWBS parent chain, never QTS-DASH,
-        activity-name keywords, or an invented reporting category. QTS - AREA
-        determines the FOH/BOH population, whose source HELIX/Construction
-        membership has already been independently verified by build_dc7_model.
-        Two underground HELIX tasks belong to Construction / Shell /
-        Foundations rather than House Systems; keep them visible as Foundations
-        so the sums match the higher-level scope and nothing is silently lost.
+        FDN.1296 / FDN.1300 have QTS-AREA FOH/BOH but belong to
+        Construction / Shell / Foundations, outside House Systems.
+        By default these WBS exceptions are excluded ONLY from the FOH/BOH
+        detail and chart. include_exceptions=True preserves both original
+        records for the formal activity audit. Project-level HELIX counts
+        and the original XERs are never changed by this presentation rule.
         """
         if area not in ("FOH", "BOH"):
             raise ValueError(f"P6 WBS detail is supported only for FOH/BOH, got {area!r}")
@@ -531,10 +530,19 @@ class DC7Model:
         source["WBS Path"] = [entry[1] for entry in resolved]
         if source["task_code"].astype(str).duplicated().any():
             raise ValueError(f"Duplicate HELIX Construction Activity IDs in {area}")
+        # Only these two evidenced Shell/Foundations exceptions may be
+        # left out of the FOH/BOH WBS detail; reject any new, unexpected one.
+        exceptions = source[source["WBS Group"].eq("Foundations")]
+        expected = {"FOH": {"FDN.1296"}, "BOH": {"FDN.1300"}}[area]
+        found = set(exceptions["task_code"].astype(str))
+        if found != expected:
+            raise ValueError(f"{area} WBS exceptions changed: {sorted(found)}; expected {sorted(expected)}")
+        if not include_exceptions:
+            source = source[source["WBS Group"].ne("Foundations")].copy()
         return source
 
     def wbs_area_stats(self, area: str) -> pd.DataFrame:
-        """FOH/BOH progress by the direct child WBS of the P6 FOH/BOH nodes."""
+        """FOH/BOH original P6 WBS detail, excluding audited Shell/Foundation exceptions."""
         detail = self.wbs_area_activities(area)
         rows = []
         for group, activities in detail.groupby("WBS Group", sort=False):
@@ -895,13 +903,49 @@ def build_dc7_model(data_dir: Path) -> DC7Model:
     # Updates may add, split, replace, or recode activities.
     # Baseline-vs-current comparisons use matched task_codes only,
     # while current-status analytics retain the full current HELIX scope.
-    return DC7Model(
+    model = DC7Model(
         bl_path, up_path, bp, up, baseline, current, bt, ut,
         auxiliary_path=aux_path,
         auxiliary_tasks=aux_tasks,
         auxiliary_project=aux_project,
         audit_reports=audit_reports,
     )
+
+
+    # Reconcile FOH/BOH category exclusions in an explicit audit register.
+    # These remain HELIX-coded, active Construction records in P6,
+    # but are NOT descendants of the FOH/BOH House Systems WBS nodes.
+    exception_parts = []
+    for zone in ("FOH", "BOH"):
+        full = model.wbs_area_activities(zone, include_exceptions=True)
+        mismatch = full[full["WBS Group"].eq("Foundations")].copy()
+        for _, row in mismatch.iterrows():
+            exception_parts.append({
+                "Activity ID": str(row["task_code"]),
+                "Activity Name": str(row.get("task_name", "")),
+                "QTS - AREA": zone,
+                "Original P6 WBS": str(row["WBS Path"]),
+                "Current Status": str(row.get("Status", "")),
+                "Reconciliation": "EXCLUDED FROM FOH/BOH WBS DETAIL · RETAINED IN HELIX CONSTRUCTION SOURCE",
+                "Reason": "QTS - AREA differs from original P6 WBS: Construction / Shell / Foundations",
+            })
+    wbs_exceptions = pd.DataFrame(exception_parts)
+    if set(wbs_exceptions["Activity ID"]) != {"FDN.1296", "FDN.1300"} or len(wbs_exceptions) != 2:
+        raise ValueError("Unexpected FOH/BOH Foundations exceptions; audit required")
+    audit_reports["wbs_exceptions"] = wbs_exceptions
+    report = audit_reports["active"]
+    matched = report["Activity ID"].astype(str).isin(wbs_exceptions["Activity ID"])
+    if matched.sum() != 2:
+        raise ValueError("Expected both Foundations records in the active construction audit")
+    report.loc[matched, "Audit"] = "WBS EXCEPTION — FOH/BOH DETAIL EXCLUDED; SOURCE INCLUDED"
+    audit_reports["summary"] = pd.concat([
+        audit_reports["summary"],
+        pd.DataFrame([
+            {"Metric": "FOH/BOH Shell-Foundations WBS exceptions (audit only)", "Value": 2},
+            {"Metric": "FOH/BOH WBS detail activity count (combined)", "Value": 323},
+        ]),
+    ], ignore_index=True)
+    return model
 
 
 def build_suffolk_model(helix_model: DC7Model) -> DC7Model:
