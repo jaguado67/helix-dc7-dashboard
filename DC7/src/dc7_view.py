@@ -522,6 +522,74 @@ def render_gates(m: DC7Model):
     st.dataframe(audit, use_container_width=True, hide_index=True)
     st.caption("Key milestones are restricted to FTE Ready milestones from the DC7 main project. External projects and cross-project relationships are excluded.")
 
+def render_helix_lineup_stats(m: DC7Model):
+    """Replace the SUFFOLK-derived FOH/BOH/DH statistics in HELIX VIEW.
+
+    Only independent HELIX baseline WBS activity quantities belong here.
+    No completion percentages are computed from a baseline-only schedule.
+    """
+    from src.helix_baseline import lineup_activity_summary
+
+    data = m.independent_helix_baseline()
+    summary = lineup_activity_summary(data)
+    st.markdown(
+        '<div class="section-caption">PROJECT STATS · HELIX LINE-UPS & MOH · BASELINE ACTIVITIES</div>',
+        unsafe_allow_html=True,
+    )
+    st.caption(
+        "Seis Data Halls y MOH; sin FOH ni BOH. "
+        "Electrical = suma de los 11 Line-Ups por Data Hall; "
+        "Commissioning es una rama independiente; MOH = Equipment. "
+        "Las cifras proceden únicamente de la línea base oficial HELIX."
+    )
+    left, right = st.columns([1.25, 1], gap="large")
+    with left:
+        st.dataframe(
+            summary, use_container_width=True, hide_index=True,
+            column_config={
+                "Area": st.column_config.TextColumn("Data Hall / MOH"),
+                "Electrical Line-Ups": st.column_config.TextColumn("Electrical Line-Ups") if data is None else st.column_config.NumberColumn("Electrical Line-Ups", format="%d"),
+                "Commissioning": st.column_config.TextColumn("Commissioning") if data is None else st.column_config.NumberColumn("Commissioning", format="%d"),
+                "MOH Equipment": st.column_config.TextColumn("MOH Equipment") if data is None else st.column_config.NumberColumn("MOH Equipment", format="%d"),
+                "Total Activities": st.column_config.TextColumn("Total Activities") if data is None else st.column_config.NumberColumn("Total Activities", format="%d"),
+            },
+        )
+        if data is not None:
+            st.caption(
+                f"Total actividades mapeadas a Line-Ups, Commissioning y MOH: "
+                f"{int(summary['Total Activities'].sum()):,}. "
+                "Las actividades fuera de estas ramas quedan en la auditoría."
+            )
+    with right:
+        if data is None:
+            st.info(
+                "Cantidad de actividades y gráfica pendientes del XER oficial "
+                "226021-HE.B.xer. No se utilizarán cantidades del cronograma SUFFOLK."
+            )
+        else:
+            fig = go.Figure()
+            for label, color in (
+                ("Electrical Line-Ups", NAVY2),
+                ("Commissioning", BLUE),
+                ("MOH Equipment", GREEN),
+            ):
+                fig.add_trace(go.Bar(
+                    y=summary["Area"], x=summary[label],
+                    orientation="h", name=label, marker_color=color,
+                    hovertemplate="%{y}<br>%{x:,.0f} activities<extra>" + label + "</extra>",
+                ))
+            fig.update_layout(
+                **_layout(385, 80, 55, 38),
+                barmode="stack",
+                title="BASELINE ACTIVITY COUNT · DATA HALL & MOH",
+                xaxis_title="Activities",
+                legend=dict(orientation="h", y=-0.20, x=0),
+            )
+            fig.update_yaxes(autorange="reversed")
+            fig.update_xaxes(rangemode="tozero")
+            st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+
+
 def render_helix_lineups(m: DC7Model):
     """HELIX independent P6 baseline navigation: only Data Hall Line-Ups + MOH."""
     from src.helix_baseline import HALLS, baseline_outline
