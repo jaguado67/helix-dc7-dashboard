@@ -86,15 +86,31 @@ def _layout(height=360,left=55,bottom=50,top=48):
 
 
 def render_header(m: DC7Model, view: str):
+    if view == "SUFFOLK":
+        date_label, date_value = "Latest Data Date", _fmt_date(m.data_date)
+        current_label, current_value = "Current Update", m.update_path.stem
+        source_label = "SUFFOLK · HELIX Construction"
+    else:
+        independent = m.auxiliary_project
+        from src.dc7_model import _project_date
+        baseline_date = (
+            _project_date(independent, "data_date", "last_recalc_date")
+            if independent is not None else None
+        )
+        date_label = "HELIX BL Data Date"
+        date_value = _fmt_date(baseline_date)
+        current_label, current_value = "HELIX Current", "Not available"
+        source_label = "Independent HELIX baseline · Line-Ups/MOH"
+
     st.markdown(f"""
     <div class="helix-header">
       <div class="logo-card"><img src="{_logo('toro')}"></div>
       <div><div class="brand-title">{BRAND_NAME} {APP_TITLE}</div><div class="brand-subtitle">{APP_SUBTITLE}</div></div>
       <div class="header-center"><span class="header-chip">DC7 PROJECT DETAIL</span><span class="header-chip">v{VERSION}</span></div>
       <div class="header-meta">
-        <div class="line">Latest Data Date&nbsp;&nbsp;<span class="value">{_fmt_date(m.data_date)}</span></div>
-        <div class="line">Current Update&nbsp;&nbsp;<span class="value">{_safe(m.update_path.stem)}</span></div>
-        <div class="line">Scope&nbsp;&nbsp;<span class="value">{_safe("SUFFOLK / HELIX Construction" if view == "SUFFOLK" else "HELIX Construction")}</span></div>
+        <div class="line">{_safe(date_label)}&nbsp;&nbsp;<span class="value">{_safe(date_value)}</span></div>
+        <div class="line">{_safe(current_label)}&nbsp;&nbsp;<span class="value">{_safe(current_value)}</span></div>
+        <div class="line">Scope&nbsp;&nbsp;<span class="value">{_safe(source_label)}</span></div>
       </div>
       <div class="logo-card"><img src="{_logo('helix')}"></div>
     </div>
@@ -510,17 +526,81 @@ def render_gates(m: DC7Model):
     st.caption("Key milestones are restricted to FTE Ready milestones from the DC7 main project. External projects and cross-project relationships are excluded.")
 
 def render_helix_lineups(m: DC7Model):
-    halls = [a for a in m.areas() if a.startswith("DH") and not m.lineup_stats(a).empty]
-    if not halls:
+    """HELIX independent P6 baseline navigation: only Data Hall Line-Ups + MOH."""
+    from src.helix_baseline import HALLS, baseline_outline
+
+    data = m.independent_helix_baseline()
+    areas = list(HALLS) + ["MOH"]
+    st.markdown(
+        '<div class="section-caption">HELIX · DATA HALL LINE-UPS & MOH · P6 BASELINE</div>',
+        unsafe_allow_html=True,
+    )
+    st.caption(
+        "Jerarquía original: DH → Electrical → Line-Ups y Commissioning; "
+        "MOH → Equipment. R aparece primero en DH1200, DH1400 y DH1600, "
+        "y al final en DH1100, DH1300 y DH1500. "
+        "Solo se utiliza la línea base HELIX 226021-HE.B.xer; "
+        "no existe un Current HELIX independiente."
+    )
+    area = st.selectbox(
+        "Data Hall / MOH", areas, index=0, key="helix_baseline_area"
+    )
+    outline = baseline_outline()
+    expected = outline[area]
+    if data is None:
         st.info(
-            "Equipment Line-Ups / MOH: línea base independiente HELIX "
-            "(226021-HE.B.xer) todavía no cargada. No se utilizará "
-            "226021-HE.B-4.xer ni se sustituirá con actividades de SUFFOLK."
+            "La línea base HELIX 226021-HE.B.xer aún no está disponible. "
+            "Se muestra exclusivamente la estructura identificada en las "
+            "capturas de P6: sin fechas, cantidades ni porcentajes de avance. "
+            "El archivo 226021-HE.B-4.xer no se utilizará."
         )
-        return
-    st.markdown('<div class="section-caption">HELIX · EQUIPMENT LINE-UPS</div>', unsafe_allow_html=True)
-    area = st.selectbox("Data Hall · Equipment Line-Ups", halls, key="helix_lineup_area")
-    render_lineups_detail(m, area)
+
+    if data is None:
+        rows = pd.DataFrame([
+            {"P6 WBS": r["WBS Level"], "Line-Up": r["Line-Up"]}
+            for r in expected
+        ])
+    else:
+        rows = data[area].copy()
+        required_order = [(r["WBS Level"], r["Line-Up"]) for r in expected]
+        actual_order = list(zip(rows["WBS Level"], rows["Line-Up"]))
+        if actual_order != required_order:
+            raise ValueError(f"Original HELIX WBS line-up order mismatch for {area}")
+        rows["Baseline Start"] = rows["Baseline Start"].apply(_fmt_date)
+        rows["Baseline Finish"] = rows["Baseline Finish"].apply(_fmt_date)
+        rows = rows.rename(columns={
+            "WBS Level": "P6 WBS", "Baseline Tasks": "Activities",
+        })
+    if area == "MOH":
+        st.markdown('<div class="section-caption">MOH · EQUIPMENT</div>', unsafe_allow_html=True)
+        st.dataframe(rows, use_container_width=True, hide_index=True)
+    else:
+        electrical = rows[rows["P6 WBS"].eq("Electrical")].copy()
+        commissioning = rows[rows["P6 WBS"].eq("Commissioning")].copy()
+        st.markdown(
+            f'<div class="section-caption">{_safe(area)} · ELECTRICAL LINE-UPS</div>',
+            unsafe_allow_html=True,
+        )
+        st.dataframe(electrical, use_container_width=True, hide_index=True)
+        st.markdown(
+            f'<div class="section-caption">{_safe(area)} · COMMISSIONING</div>',
+            unsafe_allow_html=True,
+        )
+        st.dataframe(commissioning, use_container_width=True, hide_index=True)
+
+    if data is not None:
+        st.caption(
+            "Las cantidades y fechas son exclusivamente de la línea base P6. "
+            "No representan avance real, estado actual ni pronóstico de ejecución."
+        )
+        audit = data["_audit"]
+        st.download_button(
+            "Descargar auditoría de actividades de la línea base HELIX (CSV)",
+            audit.to_csv(index=False).encode("utf-8-sig"),
+            file_name="DC7_HELIX_Official_BL_Lineup_WBS_Audit.csv",
+            mime="text/csv",
+            key="helix_baseline_audit_csv",
+        )
 
 
 def render_dashboard(helix: DC7Model, suffolk: DC7Model):
@@ -529,7 +609,7 @@ def render_dashboard(helix: DC7Model, suffolk: DC7Model):
         view = "SUFFOLK"
     model = suffolk if view == "SUFFOLK" else helix
     st.markdown(CSS, unsafe_allow_html=True)
-    st.markdown(f'<div class="schedule-view-caption">{_safe("DC7 Suffolk Schedule" if view == "SUFFOLK" else "DC7 HELIX PROGRESS VIEW")}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="schedule-view-caption">{_safe("DC7 Suffolk Schedule" if view == "SUFFOLK" else "DC7 HELIX BASELINE · LINE-UPS & MOH")}</div>', unsafe_allow_html=True)
     render_header(model, view)
     # Keep the native control in its own Streamlit layout row, separated from the HTML header.
     with st.container(border=True):
@@ -540,33 +620,24 @@ def render_dashboard(helix: DC7Model, suffolk: DC7Model):
                 default="SUFFOLK", key="dc7_schedule_view",
                 label_visibility="collapsed",
             )
-    note = "SUFFOLK contractual dates · HELIX Construction only" if view == "SUFFOLK" else "HELIX Construction · commissioning included · procurement excluded"
-    st.markdown(f'<div class="project-strip"><span>{view} VIEW</span><span class="right">{_safe(note)}</span></div>', unsafe_allow_html=True)
-    render_kpis(model, view)
-
-    if view == "SUFFOLK":
-        render_stats(suffolk, "SUFFOLK PROJECT STATS · AREA PROGRESS")
-        render_windows(suffolk)
-        render_progress_detail(suffolk, view="SUFFOLK")
-    else:
-        st.caption(
-            "El avance constructivo de esta vista se obtiene exclusivamente "
-            "del cronograma SUFFOLK (QTS - Subcontractor = HELIX, Construction). "
-            "La línea base independiente HELIX 226021-HE.B.xer está pendiente "
-            "de incorporación; no existe un Current independiente de HELIX."
-        )
-        render_scurve_and_status(helix)
-        render_stats(helix, "PROJECT STATS · HELIX SCOPE")
-        render_progress_detail(helix, view="HELIX")
+    note = (
+        "SUFFOLK contractual dates · HELIX Construction only"
+        if view == "SUFFOLK"
+        else "P6 HELIX Baseline · Electrical Line-Ups · Commissioning · MOH"
+    )
+    st.markdown(
+        f'<div class="project-strip"><span>{view} VIEW</span><span class="right">{_safe(note)}</span></div>',
+        unsafe_allow_html=True,
+    )
+    if view == "HELIX":
+        # No SUFFOLK progress, KPIs, dates, gates, area stats or scope audit here.
         render_helix_lineups(helix)
-        render_gates(helix)
-        st.caption(
-            "Source note: HELIX construction KPIs and S-curve are derived "
-            "from the SUFFOLK Baseline / Current-C under QTS - Subcontractor = HELIX. "
-            "Only the official independent HELIX baseline 226021-HE.B.xer "
-            "is authorized for MOH and Equipment Line-Ups; it is not yet loaded. "
-            "No independent HELIX update is available."
-        )
+        return
+
+    render_kpis(suffolk, "SUFFOLK")
+    render_stats(suffolk, "SUFFOLK PROJECT STATS · AREA PROGRESS")
+    render_windows(suffolk)
+    render_progress_detail(suffolk, view="SUFFOLK")
 
     reports = helix.audit_reports or {}
     if reports:
