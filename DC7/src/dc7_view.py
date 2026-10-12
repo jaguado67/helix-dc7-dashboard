@@ -747,8 +747,9 @@ def render_dashboard(helix: DC7Model, suffolk: DC7Model):
         st.caption(
             "**SOURCE OF PROGRESS:** SUFFOLK DC7 BL / Current-C, "
             "filtered to HELIX Construction activities, including commissioning. "
-            "**ELECTRICAL LINE-UPS & MOH:** independent HELIX "
-            "226021-HE.B baseline (pending); there is no independent "
+            "**ELECTRICAL LINE-UPS & MOH:** verified official HELIX "
+            "226021-HE.B independent Baseline, 4,689 original P6 activities "
+            "(including 24 project milestones). There is no independent "
             "HELIX Current. These two data sources are not interchangeable."
         )
         render_kpis(helix, "HELIX")
