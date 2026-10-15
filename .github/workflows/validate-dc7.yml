@@ -2,7 +2,7 @@ name: Validate DC7 dashboard
 
 on:
   push:
-    branches: [main]
+    branches: [main, fix/dc7-helix-lineup-percent-completion-v034]
     paths:
       - "DC7/**"
       - ".github/workflows/validate-dc7.yml"
@@ -166,6 +166,17 @@ jobs:
                   detail["Not Started"] + detail["In Progress"] + detail["Completed"]
               ).eq(detail["Total Activities"]).all()
               assert (detail[expected_columns[1:]] >= 0).all().all()
+              # Line-Up chart must plot progress (completed / total),
+              # not activity counts nor share of all Data Hall activities.
+              progress = detail["Completed"] / detail["Total Activities"] * 100
+              assert ((progress >= 0) & (progress <= 100)).all()
+              if area == "DH1100":
+                  assert detail.set_index("Line-Up").loc["A110","Completed"] == 2
+                  assert abs(float(progress.iloc[0]) - (2 / 58 * 100)) < 1e-12
+                  assert f"{progress.iloc[0]:.1f}%" == "3.4%"
+                  assert progress.iloc[1:].eq(0).all()
+              else:
+                  assert progress.eq(0).all()
           mohtree = wbs_lineup_hierarchy(approved, "MOH")
           assert mohtree.columns.tolist() == expected_columns
           assert mohtree["Line-Up"].tolist() == ["Equipment"]
@@ -295,7 +306,15 @@ jobs:
           assert "Solo actividades" not in detail_code
           assert "Auditoría:" not in detail_code
           assert "Descargar auditoría" not in detail_code
-          assert "xaxis_title=\"Activity Count\"" in detail_code
+          assert 'xaxis_title="Activity Completion %"' in detail_code
+          assert 'ACTIVITY COMPLETION BY LINE-UP' in detail_code
+          assert 'completed_activities / total_activities * 100' in detail_code
+          assert 'text=pct_labels, textposition="outside"' in detail_code
+          assert 'customdata=list(zip(' in detail_code
+          assert 'ticksuffix="%"' in detail_code
+          assert 'xaxis_title="Activity Count"' not in detail_code
+          assert 'HELIX ACTIVITIES BY LINE-UP' not in detail_code
+          assert 'values = table["Total Activities"]' not in detail_code
           # All seven expander labels are bare P6 area names.
           labels = [("MOH" if area == "MOH" else f"DH {area[2:]}") for area in (*HALLS, "MOH")]
           assert labels == ["DH 1100", "DH 1200", "DH 1300", "DH 1400",
