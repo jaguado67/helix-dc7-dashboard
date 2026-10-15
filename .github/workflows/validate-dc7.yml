@@ -2,7 +2,7 @@ name: Validate DC7 dashboard
 
 on:
   push:
-    branches: [main, feat/dc7-separate-suffolk-helix-scurve-v033]
+    branches: [main]
     paths:
       - "DC7/**"
       - ".github/workflows/validate-dc7.yml"
