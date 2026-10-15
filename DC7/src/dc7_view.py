@@ -780,24 +780,45 @@ def render_helix_lineups(m: DC7Model):
                         if table["Line-Up"].tolist() != list(lineup_order(area)):
                             raise ValueError(f"Line-Up P6 order mismatch: {area}")
                         names = table["Line-Up"].tolist()
-                        values = table["Total Activities"].astype(int).tolist()
+                        total_activities = table["Total Activities"].astype(int)
+                        completed_activities = table["Completed"].astype(int)
+                        if (total_activities <= 0).any():
+                            raise ValueError(f"Invalid HELIX Line-Up activity total in {area}")
+                        if (completed_activities < 0).any() or (
+                            completed_activities > total_activities
+                        ).any():
+                            raise ValueError(f"Invalid completed activities in HELIX {area}")
+                        completion_pct = (completed_activities / total_activities * 100).tolist()
+                        pct_labels = [f"{value:.1f}%" for value in completion_pct]
                         fig = go.Figure(go.Bar(
-                            y=names, x=values, orientation="h",
+                            y=names, x=completion_pct, orientation="h",
                             marker_color=NAVY2,
-                            text=values, textposition="outside",
-                            hovertemplate="%{y}<br>%{x:,} HELIX activities<extra></extra>",
+                            text=pct_labels, textposition="outside",
+                            customdata=list(zip(
+                                completed_activities.tolist(), total_activities.tolist()
+                            )),
+                            hovertemplate=(
+                                "%{y}<br>Activity Completion: %{x:.2f}%"
+                                "<br>Completed: %{customdata[0]:,} of "
+                                "%{customdata[1]:,}<extra></extra>"
+                            ),
                         ))
                         fig.update_layout(
-                            **_layout(450, 46, 55, 50),
-                            title=f"HELIX ACTIVITIES BY LINE-UP · {area}",
+                            **_layout(450, 46, 78, 50),
+                            title=f"ACTIVITY COMPLETION BY LINE-UP · {area}",
                             showlegend=False,
-                            xaxis_title="Activity Count",
+                            xaxis_title="Activity Completion %",
                         )
                         fig.update_yaxes(
                             autorange="reversed", categoryorder="array",
                             categoryarray=names,
                         )
-                        fig.update_xaxes(rangemode="tozero", gridcolor=GRID)
+                        # Keep small nonzero values legible; scale is percent,
+                        # not the number of activities or share of the hall.
+                        x_max = min(100.0, max(10.0, max(completion_pct) * 1.35))
+                        fig.update_xaxes(
+                            range=[0, x_max], ticksuffix="%", gridcolor=GRID,
+                        )
                         st.plotly_chart(
                             fig, use_container_width=True,
                             config={"displayModeBar": False},
