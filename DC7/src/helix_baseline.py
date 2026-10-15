@@ -148,6 +148,76 @@ def wbs_lineup_hierarchy(data: Mapping[str, pd.DataFrame] | None, area: str) -> 
 
 
 
+
+def helix_baseline_overview(
+    data: Mapping[str, pd.DataFrame],
+    baseline_data_date=None,
+) -> tuple[dict, pd.DataFrame]:
+    """Audit-only HELIX baseline snapshot and planned cumulative activity curve.
+
+    Source is exclusively 226021-HE.B, QTS-Subcontractor HELIX, in the
+    six Data Hall Electrical Line-Ups and MOH/Equipment. There is no
+    independent Current HELIX: NEVER create forecast or actual curves.
+    """
+    if data is None or "_audit" not in data:
+        raise ValueError("Official HELIX independent baseline is required")
+    audit = data["_audit"]
+    if len(audit) != 4153 or not audit["Activity ID"].is_unique:
+        raise ValueError("Unexpected HELIX baseline activity universe")
+    if not audit["QTS - Subcontractor"].eq("HELIX").all():
+        raise ValueError("SUFFOLK or third-party activities entered HELIX baseline overview")
+    status = audit["Status"].value_counts()
+    counts = {
+        "Total": int(len(audit)),
+        "Completed": int(status.get("Completed", 0)),
+        "In Progress": int(status.get("In Progress", 0)),
+        "Not Started": int(status.get("Not Started", 0)),
+    }
+    if counts["Completed"] + counts["In Progress"] + counts["Not Started"] != counts["Total"]:
+        raise ValueError("Unrecognized independent HELIX baseline statuses")
+
+    starts = pd.to_datetime(audit["Baseline Start"], errors="coerce")
+    finishes = pd.to_datetime(audit["Baseline Finish"], errors="coerce")
+    if finishes.isna().any() or starts.isna().any():
+        raise ValueError("HELIX Baseline Start/Finish missing for scheduled activities")
+    if (finishes < starts).any():
+        raise ValueError("P6 HELIX baseline activities finish before their starts")
+
+    dd = pd.to_datetime(baseline_data_date, errors="coerce")
+    dd = pd.Timestamp(dd).normalize() if pd.notna(dd) else pd.NaT
+    start = min(finishes.min().normalize(), dd) if pd.notna(dd) else finishes.min().normalize()
+    end = finishes.max().normalize()
+    if end < start:
+        raise ValueError("HELIX baseline data date is later than every activity Finish")
+    timeline = list(pd.date_range(
+        start=start.replace(day=1),
+        end=end + pd.offsets.MonthEnd(0),
+        freq="ME",
+    ))
+    if pd.notna(dd) and start <= dd <= end:
+        timeline.append(dd)
+    timeline.append(end)
+    grid = pd.DatetimeIndex(sorted(set(timeline)))
+    planned = finishes.dt.normalize()
+    series = pd.DataFrame({
+        "Date": grid,
+        "Baseline Planned Activities": [
+            int(planned.le(d).sum()) for d in grid
+        ],
+    })
+    if series.empty or int(series.iloc[-1]["Baseline Planned Activities"]) != counts["Total"]:
+        raise ValueError("HELIX planned cumulative curve does not reconcile to 4153 Activity IDs")
+    if not series["Baseline Planned Activities"].is_monotonic_increasing:
+        raise ValueError("HELIX cumulative curve is not monotonic")
+    info = {
+        "Counts": counts,
+        "Baseline Start": starts.min().normalize(),
+        "Baseline Finish": end,
+        "Baseline Data Date": dd,
+        "Source": "226021-HE.B.xer",
+    }
+    return info, series
+
 def lineup_area_status_summary(data: Mapping[str, pd.DataFrame] | None) -> pd.DataFrame:
     """Suffolk-style activity status summary, but for independent HELIX BL.
 
