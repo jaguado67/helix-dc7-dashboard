@@ -91,13 +91,13 @@ def render_header(m: DC7Model, view: str):
         current_label, current_value = "Current Update", m.update_path.stem
         source_label = "SUFFOLK · HELIX Construction"
     else:
-        # In HELIX VIEW, construction KPI/S-curve/FTE are a HELIX-coded
-        # scope filtered from SUFFOLK's current update, not a HELIX Current.
-        # The independent HELIX electrical baseline is used ONLY for Line-Ups.
-        date_label = "SUFFOLK Data Date"
-        date_value = _fmt_date(m.data_date)
-        current_label, current_value = "SUFFOLK Current", m.update_path.stem
-        source_label = "HELIX construction / SUFFOLK source"
+        # HELIX VIEW is strictly the independent 226021-HE.B baseline;
+        # never present the SUFFOLK Current metadata as HELIX progress.
+        source = m.auxiliary_project
+        baseline_date = source.get("last_recalc_date") if source is not None else None
+        date_label, date_value = "HELIX BL Data Date", _fmt_date(pd.to_datetime(baseline_date, errors="coerce"))
+        current_label, current_value = "Independent Current", "Not available"
+        source_label = "HELIX Electrical BL · Line-Ups & MOH"
 
     st.markdown(f"""
     <div class="helix-header">
@@ -137,11 +137,134 @@ def render_kpis(m: DC7Model, view: str):
     st.markdown(h + '</div></div>', unsafe_allow_html=True)
 
 
+
+def render_helix_kpis(m: DC7Model):
+    """Source-accurate HELIX KPI strip from independent electrical BL only."""
+    from src.helix_baseline import helix_baseline_overview
+    data = m.independent_helix_baseline()
+    st.markdown('<div class="section-caption">PROJECT STATUS SUMMARY</div>', unsafe_allow_html=True)
+    if data is None:
+        st.info("Independent HELIX baseline is not available; no SUFFOLK fallback.")
+        return
+    project = m.auxiliary_project
+    date = project.get("last_recalc_date") if project is not None else None
+    overview, _ = helix_baseline_overview(data, date)
+    counts = overview["Counts"]
+    total = counts["Total"]
+    pct = lambda n: f"{100*n/total:.2f}%" if total else "0.00%"
+    st.markdown(
+        '<div class="panel schedule"><div class="panel-head">'
+        '<div><span class="time-pill">TIME</span>'
+        '<span class="panel-title">SCHEDULE PERFORMANCE · HELIX BASELINE</span></div>'
+        '<div class="panel-note">Independent HELIX electrical baseline · no Current update</div>'
+        '</div>', unsafe_allow_html=True,
+    )
+    cards = [
+        ("Baseline Completion", _fmt_date(overview["Baseline Finish"]),
+         "Last HELIX Line-Up/MOH planned finish", ""),
+        ("Current Forecast Finish", "—", "Independent HELIX Current not available", ""),
+        ("Finish Date Shift", "—", "Not calculable without HELIX Current", ""),
+        ("Completed Activities", pct(counts["Completed"]),
+         f'{counts["Completed"]:,} of {total:,} · baseline snapshot', ""),
+        ("In Progress Activities", pct(counts["In Progress"]),
+         f'{counts["In Progress"]:,} of {total:,} · baseline snapshot', ""),
+        ("Not Started Activities", pct(counts["Not Started"]),
+         f'{counts["Not Started"]:,} of {total:,} · baseline snapshot', ""),
+        ("HELIX Scope Activities", f"{total:,}",
+         f'{counts["Completed"]} C · {counts["In Progress"]} IP · '
+         f'{counts["Not Started"]} NS', ""),
+        ("Baseline Data Date", _fmt_date(overview["Baseline Data Date"]),
+         "Official P6 226021-HE.B", ""),
+    ]
+    h = '<div class="kpi-grid">'
+    for label, value, sub, css in cards:
+        h += (f'<div class="kpi"><div class="label">{_safe(label)}</div>'
+              f'<div class="value {css}">{_safe(value)}</div>'
+              f'<div class="sub">{_safe(sub)}</div></div>')
+    st.markdown(h + '</div></div>', unsafe_allow_html=True)
+
+
+def render_helix_baseline_scurve_and_status(m: DC7Model):
+    """HELIX-only planned baseline cumulative count, plus status snapshot.
+
+    A single recorded baseline status point is intentionally NOT a
+    Current or Actual-progress time series.
+    """
+    from src.helix_baseline import helix_baseline_overview
+    data = m.independent_helix_baseline()
+    st.markdown('<div class="section-caption">ACTIVITY PERFORMANCE</div>', unsafe_allow_html=True)
+    if data is None:
+        st.info("HELIX baseline activity curve unavailable. SUFFOLK data are not substituted.")
+        return
+    project = m.auxiliary_project
+    date = project.get("last_recalc_date") if project is not None else None
+    info, curve = helix_baseline_overview(data, date)
+    counts = info["Counts"]
+    total = counts["Total"]
+    c1, c2 = st.columns([1.7, 0.8], gap="large")
+    with c1:
+        st.markdown(
+            '<div class="panel"><div class="panel-head">'
+            '<div class="panel-title">ACTIVITY S-CURVE · HELIX ELECTRICAL BASELINE</div>'
+            '<div class="panel-note">Cumulative planned finishes · 4,153 HELIX Line-Up/MOH activities</div>'
+            '</div>', unsafe_allow_html=True,
+        )
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(
+            x=curve["Date"], y=curve["Baseline Planned Activities"],
+            name="HELIX Baseline Planned Activities", mode="lines",
+            line=dict(color="#446a9e", width=3),
+            hovertemplate="%{x|%d-%b-%Y}<br>%{y:,.0f} planned HELIX activities<extra></extra>",
+        ))
+        dd = info["Baseline Data Date"]
+        if pd.notna(dd):
+            fig.add_vline(
+                x=dd, line_dash="dash", line_color="#6d7f92",
+                annotation_text=f"Baseline Data Date · {_fmt_date(dd)}",
+                annotation_position="top right",
+            )
+            fig.add_trace(go.Scatter(
+                x=[dd], y=[counts["Completed"]],
+                name="Completed in BL snapshot (not Current)", mode="markers",
+                marker=dict(color=GREEN, size=10),
+                hovertemplate="BL snapshot · %{x|%d-%b-%Y}<br>%{y:,.0f} completed statuses<extra></extra>",
+            ))
+        fig.update_layout(
+            **_layout(410, 70, 55, 34),
+            yaxis_title="Cumulative Activities", xaxis_title="Date",
+            title=dict(text=""), legend_title_text="",
+        )
+        fig.update_yaxes(range=[0, total * 1.04], tickformat=",d", gridcolor=GRID)
+        fig.update_xaxes(type="date", dtick="M3", tickformat="%b\n%Y", gridcolor=GRID)
+        st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+        st.markdown('</div>', unsafe_allow_html=True)
+    with c2:
+        st.markdown(
+            '<div class="panel"><div class="panel-head">'
+            '<div class="panel-title">OVERALL ACTIVITY STATUS · HELIX BL</div>'
+            '</div>', unsafe_allow_html=True,
+        )
+        h = '<div class="activity-wrap">'
+        for label in ("Total", "Completed", "In Progress", "Not Started"):
+            h += (f'<div class="activity-card"><div class="num">{counts[label]:,}</div>'
+                  f'<div class="lab">{label}</div></div>')
+        ratio = lambda x: f'{counts[x] / total * 100:.2f}%' if total else "0.00%"
+        h += (
+            '</div><div class="scope-note">'
+            f'Completed: <b>{ratio("Completed")}</b><br>'
+            f'In Progress: <b>{ratio("In Progress")}</b><br>'
+            f'Not Started: <b>{ratio("Not Started")}</b><br>'
+            '<b>Baseline statuses only · No independent HELIX Current</b>'
+            '</div></div>'
+        )
+        st.markdown(h, unsafe_allow_html=True)
+
+
 def render_scurve_and_status(m: DC7Model):
     st.markdown('<div class="section-caption">ACTIVITY PERFORMANCE</div>', unsafe_allow_html=True)
     c1, c2 = st.columns([1.7, 0.8], gap="large")
     with c1:
-        st.markdown('<div class="panel"><div class="panel-head"><div class="panel-title">ACTIVITY S-CURVE · HELIX CONSTRUCTION</div><div class="panel-note">Cumulative activity count · baseline / current forecast / actual completions</div></div>', unsafe_allow_html=True)
+        st.markdown('<div class="panel"><div class="panel-head"><div class="panel-title">ACTIVITY S-CURVE · SUFFOLK / HELIX CONSTRUCTION</div><div class="panel-note">Cumulative activity count · baseline / current forecast / actual completions</div></div>', unsafe_allow_html=True)
         df = m.scurve()
         if df.empty:
             st.info("Activity S-curve could not be constructed from the XER finish dates.")
@@ -794,19 +917,18 @@ def render_dashboard(helix: DC7Model, suffolk: DC7Model):
     note = (
         "SUFFOLK contractual dates · HELIX Construction only"
         if view == "SUFFOLK"
-        else "HELIX construction (SUFFOLK update) · Electrical BL Line-Ups & MOH"
+        else "HELIX independent electrical baseline · Line-Ups & MOH"
     )
     st.markdown(
         f'<div class="project-strip"><span>{view} VIEW</span><span class="right">{_safe(note)}</span></div>',
         unsafe_allow_html=True,
     )
     if view == "HELIX":
-        # Keep all pre-v0.2.20 dashboard sections except the duplicated
-        # HELIX PROJECT PROGRESS DETAIL (FOH / BOH / DH QTS-DASH breakdown).
-        # The progress widgets below use HELIX-coded SUFFOLK Construction,
-        # while Line-Ups/MOH use ONLY the independent approved HELIX baseline.
-        render_kpis(helix, "HELIX")
-        render_scurve_and_status(helix)
+        # No shared SUFFOLK construction KPI/curve data in HELIX VIEW.
+        # All HELIX summary/curve/status/line-up widgets use official
+        # 226021-HE.B independent electrical Baseline only.
+        render_helix_kpis(helix)
+        render_helix_baseline_scurve_and_status(helix)
         render_helix_lineup_stats(helix)
         # Do not call render_progress_detail(helix, view="HELIX"):
         # its QTS-DASH group breakdown duplicates the SUFFOLK view.
@@ -817,6 +939,7 @@ def render_dashboard(helix: DC7Model, suffolk: DC7Model):
         return
 
     render_kpis(suffolk, "SUFFOLK")
+    render_scurve_and_status(suffolk)
     render_stats(suffolk, "SUFFOLK PROJECT STATS · AREA PROGRESS")
     render_windows(suffolk)
     render_progress_detail(suffolk, view="SUFFOLK")

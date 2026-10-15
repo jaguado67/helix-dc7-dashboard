@@ -65,7 +65,7 @@ jobs:
 
           # Independent HELIX BL: only HELIX-coded activities under
           # original Electrical Line-Ups and MOH/Equipment, never full-XER.
-          from src.helix_baseline import HALLS, lineup_order, baseline_outline, lineup_activity_summary, wbs_lineup_hierarchy, lineup_area_status_summary, us_federal_workday_delay
+          from src.helix_baseline import HALLS, lineup_order, baseline_outline, lineup_activity_summary, wbs_lineup_hierarchy, lineup_area_status_summary, us_federal_workday_delay, helix_baseline_overview
           outline = baseline_outline()
           assert list(outline) == list(HALLS)+["MOH"]
           assert len(outline["DH1200"]) == 11
@@ -81,6 +81,24 @@ jobs:
           assert str(helix.auxiliary_project["add_date"]).startswith("2026-10-01")
           approved = helix.independent_helix_baseline()
           assert approved is not None
+          # HELIX overview must derive only from the 4,153 approved
+          # electrical baseline Activity IDs, NOT Suffolk's 2,545.
+          helix_info, helix_curve = helix_baseline_overview(
+              approved, helix.auxiliary_project["last_recalc_date"]
+          )
+          assert helix_info["Source"] == "226021-HE.B.xer"
+          assert helix_info["Counts"] == {
+              "Total":4153,"Completed":2,"In Progress":0,"Not Started":4151
+          }
+          assert str(helix_info["Baseline Data Date"].date()) == "2026-09-29"
+          assert int(helix_curve["Baseline Planned Activities"].iloc[-1]) == 4153
+          assert helix_curve["Baseline Planned Activities"].is_monotonic_increasing
+          assert helix_curve.columns.tolist() == ["Date", "Baseline Planned Activities"]
+          assert "Current Forecast Activities" not in helix_curve
+          assert "Actual Completed Activities" not in helix_curve
+          audit_finish = approved["_audit"]["Baseline Finish"]
+          assert helix_info["Baseline Finish"] == audit_finish.max().normalize()
+          print("PASS: HELIX independent baseline curve 4,153, BL date, statuses 2/0/4151; no fictitious Current")
           # Contractual milestone audit: only HELIX assignments to native
           # Milestones WBS with literal dates inside Activity Names.
           milestones = approved["_contract_milestones"]
@@ -211,15 +229,28 @@ jobs:
           assert 'if view == "HELIX":' in dispatch
           assert "render_helix_lineups(helix)" in dispatch
           assert dispatch.index("render_helix_lineups(helix)") < dispatch.index("render_kpis(suffolk")
-          # Restore HELIX scope overview. Only duplicate QTS-DASH detail is removed.
+          # Strictly separate the construction S-curve and the independent
+          # HELIX baseline S-curve. No SUFFOLK overview in HELIX VIEW.
           helix_case = dispatch.split('if view == "HELIX":', 1)[1].split('return', 1)[0]
           for required in (
-              'render_kpis(helix, "HELIX")',
-              'render_scurve_and_status(helix)',
+              'render_helix_kpis(helix)',
+              'render_helix_baseline_scurve_and_status(helix)',
               'render_helix_lineup_stats(helix)',
               'render_helix_lineups(helix)',
           ):
-              assert required in helix_case, f"Missing restored HELIX section: {required}"
+              assert required in helix_case, f"Missing HELIX-only overview: {required}"
+          for forbidden in ('render_kpis(helix, "HELIX")',
+                            'render_scurve_and_status(helix)',
+                            'render_scurve_and_status(suffolk)'):
+              assert forbidden not in helix_case, f"SUFFOLK overview contaminates HELIX: {forbidden}"
+          suffolk_case = dispatch.split('render_kpis(suffolk, "SUFFOLK")', 1)[1]
+          assert 'render_scurve_and_status(suffolk)' in suffolk_case
+          assert suffolk_case.index('render_scurve_and_status(suffolk)') < suffolk_case.index('render_stats(suffolk')
+          assert 'ACTIVITY S-CURVE · SUFFOLK / HELIX CONSTRUCTION' in view_text
+          assert 'ACTIVITY S-CURVE · HELIX ELECTRICAL BASELINE' in view_text
+          assert 'Independent HELIX Current not available' in view_text
+          assert 'Baseline statuses only · No independent HELIX Current' in view_text
+          assert 'Current Forecast Activities' not in view_text.split('def render_helix_baseline_scurve_and_status(', 1)[1].split('def render_scurve_and_status(', 1)[0]
           assert not any(line.lstrip().startswith("render_progress_detail(helix") for line in helix_case.splitlines())
           assert not any(line.lstrip().startswith("render_stats(helix") for line in helix_case.splitlines())
           assert "render_stats(suffolk" in dispatch

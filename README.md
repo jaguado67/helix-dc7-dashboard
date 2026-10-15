@@ -2,7 +2,7 @@
 
 Cloud-ready Streamlit package for the HELIX DC7 schedule dashboard.
 
-**Version:** 0.2.32
+**Version:** 0.2.33
 
 ## Data scope
 
@@ -13,6 +13,48 @@ This release has two selectable views. SUFFOLK displays the main DC7 project sco
 - No `DC7-MIL`
 - No `DC7.TFO-B`
 - No external-project relationships in dashboard analytics
+
+## v0.2.33 — Isolate SUFFOLK and HELIX overview/curves by schedule source
+
+**SUFFOLK VIEW** now contains the existing SUFFOLK HELIX-Construction
+activity S-curve and 2×2 status cards, immediately after its own KPI
+strip and before the SUFFOLK area progress table. This source remains
+`226021.005.MO-BL` vs `226021.010.MO-UP-C` with exactly **2,545
+construction activity IDs**, 187 completed, 32 in progress, 2,326 not
+started, and baseline/current/actual completion series. It is no longer
+displayed in HELIX VIEW.
+
+**HELIX VIEW** now has an independent `226021-HE.B.xer` electrical
+baseline overview using ONLY `QTS - Subcontractor = HELIX` Activity
+IDs in DH1100–DH1600 Electrical Line-Ups and MOH/Equipment:
+**4,153 unique activities** (2 completed, 0 in progress, 4,151 not
+started as saved in the baseline file). It includes the same visual
+families as SUFFOLK (8 KPI cards, large cumulative-activity curve,
+2×2 overall status cards), with the critical source distinctions:
+
+- **Baseline Completion** derives from the latest finish of the 4,153
+  in-scope independent HELIX baseline activities, not Suffolk dates.
+- **Current Forecast Finish** and **Finish Date Shift** are **N/A**
+  because **no independent HELIX Current exists**. They are not
+  borrowed from Suffolk's 22-Jun-2027 forecast or +43-day shift.
+- **Completed/In Progress/Not Started** and their percentages come
+  solely from the independent HELIX baseline Activity IDs. Small
+  completion fractions are shown with two decimals (2/4,153 = 0.05%).
+- **Baseline Data Date** is read from independent HELIX project
+  `last_recalc_date` (29-Sep-2026), not Suffolk's 26-Aug-2026.
+- HELIX cumulative S-curve draws only **Baseline Planned Activities**
+  based on the 4,153 audited task Finish dates; a single green
+  snapshot marker identifies two baseline-stored Completed statuses at
+  that baseline data date. **No fictitious Current Forecast or Actual
+  progress time series is drawn.**
+- The HELIX header and scope strip now reference the independent
+  HELIX baseline instead of advertising SUFFOLK Current metadata.
+
+Everything below the overview in each view remains intact: SUFFOLK's
+P6 WBS progress/audits and HELIX's Line-Up/MOH areas, status tables and
+contractual milestone analyses. Original XER files, mappings and
+project math are unchanged. Regression confirms the 4,153/2,545
+population split, baseline-only cumulative curve, date and statuses.
 
 ## v0.2.32 — SUFFOLK FOH/BOH display label correction
 
