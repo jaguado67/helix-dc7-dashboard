@@ -2,7 +2,7 @@
 
 Cloud-ready Streamlit package for the HELIX DC7 schedule dashboard.
 
-**Version:** 0.2.34
+**Version:** 0.2.35
 
 ## Data scope
 
@@ -13,6 +13,22 @@ This release has two selectable views. SUFFOLK displays the main DC7 project sco
 - No `DC7-MIL`
 - No `DC7.TFO-B`
 - No external-project relationships in dashboard analytics
+
+## v0.2.35 — SUFFOLK Area Start–Finish labels: days only
+
+Presentation-only adjustment to **SUFFOLK VIEW > AREA START–FINISH
+COMPARISON · BASELINE VS CURRENT**. Remove Activity Completion %
+from both the visible right-end annotations and the associated hover
+tooltips. Each colored Current/Actual representative bar now displays
+only the **Finish Date Shift** (e.g. +21 days or −29 days).
+This keeps a date-comparison chart focused on time variance and avoids
+mixing activity-count completion metrics with date shifts.
+
+Original baseline/current dates, area spans, bar colors, dates/data
+date, finish shifts, activity percentages in every other panel,
+P6 XER inputs and HELIX VIEW are all unchanged. The CI suite checks
+that completion-percent text is absent only from the Suffolk time
+comparison renderer and that the existing models pass regression.
 
 ## v0.2.34 — HELIX Line-Up charts use Activity Completion %, not Activity Count
 
