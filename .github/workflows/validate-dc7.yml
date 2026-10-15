@@ -2,7 +2,7 @@ name: Validate DC7 dashboard
 
 on:
   push:
-    branches: [main]
+    branches: [main, fix/dc7-suffolk-priority-rooms-label-v032]
     paths:
       - "DC7/**"
       - ".github/workflows/validate-dc7.yml"
@@ -347,6 +347,27 @@ jobs:
               assert not detail["WBS Path"].str.contains("Procurement").any()
               # Existing original P6 data is not modified.
               assert suffolk.subarea_stats(area)["Tasks"].sum() == len(source)
+          # UI-only alias: P6 PROJWBS remains "Priority Walls".
+          # The Suffolk FOH/BOH table and chart share the copied df.Area.
+          from src import dc7_view
+          import inspect
+          ui_source = inspect.getsource(dc7_view.render_progress_detail)
+          assert 'if p6_wbs:' in ui_source
+          assert 'df = df.copy()' in ui_source
+          assert 'df["Area"] = df["Area"].replace({"Priority Walls": "Priority Rooms"})' in ui_source
+          for area in ("FOH", "BOH"):
+              original = suffolk.wbs_area_stats(area)
+              shown = original.copy()
+              shown["Area"] = shown["Area"].replace({"Priority Walls": "Priority Rooms"})
+              assert "Priority Walls" in original["Area"].tolist()
+              assert "Priority Walls" not in shown["Area"].tolist()
+              assert shown["Area"].iloc[0] == "Priority Rooms"
+              assert int(shown.loc[shown["Area"].eq("Priority Rooms"), "Tasks"].iloc[0]) == (
+                  34 if area == "FOH" else 35
+              )
+              assert shown.drop(columns=["Area"]).equals(original.drop(columns=["Area"]))
+              assert "Priority Rooms" not in suffolk.wbs_area_stats(area)["Area"].tolist()
+          print("PASS: Suffolk FOH/BOH Priority Rooms display label, WBS and numeric data unchanged")
           assert sum(sum(groups.values()) for groups in expected.values()) == 323
           exception_report = helix.audit_reports["wbs_exceptions"]
           assert set(exception_report["Activity ID"]) == set(special.values())
