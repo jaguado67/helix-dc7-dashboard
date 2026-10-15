@@ -2,7 +2,7 @@
 
 Cloud-ready Streamlit package for the HELIX DC7 schedule dashboard.
 
-**Version:** 0.2.33
+**Version:** 0.2.34
 
 ## Data scope
 
@@ -13,6 +13,26 @@ This release has two selectable views. SUFFOLK displays the main DC7 project sco
 - No `DC7-MIL`
 - No `DC7.TFO-B`
 - No external-project relationships in dashboard analytics
+
+## v0.2.34 — HELIX Line-Up charts use Activity Completion %, not Activity Count
+
+Presentation-only update to **HELIX VIEW > DATA HALL / LINE-UP DETAIL**.
+For each of the six Data Halls, the horizontal chart displays
+**Activity Completion % = 100 × Completed / Total Activities** per
+individual HELIX-only Line-Up. Titles become `ACTIVITY COMPLETION BY
+LINE-UP`, the x-axis reads `Activity Completion %` with percentage
+ticks, and bar labels show one decimal place. Hover text displays both
+the rate and its numerator/denominator.
+
+The source is still the independent 226021-HE.B.xer HELIX **baseline
+status**, not SUFFOLK Current; the existing Line-Up counts and
+Not Started / In Progress / Completed tables remain unchanged. For
+DH1100, A110 has 2/58 Completed = **3.4%** (displayed); the other ten
+Line-Ups remain **0.0%**. The same algorithm is applied to DH1200–
+DH1600 in original P6 Line-Up order (R-first where applicable).
+MOH, SUFFOLK VIEW, top-level status summaries, the independent HELIX
+baseline S-curve, milestone delay calculations and source XER files
+are unaffected.
 
 ## v0.2.33 — Isolate SUFFOLK and HELIX overview/curves by schedule source
 
