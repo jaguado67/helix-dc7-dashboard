@@ -2,7 +2,7 @@
 
 Cloud-ready Streamlit package for the HELIX DC7 schedule dashboard.
 
-**Version:** 0.2.31
+**Version:** 0.2.32
 
 ## Data scope
 
@@ -13,6 +13,19 @@ This release has two selectable views. SUFFOLK displays the main DC7 project sco
 - No `DC7-MIL`
 - No `DC7.TFO-B`
 - No external-project relationships in dashboard analytics
+
+## v0.2.32 — SUFFOLK FOH/BOH display label correction
+
+Presentation-only change to **SUFFOLK PROJECT PROGRESS DETAIL**:
+in `FOH` and `BOH`, show **Priority Rooms** instead of
+**Priority Walls** in both the WBS summary table and its completion
+bar chart. The alias applies only to the displayed DataFrame after the
+native `wbs_area_stats` calculation; the original P6
+`PROJWBS.wbs_name = Priority Walls`, XER, WBS hierarchy,
+Activity IDs, source audit/export and all statuses, percentages and
+counts remain untouched. Both FOH (34) and BOH (35) original activity
+quantities remain independently audited. No change to HELIX VIEW or
+other SUFFOLK areas.
 
 ## v0.2.31 — US federal working days for HELIX contractual milestone variance
 

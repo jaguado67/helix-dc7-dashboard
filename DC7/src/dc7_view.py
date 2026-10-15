@@ -307,6 +307,11 @@ def render_progress_detail(m: DC7Model, view: str):
         else m.data_hall_wbs_stats(area) if dh_p6_wbs
         else m.subarea_stats(area, helix_display=consolidated)
     )
+    # SUFFOLK FOH/BOH display alias only: preserve the P6 WBS, task mapping,
+    # original activity audit and every numeric result unchanged.
+    if p6_wbs:
+        df = df.copy()
+        df["Area"] = df["Area"].replace({"Priority Walls": "Priority Rooms"})
     c1, c2 = st.columns([1.15, 1], gap="large")
     with c1:
         summary_title = ("SUMMARY BY P6 WBS" if p6_wbs or dh_p6_wbs else
