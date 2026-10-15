@@ -360,7 +360,6 @@ jobs:
           assert 'text=_fmt_days(v)' in timeline_source
           assert 'Finish Date Shift: {_fmt_days(v)}<extra></extra>' in timeline_source
           assert 'Activity Completion:' not in timeline_source
-          assert '"Activity Completion %" not in timeline_source
           assert "r['Activity Completion %']" not in timeline_source
           print("PASS: SUFFOLK area timeline labels/hover show date shift days only")
           assert not suffolk.area_stats().empty, "SUFFOLK area matrix missing"
