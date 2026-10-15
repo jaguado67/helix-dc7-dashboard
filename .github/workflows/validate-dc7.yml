@@ -2,7 +2,7 @@ name: Validate DC7 dashboard
 
 on:
   push:
-    branches: [main]
+    branches: [main, fix/dc7-suffolk-timeline-no-percent-v035]
     paths:
       - "DC7/**"
       - ".github/workflows/validate-dc7.yml"
@@ -352,6 +352,17 @@ jobs:
           assert s_total == h_total, f"SUFFOLK scoped {s_total} does not match HELIX construction {h_total}"
           assert not helix.scurve().empty, "HELIX S-curve missing"
           assert not suffolk.area_windows().empty, "SUFFOLK windows missing"
+          # Suffolk area timeline is a DATE comparison; show date-shift
+          # days alone, not the area activity completion percentage.
+          timeline_source = view_text.split('def render_windows(', 1)[1].split(
+              '\ndef ', 1
+          )[0]
+          assert 'text=_fmt_days(v)' in timeline_source
+          assert 'Finish Date Shift: {_fmt_days(v)}<extra></extra>' in timeline_source
+          assert 'Activity Completion:' not in timeline_source
+          assert '"Activity Completion %" not in timeline_source
+          assert "r['Activity Completion %']" not in timeline_source
+          print("PASS: SUFFOLK area timeline labels/hover show date shift days only")
           assert not suffolk.area_stats().empty, "SUFFOLK area matrix missing"
           for scope_model in (suffolk, helix):
               matrix = scope_model.area_stats()
