@@ -218,6 +218,83 @@ def helix_baseline_overview(
     }
     return info, series
 
+
+def helix_bl_current_overview(baseline: Mapping, current: Mapping, current_data_date) -> tuple[dict, pd.DataFrame]:
+    """Produce only independently matched HELIX BL/U01 Line-Up+MOH progress.
+
+    Each of 4153 unique task_codes exists once in each original P6 export.
+    Actual completions are shown only through the U01 Data Date; the
+    forecast cumulative curve includes actual finishes and remaining
+    scheduled finishes from U01, never data from the Suffolk project.
+    """
+    if baseline is None or current is None:
+        raise ValueError("Both independent HELIX BL and U01 are required")
+    b, c = baseline["_audit"].copy(), current["_audit"].copy()
+    if not b["Activity ID"].is_unique or not c["Activity ID"].is_unique:
+        raise ValueError("Duplicate HELIX Activity IDs in BL/U01")
+    bi, ci = set(b["Activity ID"]), set(c["Activity ID"])
+    if bi != ci or len(b) != 4153:
+        raise ValueError(f"HELIX BL/U01 Activity ID mismatch: deleted={len(bi-ci)} added={len(ci-bi)}")
+    if not b["QTS - Subcontractor"].eq("HELIX").all() or not c["QTS - Subcontractor"].eq("HELIX").all():
+        raise ValueError("HELIX BL/U01 scope includes a third-party subcontractor")
+    mapping_fields = ["Data Hall / MOH", "Line-Up"]
+    aligned = b.set_index("Activity ID")[mapping_fields].sort_index().eq(
+        c.set_index("Activity ID")[mapping_fields].sort_index()
+    ).all().all()
+    if not aligned:
+        raise ValueError("HELIX BL/U01 original P6 Data Hall/Line-Up classification changed")
+    status_counts = c["Status"].value_counts()
+    counts = {key: int(status_counts.get(key, 0)) for key in ("Completed", "In Progress", "Not Started")}
+    counts["Total"] = len(c)
+    if sum(counts[x] for x in ("Completed", "In Progress", "Not Started")) != counts["Total"]:
+        raise ValueError("U01 HELIX status reconciliation failed")
+    if counts != {"Completed":42, "In Progress":11, "Not Started":4100, "Total":4153}:
+        raise ValueError(f"Unexpected official U01 status data: {counts}")
+
+    bl_finish = pd.to_datetime(b["Baseline Finish"],errors="raise").dt.normalize()
+    cur_finish = pd.to_datetime(c["Current Finish"],errors="raise").dt.normalize()
+    data_date = pd.Timestamp(current_data_date).normalize()
+    if data_date != pd.Timestamp("2026-10-14"):
+        raise ValueError("Official HELIX U01 Data Date must be 14-Oct-2026")
+    actual_dates = pd.to_datetime(
+        c.loc[c["Status"].eq("Completed"), "Actual Finish"], errors="coerce"
+    ).dt.normalize()
+    if actual_dates.isna().any() or (actual_dates > data_date).any():
+        raise ValueError("Completed U01 tasks require valid actual dates no later than Data Date")
+    if bl_finish.isna().any() or cur_finish.isna().any():
+        raise ValueError("Missing HELIX baseline/current Finish values")
+
+    start = min(bl_finish.min(), cur_finish.min(), data_date)
+    end = max(bl_finish.max(), cur_finish.max())
+    ticks = list(pd.date_range(start=start.replace(day=1), end=end+pd.offsets.MonthEnd(0), freq="ME"))
+    ticks.extend([start, end, data_date])
+    timeline = pd.DatetimeIndex(sorted(set(ticks)))
+    points = pd.DataFrame({
+        "Date": timeline,
+        "Baseline Planned Activities": [int(bl_finish.le(d).sum()) for d in timeline],
+        "Current Forecast Activities": [int(cur_finish.le(d).sum()) for d in timeline],
+        "Actual Completed Activities": [
+            int(actual_dates.le(d).sum()) if d <= data_date else float("nan")
+            for d in timeline
+        ],
+    })
+    if any(int(points.iloc[-1][k]) != 4153 for k in
+           ("Baseline Planned Activities", "Current Forecast Activities")):
+        raise ValueError("HELIX baseline/current cumulative activity totals do not match")
+    if int(actual_dates.count()) != counts["Completed"]:
+        raise ValueError("HELIX actual completed timestamps do not match status count")
+    info = {
+        "Counts": counts,
+        "Baseline Finish": bl_finish.max(),
+        "Current Finish": cur_finish.max(),
+        "Current Data Date": data_date,
+        "Baseline Source": "226021-HE.B.xer",
+        "Current Source": "226021-HE.U01.xer",
+        "Finish Shift (calendar days)": int((bl_finish.max() - cur_finish.max()).days),
+    }
+    return info, points
+
+
 def lineup_area_status_summary(data: Mapping[str, pd.DataFrame] | None) -> pd.DataFrame:
     """Suffolk-style activity status summary, but for independent HELIX BL.
 
@@ -269,8 +346,10 @@ def lineup_area_status_summary(data: Mapping[str, pd.DataFrame] | None) -> pd.Da
                 raise ValueError(f"HELIX baseline {display} counts do not reconcile")
     return summary
 
-def summarize_approved_baseline(tables: Mapping[str, pd.DataFrame], project_id: str) -> dict[str, pd.DataFrame]:
-    """Audit real HELIX-coded P6 TASK/PROJWBS/TASKACTV associations."""
+def summarize_approved_baseline(tables: Mapping[str, pd.DataFrame], project_id: str, snapshot_role: str = "Baseline") -> dict[str, pd.DataFrame]:
+    """Audit real HELIX-coded TASK/PROJWBS/TASKACTV, baseline or U01."""
+    if snapshot_role not in ("Baseline", "Current"):
+        raise ValueError("Unknown independent HELIX schedule role")
     required = ("PROJWBS","TASK","ACTVTYPE","ACTVCODE","TASKACTV")
     for key in required:
         if key not in tables or tables[key].empty:
@@ -343,12 +422,24 @@ def summarize_approved_baseline(tables: Mapping[str, pd.DataFrame], project_id: 
     task["_LineUp"] = mapped.map(lambda x:x[1])
     task["_WBS Path"] = paths.map(lambda x:" / ".join(x))
     task["_Included"] = task["_Sub"].eq("HELIX") & task["_LineUp"].notna()
-    task["_Start"] = pd.to_datetime(task.get("target_start_date"),errors="coerce")
-    task["_Finish"] = pd.to_datetime(task.get("target_end_date"),errors="coerce")
-    if not task["_Start"].notna().any():
-        task["_Start"]=pd.to_datetime(task.get("early_start_date"),errors="coerce")
-    if not task["_Finish"].notna().any():
-        task["_Finish"]=pd.to_datetime(task.get("early_end_date"),errors="coerce")
+    if snapshot_role == "Current":
+        # For completed work use actual dates; for unfinished work use P6
+        # Remaining Start/Finish (not the static BL target dates).
+        actual_start = pd.to_datetime(task.get("act_start_date"), errors="coerce")
+        actual_finish = pd.to_datetime(task.get("act_end_date"), errors="coerce")
+        restart = pd.to_datetime(task.get("restart_date"), errors="coerce")
+        reend = pd.to_datetime(task.get("reend_date"), errors="coerce")
+        task["_Start"] = actual_start.where(task["Status"].eq("Completed"), restart)
+        task["_Start"] = task["_Start"].fillna(actual_start).fillna(pd.to_datetime(task.get("target_start_date"),errors="coerce"))
+        task["_Finish"] = actual_finish.where(task["Status"].eq("Completed"), reend)
+        task["_Finish"] = task["_Finish"].fillna(reend).fillna(pd.to_datetime(task.get("target_end_date"),errors="coerce"))
+    else:
+        task["_Start"] = pd.to_datetime(task.get("target_start_date"),errors="coerce")
+        task["_Finish"] = pd.to_datetime(task.get("target_end_date"),errors="coerce")
+        if not task["_Start"].notna().any():
+            task["_Start"]=pd.to_datetime(task.get("early_start_date"),errors="coerce")
+        if not task["_Finish"].notna().any():
+            task["_Finish"]=pd.to_datetime(task.get("early_end_date"),errors="coerce")
 
     included = task[task["_Included"]].copy()
     valid_statuses = {"Not Started", "In Progress", "Completed"}
@@ -379,7 +470,13 @@ def summarize_approved_baseline(tables: Mapping[str, pd.DataFrame], project_id: 
         "Original P6 WBS":included["_WBS Path"].astype(str),
         "Baseline Start":included["_Start"],
         "Baseline Finish":included["_Finish"],
+        "Actual Finish":pd.to_datetime(included.get("act_end_date"),errors="coerce"),
     }).reset_index(drop=True)
+    if snapshot_role == "Current":
+        audit = audit.rename(columns={
+            "Baseline Start": "Current Start",
+            "Baseline Finish": "Current Finish",
+        })
     # Contractual dates are embedded in ORIGINAL Activity Names, not P6
     # contractual-date UDFs. Only assigned HELIX tasks in Milestones WBS.
     # The official 226021-HE.B.xer is a baseline, NOT an independent Current.
@@ -468,13 +565,18 @@ def summarize_approved_baseline(tables: Mapping[str, pd.DataFrame], project_id: 
                 f"{len(all_milestones)} assigned; "
                 f"{len(milestones)} with contract date; {len(no_contract_date)} without"
             )
+    if snapshot_role == "Current" and not milestones.empty:
+        milestones = milestones.rename(columns={"Baseline Finish": "Current Finish"})
     out["_contract_milestones"] = milestones
     out["_contract_milestone_audit"] = {
         "helix_milestone_total": int(len(all_milestones)),
         "contract_date_extracted": int(len(milestones)),
         "no_contract_date_in_name": int(len(no_contract_date)),
         "no_contract_date_ids": sorted(no_contract_date),
-        "schedule_source": "226021-HE.B independent baseline",
+        "schedule_source": (
+            "226021-HE.U01 independent Current" if snapshot_role == "Current"
+            else "226021-HE.B independent baseline"
+        ),
     }
 
     # Keep the Line-Up and MOH population separate from milestone audit.

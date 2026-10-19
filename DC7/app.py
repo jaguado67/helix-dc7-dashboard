@@ -31,6 +31,10 @@ def _materialize_cloud_xers(data_root: Path) -> Path:
     # Only the official HELIX project baseline is authorized as a separate source.
     # The historical "-4" copy must never be materialized or silently substituted.
     helix_baseline = "226021-HE.B.xer"
+    suffolk_update = "226021.022.MO-UP-08.xer"
+    suffolk_update_sha = "2860a45ccdc71cb70905eaafc9b6cb56fa87985fdd9c448ed8be9f9201c6e73e"
+    helix_update = "226021-HE.U01.xer"
+    helix_update_sha = "e5398c6e17c4797d7e269273e2104971730c7c0e3fd4e010f246924ca3bec472"
     required = official + (previous,)
 
     runtime_root = Path(tempfile.gettempdir()) / "helix_dc7_runtime_data"
@@ -87,6 +91,44 @@ def _materialize_cloud_xers(data_root: Path) -> Path:
     baseline_target = runtime_dc7 / helix_baseline
     if not baseline_target.is_file() or baseline_target.read_bytes() != payload:
         baseline_target.write_bytes(payload)
+
+    # Independent HELIX U01 (14-Oct-2026 Data Date) is a separate P6
+    # schedule from Suffolk Current-C. Preserve the exact XER byte stream.
+    source_update = dc7 / helix_update
+    encoded_parts = sorted(dc7.glob(f"{helix_update}.raw.b64.part*"))
+    if source_update.is_file():
+        current_payload = source_update.read_bytes()
+    elif encoded_parts:
+        current_payload = base64.b64decode(
+            "".join(part.read_text(encoding="ascii").strip() for part in encoded_parts),
+            validate=True,
+        )
+    else:
+        raise FileNotFoundError("Official HELIX U01 XER not found (no Suffolk substitution)")
+    if len(current_payload) != 3044612 or hashlib.sha256(current_payload).hexdigest() != helix_update_sha:
+        raise ValueError("Independent HELIX U01 failed byte-size or SHA-256 verification")
+    update_target = runtime_dc7 / helix_update
+    if not update_target.is_file() or update_target.read_bytes() != current_payload:
+        update_target.write_bytes(current_payload)
+
+    # Suffolk UP08 is the new independent Construction Current, and the
+    # former Current-C stays available for exact update-to-update audits.
+    source_suffolk = dc7 / suffolk_update
+    suffolk_parts = sorted(dc7.glob(f"{suffolk_update}.raw.b64.part*"))
+    if source_suffolk.is_file():
+        suffolk_payload = source_suffolk.read_bytes()
+    elif suffolk_parts:
+        suffolk_payload = base64.b64decode(
+            "".join(p.read_text(encoding="ascii").strip() for p in suffolk_parts),
+            validate=True,
+        )
+    else:
+        raise FileNotFoundError("Official Suffolk UP08 not found")
+    if len(suffolk_payload) != 5071788 or hashlib.sha256(suffolk_payload).hexdigest() != suffolk_update_sha:
+        raise ValueError("Suffolk UP08 byte-size/SHA-256 verification failed")
+    suffolk_target = runtime_dc7 / suffolk_update
+    if not suffolk_target.is_file() or suffolk_target.read_bytes() != suffolk_payload:
+        suffolk_target.write_bytes(suffolk_payload)
     return runtime_root
 
 source_data_dir = Path(os.environ.get("HELIX_PROJECT_DATA_DIR", str(DATA_DIR)))
@@ -100,7 +142,7 @@ if not source_data_dir.exists():
 
 data_dir = _materialize_cloud_xers(source_data_dir)
 
-MODEL_VERSION = "dc7-2026-10-12-helix-approved-baseline-activity-counts-v1"
+MODEL_VERSION = "dc7-2026-10-19-suffolk-up08-helix-u01-fb-review-v036"
 
 @st.cache_resource(show_spinner="Reading DC7 baseline/update XER and building HELIX scope…")
 def load_model(path_text: str, model_version: str):
@@ -113,8 +155,8 @@ try:
 except Exception as exc:
     st.error(f"DC7 dashboard could not be built: {exc}")
     st.info(
-        "DC7 reads the main project only. Expected official pair: "
-        "226021.005.MO-BL.xer + 226021.010.MO-UP-C.xer."
+        "Required schedules: SUFFOLK 226021.005.MO-BL / 226021.022.MO-UP-08 "
+        "and independent HELIX 226021-HE.B / 226021-HE.U01."
     )
     st.stop()
 
