@@ -91,13 +91,15 @@ def render_header(m: DC7Model, view: str):
         current_label, current_value = "Current Update", m.update_path.stem
         source_label = "SUFFOLK · HELIX Construction"
     else:
-        # HELIX VIEW is strictly the independent 226021-HE.B baseline;
-        # never present the SUFFOLK Current metadata as HELIX progress.
-        source = m.auxiliary_project
-        baseline_date = source.get("last_recalc_date") if source is not None else None
-        date_label, date_value = "HELIX BL Data Date", _fmt_date(pd.to_datetime(baseline_date, errors="coerce"))
-        current_label, current_value = "Independent Current", "Not available"
-        source_label = "HELIX Electrical BL · Line-Ups & MOH"
+        # Never substitute Suffolk Current-C for independent HELIX U01.
+        current_source = m.auxiliary_update_project
+        date_label = "Latest Data Date"
+        date_value = _fmt_date(pd.to_datetime(
+            current_source.get("last_recalc_date") if current_source is not None else None,
+            errors="coerce",
+        ))
+        current_label, current_value = "Current Update", "226021-HE.U01"
+        source_label = "HELIX Electrical Line-Ups & MOH"
 
     st.markdown(f"""
     <div class="helix-header">
@@ -139,124 +141,110 @@ def render_kpis(m: DC7Model, view: str):
 
 
 def render_helix_kpis(m: DC7Model):
-    """Source-accurate HELIX KPI strip from independent electrical BL only."""
-    from src.helix_baseline import helix_baseline_overview
-    data = m.independent_helix_baseline()
+    """Independent electrical BL/U01 schedule performance, no SUFFOLK rows."""
+    from src.helix_baseline import helix_bl_current_overview
+    bl, cur = m.independent_helix_baseline(), m.independent_helix_update()
     st.markdown('<div class="section-caption">PROJECT STATUS SUMMARY</div>', unsafe_allow_html=True)
-    if data is None:
-        st.info("Independent HELIX baseline is not available; no SUFFOLK fallback.")
+    if bl is None or cur is None:
+        st.warning("Independent HELIX BL and U01 are both required.")
         return
-    project = m.auxiliary_project
-    date = project.get("last_recalc_date") if project is not None else None
-    overview, _ = helix_baseline_overview(data, date)
-    counts = overview["Counts"]
-    total = counts["Total"]
-    pct = lambda n: f"{100*n/total:.2f}%" if total else "0.00%"
+    info, _ = helix_bl_current_overview(
+        bl, cur, m.auxiliary_update_project["last_recalc_date"]
+    )
+    count = info["Counts"]
+    total = count["Total"]
+    pct = lambda key: f"{100 * count[key] / total:.2f}%"
+    shift = info["Finish Shift (calendar days)"]
     st.markdown(
         '<div class="panel schedule"><div class="panel-head">'
         '<div><span class="time-pill">TIME</span>'
-        '<span class="panel-title">SCHEDULE PERFORMANCE · HELIX BASELINE</span></div>'
-        '<div class="panel-note">Independent HELIX electrical baseline · no Current update</div>'
+        '<span class="panel-title">SCHEDULE PERFORMANCE</span></div>'
         '</div>', unsafe_allow_html=True,
     )
     cards = [
-        ("Baseline Completion", _fmt_date(overview["Baseline Finish"]),
-         "Last HELIX Line-Up/MOH planned finish", ""),
-        ("Current Forecast Finish", "—", "Independent HELIX Current not available", ""),
-        ("Finish Date Shift", "—", "Not calculable without HELIX Current", ""),
-        ("Completed Activities", pct(counts["Completed"]),
-         f'{counts["Completed"]:,} of {total:,} · baseline snapshot', ""),
-        ("In Progress Activities", pct(counts["In Progress"]),
-         f'{counts["In Progress"]:,} of {total:,} · baseline snapshot', ""),
-        ("Not Started Activities", pct(counts["Not Started"]),
-         f'{counts["Not Started"]:,} of {total:,} · baseline snapshot', ""),
-        ("HELIX Scope Activities", f"{total:,}",
-         f'{counts["Completed"]} C · {counts["In Progress"]} IP · '
-         f'{counts["Not Started"]} NS', ""),
-        ("Baseline Data Date", _fmt_date(overview["Baseline Data Date"]),
-         "Official P6 226021-HE.B", ""),
+        ("Baseline Completion", _fmt_date(info["Baseline Finish"]), "226021-HE.B", ""),
+        ("Current Forecast Finish", _fmt_date(info["Current Finish"]), "226021-HE.U01", ""),
+        ("Finish Date Shift", f"{shift:+d} days", "Baseline − U01 · calendar days", _var_class(shift)),
+        ("Completed Activities", pct("Completed"), f'{count["Completed"]:,} of {total:,}', ""),
+        ("In Progress Activities", pct("In Progress"), f'{count["In Progress"]:,} of {total:,}', ""),
+        ("Not Started Activities", pct("Not Started"), f'{count["Not Started"]:,} of {total:,}', ""),
+        ("Total Activities", f"{total:,}", f'{count["Completed"]} C · {count["In Progress"]} IP · {count["Not Started"]} NS', ""),
+        ("Current Data Date", _fmt_date(info["Current Data Date"]), "226021-HE.U01", ""),
     ]
     h = '<div class="kpi-grid">'
     for label, value, sub, css in cards:
-        h += (f'<div class="kpi"><div class="label">{_safe(label)}</div>'
-              f'<div class="value {css}">{_safe(value)}</div>'
-              f'<div class="sub">{_safe(sub)}</div></div>')
+        h += (
+            f'<div class="kpi"><div class="label">{_safe(label)}</div>'
+            f'<div class="value {css}">{_safe(value)}</div>'
+            f'<div class="sub">{_safe(sub)}</div></div>'
+        )
     st.markdown(h + '</div></div>', unsafe_allow_html=True)
 
 
 def render_helix_baseline_scurve_and_status(m: DC7Model):
-    """HELIX-only planned baseline cumulative count, plus status snapshot.
-
-    A single recorded baseline status point is intentionally NOT a
-    Current or Actual-progress time series.
-    """
-    from src.helix_baseline import helix_baseline_overview
-    data = m.independent_helix_baseline()
-    st.markdown('<div class="section-caption">ACTIVITY PERFORMANCE</div>', unsafe_allow_html=True)
-    if data is None:
-        st.info("HELIX baseline activity curve unavailable. SUFFOLK data are not substituted.")
+    """HELIX BL vs independent U01 forecast and actual activity completions."""
+    from src.helix_baseline import helix_bl_current_overview
+    bl, cur = m.independent_helix_baseline(), m.independent_helix_update()
+    st.markdown('<div class="section-caption">SCHEDULE PERFORMANCE</div>', unsafe_allow_html=True)
+    if bl is None or cur is None:
+        st.warning("Independent HELIX BL and U01 are both required for progress S-curve.")
         return
-    project = m.auxiliary_project
-    date = project.get("last_recalc_date") if project is not None else None
-    info, curve = helix_baseline_overview(data, date)
-    counts = info["Counts"]
-    total = counts["Total"]
+    info, curve = helix_bl_current_overview(bl, cur, m.auxiliary_update_project["last_recalc_date"])
+    count = info["Counts"]
+    total = count["Total"]
     c1, c2 = st.columns([1.7, 0.8], gap="large")
     with c1:
         st.markdown(
             '<div class="panel"><div class="panel-head">'
-            '<div class="panel-title">ACTIVITY S-CURVE · HELIX ELECTRICAL BASELINE</div>'
-            '<div class="panel-note">Cumulative planned finishes · 4,153 HELIX Line-Up/MOH activities</div>'
+            '<div class="panel-title">PROGRESS S-CURVE</div>'
+            '<div class="panel-note">HELIX Electrical Line-Ups & MOH · activity count</div>'
             '</div>', unsafe_allow_html=True,
         )
         fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=curve["Date"], y=curve["Baseline Planned Activities"],
-            name="HELIX Baseline Planned Activities", mode="lines",
-            line=dict(color="#446a9e", width=3),
-            hovertemplate="%{x|%d-%b-%Y}<br>%{y:,.0f} planned HELIX activities<extra></extra>",
-        ))
-        dd = info["Baseline Data Date"]
-        if pd.notna(dd):
-            fig.add_vline(
-                x=dd, line_dash="dash", line_color="#6d7f92",
-                annotation_text=f"Baseline Data Date · {_fmt_date(dd)}",
-                annotation_position="top right",
-            )
+        for field, color in (
+            ("Baseline Planned Activities", "#446a9e"),
+            ("Current Forecast Activities", "#e16d34"),
+            ("Actual Completed Activities", GREEN),
+        ):
+            actual = field == "Actual Completed Activities"
             fig.add_trace(go.Scatter(
-                x=[dd], y=[counts["Completed"]],
-                name="Completed in BL snapshot (not Current)", mode="markers",
-                marker=dict(color=GREEN, size=10),
-                hovertemplate="BL snapshot · %{x|%d-%b-%Y}<br>%{y:,.0f} completed statuses<extra></extra>",
+                x=curve["Date"], y=curve[field], name=field,
+                mode="lines+markers" if actual else "lines",
+                line=dict(color=color, width=3),
+                marker=dict(size=6),
+                connectgaps=False,
+                hovertemplate=f"%{{x|%d-%b-%Y}}<br>%{{y:,.0f}} {field}<extra></extra>",
             ))
-        fig.update_layout(
-            **_layout(410, 70, 55, 34),
-            yaxis_title="Cumulative Activities", xaxis_title="Date",
-            title=dict(text=""), legend_title_text="",
+        dd = info["Current Data Date"]
+        fig.add_vline(
+            x=dd, line_dash="dash", line_color="#6d7f92",
+            annotation_text=f"Data Date · {_fmt_date(dd)}",
+            annotation_position="top right",
         )
-        fig.update_yaxes(range=[0, total * 1.04], tickformat=",d", gridcolor=GRID)
+        fig.update_layout(
+            **_layout(410, 70, 55, 34), title=dict(text=""),
+            yaxis_title="Cumulative Activities", xaxis_title="Date",
+            legend_title_text="",
+        )
+        fig.update_yaxes(range=[0, total * 1.05], tickformat=",d", gridcolor=GRID)
         fig.update_xaxes(type="date", dtick="M3", tickformat="%b\n%Y", gridcolor=GRID)
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
         st.markdown('</div>', unsafe_allow_html=True)
     with c2:
         st.markdown(
             '<div class="panel"><div class="panel-head">'
-            '<div class="panel-title">OVERALL ACTIVITY STATUS · HELIX BL</div>'
+            '<div class="panel-title">OVERALL ACTIVITY STATUS</div>'
             '</div>', unsafe_allow_html=True,
         )
         h = '<div class="activity-wrap">'
         for label in ("Total", "Completed", "In Progress", "Not Started"):
-            h += (f'<div class="activity-card"><div class="num">{counts[label]:,}</div>'
-                  f'<div class="lab">{label}</div></div>')
-        ratio = lambda x: f'{counts[x] / total * 100:.2f}%' if total else "0.00%"
-        h += (
-            '</div><div class="scope-note">'
-            f'Completed: <b>{ratio("Completed")}</b><br>'
-            f'In Progress: <b>{ratio("In Progress")}</b><br>'
-            f'Not Started: <b>{ratio("Not Started")}</b><br>'
-            '<b>Baseline statuses only · No independent HELIX Current</b>'
-            '</div></div>'
-        )
+            h += f'<div class="activity-card"><div class="num">{count[label]:,}</div><div class="lab">{label}</div></div>'
+        ratio = lambda k: f'{100 * count[k] / total:.2f}%'
+        h += ('</div><div class="scope-note">'
+              f'Completed: <b>{ratio("Completed")}</b><br>'
+              f'In Progress: <b>{ratio("In Progress")}</b><br>'
+              f'Not Started: <b>{ratio("Not Started")}</b>'
+              '</div></div>')
         st.markdown(h, unsafe_allow_html=True)
 
 
