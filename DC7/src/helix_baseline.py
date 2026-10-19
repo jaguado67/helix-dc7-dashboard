@@ -219,6 +219,91 @@ def helix_baseline_overview(
     return info, series
 
 
+
+def helix_milestone_update_comparison(
+    baseline_tables: Mapping[str, pd.DataFrame],
+    update_tables: Mapping[str, pd.DataFrame],
+) -> pd.DataFrame:
+    """Factual P6 BL -> U01 milestone shift, with US federal working days.
+
+    Includes all six Data Halls for the HELIX-owned independent project.
+    DH1100's missing QTS-Subcontractor=HELIX code is explicitly labelled,
+    never silently represented as a valid HELIX subcontractor assignment.
+    """
+    base=to_task_frame(baseline_tables["TASK"])
+    current=to_task_frame(update_tables["TASK"])
+    if base["task_code"].duplicated().any() or current["task_code"].duplicated().any():
+        raise ValueError("Duplicate milestone Activity ID")
+    bd=base.set_index("task_code")
+    cu=current.set_index("task_code")
+
+    ct=update_tables["ACTVTYPE"]
+    typ=ct.loc[
+        ct["actv_code_type"].fillna("").astype(str).str.casefold().eq("qts - subcontractor")
+    ]
+    if len(typ)!=1:
+        raise ValueError("Independent HELIX P6 subcontractor coding not found")
+    type_id=str(typ.iloc[0]["actv_code_type_id"])
+    codes=update_tables["ACTVCODE"]
+    code_ids=set(codes.loc[
+        codes["actv_code_type_id"].astype(str).eq(type_id)
+        & codes["short_name"].fillna("").astype(str).str.upper().eq("HELIX"),
+        "actv_code_id"
+    ].astype(str))
+    assignments=update_tables["TASKACTV"]
+    coded_ids=set(assignments.loc[
+        assignments["actv_code_type_id"].astype(str).eq(type_id)
+        & assignments["actv_code_id"].astype(str).isin(code_ids),
+        "task_id"
+    ].astype(str))
+    from datetime import datetime
+    patt=re.compile(r"\((\d{1,2}/\d{1,2}/(?:\d{4}|\d{2}))\)")
+    def name_date(name):
+        found=patt.findall(str(name))
+        if len(found)!=1:
+            return pd.NaT
+        fmt="%m/%d/%Y" if len(found[0].split("/")[-1])==4 else "%m/%d/%y"
+        return pd.Timestamp(datetime.strptime(found[0],fmt).date())
+    rows=[]
+    for category, prefix in (("QC 2.2","M"),("L4 Cx / IST","IST")):
+        for hall in HALLS:
+            activity=f"{prefix}.{hall[2:]}"
+            if activity not in bd.index or activity not in cu.index:
+                raise ValueError(f"Missing contractual milestone in HELIX BL/U01: {activity}")
+            b=bd.loc[activity]
+            u=cu.loc[activity]
+            baseline_date=pd.to_datetime(b["target_end_date"],errors="coerce")
+            if u["Status"]=="Completed":
+                current_date=pd.to_datetime(u["act_end_date"],errors="coerce")
+            else:
+                current_date=pd.to_datetime(u["reend_date"],errors="coerce")
+                if pd.isna(current_date):
+                    current_date=pd.to_datetime(u["target_end_date"],errors="coerce")
+            if pd.isna(baseline_date) or pd.isna(current_date):
+                raise ValueError(f"Invalid P6 BL/current milestone Finish: {activity}")
+            bdt,udt=baseline_date.normalize(),current_date.normalize()
+            coding="HELIX" if str(u["task_id"]) in coded_ids else "Unassigned to HELIX"
+            if hall!="DH1100" and coding!="HELIX":
+                raise ValueError(f"Milestone coding regressed for {activity}")
+            rows.append({
+                "Data Hall":hall,
+                "Milestone":category,
+                "Activity ID":activity,
+                "Baseline Date":bdt,
+                "Current Finish Date":udt,
+                "Variance (US working days)":-us_federal_workday_delay(bdt,udt),
+                "Calendar Shift (days)":int((bdt-udt).days),
+                "Status":str(u["Status"]),
+                "Coding Audit":coding,
+                "BL Activity Name Date":name_date(b["task_name"]),
+                "U01 Activity Name Date":name_date(u["task_name"]),
+            })
+    result=pd.DataFrame(rows)
+    if len(result)!=12 or result["Activity ID"].duplicated().any():
+        raise ValueError("HELIX QC/IST milestone audit must contain exactly 12 IDs")
+    return result
+
+
 def helix_current_overview(
     baseline: Mapping[str, pd.DataFrame],
     update: Mapping[str, pd.DataFrame],
