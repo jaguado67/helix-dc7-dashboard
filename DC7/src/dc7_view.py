@@ -397,7 +397,7 @@ def render_stats(m: DC7Model, title: str):
         st.markdown(h + '</tbody></table></div>', unsafe_allow_html=True)
     with right:
         fig = go.Figure(go.Bar(x=df["Activity Completion %"], y=df.Area, orientation="h", text=[f"{x:.1f}%" for x in df["Activity Completion %"]], textposition="outside", textfont=dict(size=13, color=TEXT), marker=dict(color="#1f6d8a")))
-        fig.update_layout(**_layout(max(355, 44 * len(df) + 95), 90, 40, 28), showlegend=False, xaxis_title="Activity Completion %", yaxis_title="", title=dict(text=""))
+        fig.update_layout(**_layout(max(355, 44 * len(df) + 95), 90, 40, 28), showlegend=False, xaxis_title="Activity Completion %", yaxis_title="", title="OVERALL % COMPLETE")
         fig.update_xaxes(range=[0, max(10, float(df["Activity Completion %"].max()) * 1.35 + 1)], ticksuffix="%", gridcolor=GRID)
         fig.update_yaxes(autorange="reversed", gridcolor="#fff")
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
@@ -446,58 +446,8 @@ def render_progress_detail(m: DC7Model, view: str):
         fig.update_yaxes(range=[0, ymax], ticksuffix="%", gridcolor=GRID)
         fig.update_xaxes(tickangle=-28 if dh_p6_wbs else -25)
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
-    if p6_wbs:
-        st.caption(
-            "Se muestran todas las ramas originales de la WBS de P6 bajo "
-            f"{'Front of House (FOH)' if area == 'FOH' else 'Back of House (BOH)'}, "
-            "en el mismo orden, incluso si no contienen actividades de HELIX "
-            "(Tasks = 0). Los conteos incluyen solo HELIX Construction, "
-            "también comisionamiento. Una actividad clasificada QTS-AREA "
-            f"como {area} pertenece a Shell / Foundations y se registra "
-            "por separado en SUFFOLK · HELIX CONSTRUCTION | ACTIVITY AUDIT. "
-            "No se modifican los XER ni el universo original de 2.545 actividades."
-        )
-        details = m.wbs_area_activities(area)
-        audit_export = details[["task_code", "task_name", "Area", "WBS Group", "WBS Path", "Status"]].copy()
-        audit_export.columns = [
-            "Activity ID", "Activity Name", "QTS - AREA", "P6 WBS Group",
-            "P6 WBS Path", "Current Status"
-        ]
-        st.download_button(
-            f"Download {area} HELIX Construction · WBS audit (CSV)",
-            audit_export.to_csv(index=False).encode("utf-8-sig"),
-            file_name=f"DC7_{area}_HELIX_Construction_WBS_Audit.csv",
-            mime="text/csv", key=f"wbs_audit_{area}",
-        )
-    elif dh_p6_wbs:
-        full = m.data_hall_wbs_activities(area, include_exceptions=True)
-        rejected = int(full["WBS Group"].eq("WBS EXCEPTION").sum())
-        st.caption(
-            f"Se usan siete grupos derivados de la WBS original de P6 para {area}, "
-            "unificando Electrical Rooms y Galleries. Solo actividades HELIX "
-            "de Construction; las ramas no incluidas no se reasignan. "
-            f"Las {rejected} actividades de otras WBS permanecen en el alcance "
-            "original y se documentan por Activity ID en ACTIVITY AUDIT. "
-            "No se modificaron códigos, estados ni archivos XER."
-        )
-        detail = m.data_hall_wbs_activities(area)
-        audit_export = detail[["task_code", "task_name", "Area", "WBS Group", "WBS Path", "Status"]].copy()
-        audit_export.columns = [
-            "Activity ID", "Activity Name", "QTS - AREA", "P6 WBS Group",
-            "P6 WBS Path", "Current Status"
-        ]
-        st.download_button(
-            f"Download {area} HELIX Construction · P6 WBS audit (CSV)",
-            audit_export.to_csv(index=False).encode("utf-8-sig"),
-            file_name=f"DC7_{area}_HELIX_Construction_DH_WBS_Audit.csv",
-            mime="text/csv", key=f"dh_wbs_{area}",
-        )
-    elif consolidated:
-        st.caption("HELIX Data Hall display groups consolidate Other Rooms and Electrical Rooms, and classify unassigned underslab electrical / RTU roof activities by function. Original QTS-DASH, task IDs, status, and XER data remain unchanged. Unrecognized activities remain unclassified.")
-    elif area == "MOH":
-        st.caption("MOH is sourced only from the official independent HELIX baseline 226021-HE.B.xer, when loaded. No HELIX Current is available.")
-    elif "Other HELIX Electrical Scope" in set(df["Area"].astype(str)):
-        st.caption("Other HELIX Electrical Scope contains only activities coded QTS - Subcontractor = HELIX that have no QTS-DASH assignment; the original XER coding remains unchanged.")
+    # Original WBS and out-of-scope audit remain verified internally.
+
     # Dedicated HELIX Line-Ups are rendered separately in HELIX VIEW only.
 
 
@@ -937,7 +887,6 @@ def render_dashboard(helix: DC7Model, suffolk: DC7Model):
         view = "SUFFOLK"
     model = suffolk if view == "SUFFOLK" else helix
     st.markdown(CSS, unsafe_allow_html=True)
-    st.markdown(f'<div class="schedule-view-caption">{_safe("DC7 Suffolk Schedule" if view == "SUFFOLK" else "DC7 HELIX PROGRESS VIEW")}</div>', unsafe_allow_html=True)
     render_header(model, view)
     # Keep the native control in its own Streamlit layout row, separated from the HTML header.
     with st.container(border=True):
@@ -948,13 +897,12 @@ def render_dashboard(helix: DC7Model, suffolk: DC7Model):
                 default="SUFFOLK", key="dc7_schedule_view",
                 label_visibility="collapsed",
             )
-    note = (
-        "SUFFOLK contractual dates · HELIX Construction only"
-        if view == "SUFFOLK"
-        else "HELIX independent electrical baseline · Line-Ups & MOH"
+    schedule_title = (
+        "SUFFOLK SCHEDULE – HELIX SCOPE ONLY"
+        if view == "SUFFOLK" else "HELIX SCHEDULE – ELECTRICAL LINE-UPS"
     )
     st.markdown(
-        f'<div class="project-strip"><span>{view} VIEW</span><span class="right">{_safe(note)}</span></div>',
+        f'<div class="project-strip"><span>{_safe(schedule_title)}</span></div>',
         unsafe_allow_html=True,
     )
     if view == "HELIX":
@@ -974,79 +922,10 @@ def render_dashboard(helix: DC7Model, suffolk: DC7Model):
 
     render_kpis(suffolk, "SUFFOLK")
     render_scurve_and_status(suffolk)
-    render_stats(suffolk, "SUFFOLK PROJECT STATS · AREA PROGRESS")
+    render_stats(suffolk, "PROJECT PROGRESS BY AREA")
     render_windows(suffolk)
     render_progress_detail(suffolk, view="SUFFOLK")
 
-    reports = helix.audit_reports or {}
-    if reports:
-        with st.expander("SUFFOLK · HELIX CONSTRUCTION | ACTIVITY AUDIT", expanded=True):
-            st.caption(
-                "Source: 226021.005.MO-BL (Baseline) / 226021.010.MO-UP "
-                "(Previous) / 226021.010.MO-UP-C (Current). Only QTS - "
-                "Subcontractor = HELIX under Construction WBS, including "
-                "commissioning. Procurement and archived activities excluded."
-            )
-            summary = reports["summary"]
-            st.dataframe(summary, use_container_width=True, hide_index=True)
-            wbs_exceptions = reports.get("wbs_exceptions", pd.DataFrame())
-            if not wbs_exceptions.empty:
-                st.markdown("**FOH / BOH · WBS classification exceptions**")
-                st.caption(
-                    "These two active HELIX Construction activities remain in "
-                    "the P6 source and full scope count, but are excluded from "
-                    "the FOH/BOH WBS breakdown because their original parent "
-                    "is Construction / Shell / Foundations."
-                )
-                st.dataframe(
-                    wbs_exceptions, use_container_width=True, hide_index=True,
-                )
-                st.download_button(
-                    "Download FOH/BOH WBS exceptions (CSV)",
-                    wbs_exceptions.to_csv(index=False).encode("utf-8-sig"),
-                    file_name="DC7_HELIX_FOH_BOH_WBS_exceptions_C.csv",
-                    mime="text/csv", key=f"wbs_exceptions_{view}",
-                )
-            dh_wbs_exceptions = reports.get("dh_wbs_exceptions", pd.DataFrame())
-            if not dh_wbs_exceptions.empty:
-                st.markdown("**Data Halls · Original P6 WBS branches outside the seven displayed groups**")
-                st.caption(
-                    "Son actividades HELIX Construction activas en SUFFOLK, "
-                    "no actividades archivadas ni retiradas. Conservan sus "
-                    "Activity IDs y permanecen en el total original de 2.545, "
-                    "pero no se asignan artificialmente a las siete categorías."
-                )
-                st.dataframe(
-                    dh_wbs_exceptions, use_container_width=True, hide_index=True,
-                )
-                st.download_button(
-                    "Download Data Hall WBS exceptions (CSV)",
-                    dh_wbs_exceptions.to_csv(index=False).encode("utf-8-sig"),
-                    file_name="DC7_HELIX_Data_Hall_WBS_exceptions_C.csv",
-                    mime="text/csv", key=f"dh_wbs_exceptions_{view}",
-                )
-            departed = reports["departures"]
-            if not departed.empty:
-                st.warning(
-                    f"{len(departed)} previously active HELIX activities no "
-                    "longer appear in active Construction. Review archived and "
-                    "reassigned Activity IDs before approving progress figures."
-                )
-                st.dataframe(departed, use_container_width=True, hide_index=True)
-                st.download_button(
-                    "Download departed activities (CSV)",
-                    departed.to_csv(index=False).encode("utf-8-sig"),
-                    file_name="DC7_HELIX_departed_activities_C.csv",
-                    mime="text/csv", key=f"departures_{view}",
-                )
-            active = reports["active"]
-            st.download_button(
-                "Download full HELIX construction audit (CSV)",
-                active.to_csv(index=False).encode("utf-8-sig"),
-                file_name="DC7_HELIX_construction_audit_C.csv",
-                mime="text/csv", key=f"activities_{view}",
-            )
-
-    with st.expander(f"Diagnostics · DC7 {view} XER / Scope Audit", expanded=False):
-        st.dataframe(pd.DataFrame([model.diagnostics()]), use_container_width=True, hide_index=True)
-        st.caption("Activity Completion % = Completed Tasks / Total Tasks; this is not weighted physical progress. XER inputs and scheduling calculations remain unchanged.")
+    # Maintain the detailed SUFFOLK Construction activity/WBS audit reports
+    # in the validated model; do not display separate audit/download panels
+    # in the executive dashboard (FB review p4). No records are discarded.
