@@ -646,14 +646,14 @@ def render_helix_lineup_stats(m: DC7Model):
     """
     from src.helix_baseline import lineup_area_status_summary
 
-    data = m.independent_helix_baseline()
+    data = m.independent_helix_update()
     df = lineup_area_status_summary(data)
     st.markdown(
-        '<div class="section-caption">PROJECT STATS · HELIX LINE-UPS & MOH · BASELINE STATUS</div>',
+        '<div class="section-caption">PROGRESS SUMMARY BY AREA</div>',
         unsafe_allow_html=True,
     )
     if data is None:
-        st.info("Official HELIX baseline pending; no activity counts or current progress inferred.")
+        st.info("Official HELIX U01 required.")
         return
 
     def percent_label(value: float) -> str:
@@ -683,11 +683,11 @@ def render_helix_lineup_stats(m: DC7Model):
         in_progress = int(df["In Progress"].sum())
         not_started = int(df["Not Started"].sum())
         if total_tasks != completed + in_progress + not_started:
-            raise ValueError("HELIX baseline status totals do not reconcile")
+            raise ValueError("HELIX U01 status totals do not reconcile")
         st.markdown(h + '</tbody></table></div>', unsafe_allow_html=True)
         st.caption(
-            f"HELIX Line-Ups and MOH: {total_tasks:,} unique baseline Activity IDs. "
-            "Baseline statuses are not actual current progress."
+            f"HELIX Line-Ups and MOH: {total_tasks:,} unique Activity IDs. "
+            "Current progress from official HELIX U01."
         )
     with right:
         fig = go.Figure(go.Bar(
@@ -698,13 +698,13 @@ def render_helix_lineup_stats(m: DC7Model):
             textposition="outside",
             textfont=dict(size=13, color=TEXT),
             marker=dict(color="#1f6d8a"),
-            hovertemplate="%{y}<br>Baseline completed: %{x:.3f}%<extra></extra>",
+            hovertemplate="%{y}<br>U01 completed: %{x:.3f}%<extra></extra>",
         ))
         highest = float(df["Activity Completion %"].max()) if not df.empty else 0.0
         fig.update_layout(
             **_layout(max(355, 44 * len(df) + 95), 90, 40, 28),
             showlegend=False,
-            xaxis_title="Baseline Activity Completion %",
+            xaxis_title="Activity Completion %",
             yaxis_title="",
             title=dict(text=""),
         )
@@ -724,9 +724,9 @@ def render_helix_lineups(m: DC7Model):
     """
     from src.helix_baseline import HALLS, wbs_lineup_hierarchy, lineup_order
 
-    data = m.independent_helix_baseline()
+    data = m.independent_helix_update()
     st.markdown(
-        '<div class="section-caption">HELIX · DATA HALL / LINE-UP DETAIL</div>',
+        '<div class="section-caption">DATA HALL / LINE-UP PROGRESS DETAIL</div>',
         unsafe_allow_html=True,
     )
 
@@ -737,7 +737,7 @@ def render_helix_lineups(m: DC7Model):
         with st.expander(heading, expanded=(area == "DH1100")):
             table = statuses.copy()
             if data is None:
-                st.info("Activity counts and statuses are pending the official HELIX baseline.")
+                st.info("Activity counts and statuses are pending the official HELIX U01.")
             column_config = {
                 "Line-Up": st.column_config.TextColumn(
                     "Line-Up" if not is_moh else "MOH Area"
@@ -763,7 +763,7 @@ def render_helix_lineups(m: DC7Model):
                     )
                 with right:
                     if data is None:
-                        st.info("The chart is pending the official HELIX baseline.")
+                        st.info("The chart is pending the official HELIX U01.")
                     else:
                         if table["Line-Up"].tolist() != list(lineup_order(area)):
                             raise ValueError(f"Line-Up P6 order mismatch: {area}")
@@ -793,7 +793,7 @@ def render_helix_lineups(m: DC7Model):
                         ))
                         fig.update_layout(
                             **_layout(450, 46, 78, 50),
-                            title=f"ACTIVITY COMPLETION BY LINE-UP · {area}",
+                            title=f"% COMPLETE BY LINE-UP · {area}",
                             showlegend=False,
                             xaxis_title="Activity Completion %",
                         )
@@ -819,7 +819,7 @@ def render_helix_lineups(m: DC7Model):
                     )
             if data is not None and is_moh:
                 st.caption(
-                    "MOH Equipment: baseline statuses for HELIX-assigned "
+                    "MOH Equipment: U01 statuses for HELIX-assigned "
                     "activities only; other subcontractors are excluded."
                 )
 
