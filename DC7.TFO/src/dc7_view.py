@@ -171,8 +171,8 @@ def render_windows(m: DC7Model):
             fig.add_trace(go.Scatter(x=[bs, bf], y=[base_y, base_y], mode="lines+markers", line=dict(color=BASELINE, width=8), marker=dict(size=8, color=BASELINE), showlegend=False, hovertemplate=f"<b>{r.Area} · Baseline</b><br>Start: {_fmt_date(bs)}<br>Finish: {_fmt_date(bf)}<extra></extra>"))
         if pd.notna(cs) and pd.notna(cf):
             v = r["Finish Date Shift (d)"]; col = _timeline_color(v)
-            fig.add_trace(go.Scatter(x=[cs, cf], y=[cur_y, cur_y], mode="lines+markers", line=dict(color=col, width=9), marker=dict(size=9, color=col), showlegend=False, hovertemplate=f"<b>{r.Area} · Current</b><br>Representative Start: {_fmt_date(cs)}<br>Start Anchor: {_safe(r['Start Anchor ID'])}<br>Finish: {_fmt_date(cf)}<br>Start Date Shift: {_fmt_days(r['Start Date Shift (d)'])}<br>Finish Date Shift: {_fmt_days(v)}<br>Activity Completion: {r['Activity Completion %']:.1f}%<extra></extra>"))
-            fig.add_annotation(x=cf, y=cur_y, text=f"{_fmt_days(v)} · {r['Activity Completion %']:.1f}%", showarrow=False, xanchor="left", xshift=8, font=dict(size=12, color=col))
+            fig.add_trace(go.Scatter(x=[cs, cf], y=[cur_y, cur_y], mode="lines+markers", line=dict(color=col, width=9), marker=dict(size=9, color=col), showlegend=False, hovertemplate=f"<b>{r.Area} · Current</b><br>Representative Start: {_fmt_date(cs)}<br>Start Anchor: {_safe(r['Start Anchor ID'])}<br>Finish: {_fmt_date(cf)}<br>Start Date Shift: {_fmt_days(r['Start Date Shift (d)'])}<br>Finish Date Shift: {_fmt_days(v)}<extra></extra>"))
+            fig.add_annotation(x=cf, y=cur_y, text=f"{_fmt_days(v)}", showarrow=False, xanchor="left", xshift=8, font=dict(size=12, color=col))
     if dates:
         lo = min(dates) - pd.Timedelta(days=25); hi = max(dates) + pd.Timedelta(days=45)
         fig.update_xaxes(type="date", range=[lo, hi], dtick="M2", tickformat="%b\n%Y", gridcolor=GRID, title="Date")
