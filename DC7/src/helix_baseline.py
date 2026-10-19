@@ -264,27 +264,45 @@ def helix_bl_current_overview(baseline: Mapping, current: Mapping, current_data_
     if bl_finish.isna().any() or cur_finish.isna().any():
         raise ValueError("Missing HELIX baseline/current Finish values")
 
-    start = min(bl_finish.min(), cur_finish.min(), data_date)
-    end = max(bl_finish.max(), cur_finish.max())
-    ticks = list(pd.date_range(start=start.replace(day=1), end=end+pd.offsets.MonthEnd(0), freq="ME"))
-    ticks.extend([start, end, data_date])
-    timeline = pd.DatetimeIndex(sorted(set(ticks)))
+    # Daily discrete cumulative counts: never interpolate monthly endpoints.
+    # The current projection uses actual finish for completed activities,
+    # remaining P6 forecast finish for all incomplete activities.
+    completed_mask = c["Status"].eq("Completed").to_numpy()
+    hybrid_finish = cur_finish.copy()
+    hybrid_finish.loc[completed_mask] = pd.to_datetime(
+        c.loc[completed_mask, "Actual Finish"], errors="raise"
+    ).dt.normalize().to_numpy()
+    start = min(bl_finish.min(), hybrid_finish.min(), data_date)
+    end = max(bl_finish.max(), hybrid_finish.max(), data_date)
+    timeline = pd.date_range(start=start, end=end, freq="D")
+    planned_values = np.searchsorted(np.sort(bl_finish.to_numpy(dtype="datetime64[ns]")),
+                                   timeline.to_numpy(dtype="datetime64[ns]"), side="right")
+    forecast_values = np.searchsorted(np.sort(hybrid_finish.to_numpy(dtype="datetime64[ns]")),
+                                    timeline.to_numpy(dtype="datetime64[ns]"), side="right")
+    actual_sorted = np.sort(actual_dates.to_numpy(dtype="datetime64[ns]"))
+    actual_values = np.searchsorted(actual_sorted, timeline.to_numpy(dtype="datetime64[ns]"), side="right").astype(float)
+    actual_values[timeline > data_date] = np.nan
     points = pd.DataFrame({
         "Date": timeline,
-        "Baseline Planned Activities": [int(bl_finish.le(d).sum()) for d in timeline],
-        "Current Forecast Activities": [int(cur_finish.le(d).sum()) for d in timeline],
-        "Actual Completed Activities": [
-            int(actual_dates.le(d).sum()) if d <= data_date else float("nan")
-            for d in timeline
-        ],
+        "Baseline Planned Activities": planned_values,
+        "Current Forecast Activities": forecast_values,
+        "Actual Completed Activities": actual_values,
     })
     if any(int(points.iloc[-1][k]) != 4153 for k in
            ("Baseline Planned Activities", "Current Forecast Activities")):
         raise ValueError("HELIX baseline/current cumulative activity totals do not match")
     if int(actual_dates.count()) != counts["Completed"]:
         raise ValueError("HELIX actual completed timestamps do not match status count")
+    dd_row = points.loc[points["Date"].eq(data_date)].iloc[0]
+    planned_dd = int(dd_row["Baseline Planned Activities"])
+    forecast_dd = int(dd_row["Current Forecast Activities"])
+    actual_dd = int(dd_row["Actual Completed Activities"])
     info = {
         "Counts": counts,
+        "Planned at Data Date": planned_dd,
+        "Current Forecast at Data Date": forecast_dd,
+        "Actual at Data Date": actual_dd,
+        "Variance vs Baseline at Data Date": actual_dd - planned_dd,
         "Baseline Finish": bl_finish.max(),
         "Current Finish": cur_finish.max(),
         "Current Data Date": data_date,
