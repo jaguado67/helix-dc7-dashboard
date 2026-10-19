@@ -8,7 +8,7 @@ Cloud-ready Streamlit package for the HELIX DC7 schedule dashboard.
 
 This release has two selectable views. SUFFOLK displays the main DC7 project scope grouped by QTS - AREA, while HELIX preserves the existing subcontractor-coded analytics and dedicated HELIX electrical Line-Ups. The main source projects are:
 
-- Current project: `proj_id 1118`
+- SUFFOLK UP-08 Current project: `proj_id 1304` (30-Sep-2026 Data Date)
 - Baseline project: `proj_id 1071`
 - No `DC7-MIL`
 - No `DC7.TFO-B`
