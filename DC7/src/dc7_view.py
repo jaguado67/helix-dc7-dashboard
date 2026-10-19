@@ -201,16 +201,17 @@ def render_helix_baseline_scurve_and_status(m: DC7Model):
         )
         fig = go.Figure()
         for field, color in (
-            ("Baseline Planned Activities", "#446a9e"),
-            ("Current Forecast Activities", "#e16d34"),
-            ("Actual Completed Activities", GREEN),
+            ("Baseline Planned Activities", "#4B91F1"),
+            ("Current Forecast Activities", "#59BA75"),
+            ("Actual Completed Activities", "#F28A58"),
         ):
             actual = field == "Actual Completed Activities"
             fig.add_trace(go.Scatter(
                 x=curve["Date"], y=curve[field], name=field,
                 mode="lines+markers" if actual else "lines",
+                line_shape="hv",
                 line=dict(color=color, width=3),
-                marker=dict(size=6),
+                marker=dict(size=5 if actual else 0),
                 connectgaps=False,
                 hovertemplate=f"%{{x|%d-%b-%Y}}<br>%{{y:,.0f}} {field}<extra></extra>",
             ))
@@ -221,25 +222,33 @@ def render_helix_baseline_scurve_and_status(m: DC7Model):
             annotation_position="top right",
         )
         fig.update_layout(
-            **_layout(410, 70, 55, 34), title=dict(text=""),
+            **_layout(410, 42, 52, 48), title=dict(text=""),
+            legend=dict(orientation="h", yanchor="top", y=-0.27,
+                        xanchor="center", x=0.5, font=dict(size=11)),
+            margin=dict(l=54, r=16, t=45, b=86),
             yaxis_title="Cumulative Activities", xaxis_title="Date",
             legend_title_text="",
         )
         fig.update_yaxes(range=[0, total * 1.05], tickformat=",d", gridcolor=GRID)
-        fig.update_xaxes(type="date", dtick="M3", tickformat="%b\n%Y", gridcolor=GRID)
+        fig.update_xaxes(type="date", dtick="M1", tickformat="%b\n%Y", gridcolor=GRID)
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
         planned = info["Planned at Data Date"]
-        forecast = info["Current Forecast at Data Date"]
         actual = info["Actual at Data Date"]
-        variance = info["Variance vs Baseline at Data Date"]
-        st.caption("Daily activity-finish counts · actual through Data Date only; later U01 finishes are forecast.")
+        gap = info["Variance vs Baseline at Data Date"]
+        st.markdown(
+            f'<div style="font-size:.88rem;font-weight:700;margin:0 0 8px;">'
+            f'AT DATA DATE · {_safe(_fmt_date(info["Current Data Date"]))}</div>',
+            unsafe_allow_html=True,
+        )
         k1, k2, k3 = st.columns(3)
-        k1.metric("Baseline Planned · Data Date", f"{planned:,}", f"{100*planned/total:.2f}% of scope")
-        k2.metric("Actual Completed · Data Date", f"{actual:,}", f"{100*actual/total:.2f}% of scope")
-        k3.metric("Variance vs Baseline · Data Date", f"{variance:+,} activities",
-                  f"{100*variance/total:+.2f} percentage points", delta_color="normal")
-        st.caption(f"U01 cumulative forecast at Data Date: {forecast:,} activities · "
-                   "Activity counts, not weighted physical progress.")
+        k1.metric("Planned", f"{planned:,} activities")
+        k2.metric("Actual", f"{actual:,} activities")
+        k3.metric("Gap vs Baseline", f"{gap:+,} activities")
+        st.caption(
+            f"By {_fmt_date(info['Current Data Date'])}, the baseline expected "
+            f"{planned:,} completed activities; actual completions reached {actual:,}. "
+            "Counts are not weighted physical progress."
+        )
         st.markdown('</div>', unsafe_allow_html=True)
     with c2:
         st.markdown(
