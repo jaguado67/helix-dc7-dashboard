@@ -826,85 +826,112 @@ def render_helix_lineups(m: DC7Model):
 
 
 def render_helix_contract_milestones(m: DC7Model):
-    """Contractual milestone deviation in the standalone HELIX baseline.
+    """P6 HELIX BL vs U01 milestone Finish changes, US federal working days.
 
-    Contract Date is parsed ONLY from the original Activity Name and is
-    compared to the P6 Finish stored in 226021-HE.B Baseline. No attempt
-    is made to invent independent HELIX Current dates.
+    Includes HELIX-coded M./IST. activity IDs. Contractual dates in
+    Activity Names are displayed separately; five IST names have been
+    changed in the official update and are flagged explicitly.
     """
-    data = m.independent_helix_baseline()
+    from src.helix_baseline import us_federal_workday_delay
+    baseline = m.independent_helix_baseline()
+    current = m.independent_helix_update()
     st.markdown(
-        '<div class="section-caption">HELIX · CONTRACTUAL MILESTONE VARIANCE</div>',
+        '<div class="section-caption">KEY MILESTONES VARIANCE</div>',
         unsafe_allow_html=True,
     )
-    st.caption(
-        "Contractual Date = date in Activity Name · Baseline Finish = "
-        "P6 226021-HE.B · Delay in US federal working days (Monday–Friday, "
-        "excluding observed federal holidays). Positive = late. "
-        "Baseline comparison only, not an independent HELIX Current forecast."
+    if baseline is None or current is None:
+        st.warning("HELIX BL and U01 are required for milestone comparison.")
+        return
+    bdf = baseline["_contract_milestones"].copy()
+    udf = current["_contract_milestones"].copy()
+    if len(bdf) != 10 or len(udf) != 10:
+        raise ValueError("Unexpected HELIX QC2.2 / IST contractual milestone population")
+    df = bdf[["Activity ID", "Area", "Milestone", "Baseline Finish", "Contractual Date"]].merge(
+        udf[["Activity ID", "Current Finish", "Contractual Date", "Activity Name"]],
+        on="Activity ID", how="outer", suffixes=("_BL", "_U01"), validate="one_to_one",
+        indicator=True,
     )
-    if data is None:
-        st.info("Official independent HELIX baseline not available.")
-        return
+    if not df["_merge"].eq("both").all():
+        raise ValueError("HELIX milestone BL/U01 Activity ID mismatch")
+    df["Variance (Working Days)"] = df.apply(
+        lambda r: us_federal_workday_delay(r["Baseline Finish"], r["Current Finish"]),
+        axis=1,
+    )
+    df["Contract Delay (Working Days)"] = df.apply(
+        lambda r: us_federal_workday_delay(r["Contractual Date_U01"], r["Current Finish"]),
+        axis=1,
+    )
+    df["Contract Date Changed"] = (
+        df["Contractual Date_BL"].dt.normalize() != df["Contractual Date_U01"].dt.normalize()
+    )
+    changed = df.loc[df["Contract Date Changed"], "Activity ID"].tolist()
+    if set(changed) != {f"IST.{n}" for n in (1200, 1300, 1400, 1500, 1600)}:
+        raise ValueError(f"Unexpected changes in named contractual dates: {changed}")
 
-    detail = data["_contract_milestones"]
-    source_audit = data["_contract_milestone_audit"]
-    if detail.empty:
-        st.info("No HELIX-coded contractual milestones contain a date in their Activity Name.")
-        return
-    if int(source_audit["contract_date_extracted"]) != len(detail):
-        raise ValueError("Contractual milestone count does not reconcile with the P6 audit")
+    display = df[[
+        "Area", "Milestone", "Activity ID", "Baseline Finish",
+        "Current Finish", "Variance (Working Days)",
+        "Contractual Date_U01", "Contract Delay (Working Days)",
+    ]].copy().rename(columns={
+        "Area": "Data Hall",
+        "Baseline Finish": "Baseline Date",
+        "Current Finish": "Current Finish Date",
+        "Contractual Date_U01": "Contractual Date (U01 Name)",
+    })
+    for date_field in ("Baseline Date", "Current Finish Date", "Contractual Date (U01 Name)"):
+        display[date_field] = display[date_field].apply(_fmt_date)
 
-    display = detail[[
-        "Area", "Milestone", "Activity ID",
-        "Contractual Date", "Baseline Finish", "Delay (US working days)",
-    ]].copy()
-    display["Contractual Date"] = display["Contractual Date"].apply(_fmt_date)
-    display["Baseline Finish"] = display["Baseline Finish"].apply(_fmt_date)
-
-    left, right = st.columns([1.36, 1], gap="large")
+    st.caption(
+        "Variance = U01 Finish − Baseline Finish in US federal working days "
+        "(Monday–Friday, observed federal holidays excluded). Positive = later / delayed. "
+        "Contract Delay is a separate comparison to the date in the U01 Activity Name."
+    )
+    left, right = st.columns([1.34, 1], gap="large")
     with left:
-        st.dataframe(
-            display, use_container_width=True, hide_index=True, height=450,
-            column_config={
-                "Area": st.column_config.TextColumn("Data Hall"),
-                "Milestone": st.column_config.TextColumn("Milestone"),
-                "Activity ID": st.column_config.TextColumn("Activity ID"),
-                "Contractual Date": st.column_config.TextColumn("Contractual Date"),
-                "Baseline Finish": st.column_config.TextColumn("Baseline Finish"),
-                "Delay (US working days)": st.column_config.NumberColumn("Delay (US working days)", format="%+d"),
-            },
-        )
+        st.dataframe(display, use_container_width=True, hide_index=True, height=475,
+                     column_config={
+                         "Variance (Working Days)": st.column_config.NumberColumn(
+                             "Variance (Working Days)", format="%+d"
+                         ),
+                         "Contract Delay (Working Days)": st.column_config.NumberColumn(
+                             "Contract Delay (Working Days)", format="%+d"
+                         ),
+                     })
     with right:
-        labels = [f"{r['Area']} · {r['Milestone']}" for _, r in detail.iterrows()]
-        days = detail["Delay (US working days)"].astype(int).tolist()
-        colors = [RED if v > 0 else GREEN if v < 0 else BLUE for v in days]
-        descriptions = [
-            f"{r['Activity ID']}<br>Contractual: {_fmt_date(r['Contractual Date'])}"
-            f"<br>Baseline Finish: {_fmt_date(r['Baseline Finish'])}"
-            for _, r in detail.iterrows()
-        ]
+        labels = [f"{row['Area']} · {row['Milestone']}" for _, row in df.iterrows()]
+        values = df["Variance (Working Days)"].astype(int).tolist()
         fig = go.Figure(go.Bar(
-            y=labels, x=days, orientation="h",
-            marker_color=colors,
-            text=[f"{v:+d} wd" for v in days],
-            textposition="outside",
-            customdata=descriptions,
-            hovertemplate="<b>%{y}</b><br>%{customdata}<br>Delay: %{x:+d} US working days<extra></extra>",
+            y=labels, x=values, orientation="h",
+            marker_color=[RED if v > 0 else GREEN if v < 0 else BLUE for v in values],
+            text=[f"{v:+d} wd" for v in values], textposition="outside",
+            hovertemplate="%{y}<br>BL → U01 Finish shift: %{x:+d} working days<extra></extra>",
         ))
+        lo, hi = min(0,*values), max(0,*values)
+        margin = max(12, int(max(1, hi-lo) * .18))
         fig.update_layout(
-            **_layout(450, 155, 82, 35),
-            title="CONTRACTUAL DATE DEVIATION · US WORKING DAYS",
+            **_layout(480, 130, 88, 32),
+            title="MILESTONE DATES DEVIATION · US WORKING DAYS",
+            xaxis_title="Baseline vs Current Update · Working Days",
             showlegend=False,
-            xaxis_title="Delay vs Contract (US working days)",
         )
-        low = min(0, *days)
-        high = max(0, *days)
-        margin = max(15, int((high - low) * 0.15))
-        fig.update_xaxes(range=[low - margin if low < 0 else 0, high + margin],
-                         zeroline=True, zerolinecolor=GRID, gridcolor=GRID)
+        fig.update_xaxes(range=[lo-margin if lo<0 else 0, hi+margin], zeroline=True,
+                         zerolinecolor=GRID, gridcolor=GRID)
         fig.update_yaxes(autorange="reversed")
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+
+    st.warning(
+        "P6 coding review: DH1100 M.1100 and IST.1100 exist but are NOT coded "
+        "QTS - Subcontractor = HELIX in BL/U01; excluded from the HELIX-only "
+        "variance table until their assignment is confirmed. "
+        "The contractual year in five IST Activity Names changed from 2026 "
+        "in BL to 2027 in U01; the dashboard preserves both original sources."
+    )
+    st.caption(
+        "FTE Complete milestones: FB review requests adding five items "
+        "(DH1250, DH1350, DH1450, DH1550, DH1650). Corresponding P6 "
+        "Activity IDs must be confirmed with Juan Pablo before they can be "
+        "included; Line-Up 'Ready for FTE' tasks are not a substitute."
+    )
 
 def render_dashboard(helix: DC7Model, suffolk: DC7Model):
     view = st.session_state.get("dc7_schedule_view", "SUFFOLK")
