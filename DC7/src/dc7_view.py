@@ -109,7 +109,6 @@ def render_header(m: DC7Model, view: str):
       <div class="header-meta">
         <div class="line">{_safe(date_label)}&nbsp;&nbsp;<span class="value">{_safe(date_value)}</span></div>
         <div class="line">{_safe(current_label)}&nbsp;&nbsp;<span class="value">{_safe(current_value)}</span></div>
-        <div class="line">Scope&nbsp;&nbsp;<span class="value">{_safe(source_label)}</span></div>
       </div>
       <div class="logo-card"><img src="{_logo('helix')}"></div>
     </div>
@@ -122,7 +121,7 @@ def render_kpis(m: DC7Model, view: str):
     counts = m.status_counts()
     p = m.status_percentages()
     st.markdown('<div class="section-caption">PROJECT STATUS SUMMARY</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="panel schedule"><div class="panel-head"><div><span class="time-pill">TIME</span><span class="panel-title">SCHEDULE PERFORMANCE</span></div><div class="panel-note">{_safe("SUFFOLK project finish · HELIX construction activity scope" if view == "SUFFOLK" else "SUFFOLK project finish · HELIX construction activity scope")}</div></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="panel schedule"><div class="panel-head"><div><span class="time-pill">TIME</span><span class="panel-title">SCHEDULE PERFORMANCE</span></div></div>', unsafe_allow_html=True)
     cards = [
         ("Baseline Completion", _fmt_date(m.baseline_finish), m.baseline_path.stem, ""),
         ("Current Forecast Finish", _fmt_date(m.current_finish), _fmt_days(fv) + " vs Baseline", _var_class(fv)),
@@ -130,7 +129,7 @@ def render_kpis(m: DC7Model, view: str):
         ("Completed Activities", _fmt_pct(p["Completed %"]), f"{counts['Completed']:,} of {counts['Total']:,}", "good" if p["Completed %"] > 0 else ""),
         ("In Progress Activities", _fmt_pct(p["In Progress %"]), f"{counts['In Progress']:,} of {counts['Total']:,}", "neutral" if p["In Progress %"] > 0 else ""),
         ("Not Started Activities", _fmt_pct(p["Not Started %"]), f"{counts['Not Started']:,} of {counts['Total']:,}", "bad" if p["Not Started %"] > 0 else ""),
-        (f"{view} Scope Activities", f"{counts['Total']:,}", f"{counts['Completed']} C · {counts['In Progress']} IP · {counts['Not Started']} NS", ""),
+        ("Total Activities", f"{counts['Total']:,}", f"{counts['Completed']} C · {counts['In Progress']} IP · {counts['Not Started']} NS", ""),
         ("Current Data Date", _fmt_date(m.data_date), "P6 last recalculation / Data Date", ""),
     ]
     h = '<div class="kpi-grid">'
@@ -249,10 +248,10 @@ def render_helix_baseline_scurve_and_status(m: DC7Model):
 
 
 def render_scurve_and_status(m: DC7Model):
-    st.markdown('<div class="section-caption">ACTIVITY PERFORMANCE</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-caption">SCHEDULE PERFORMANCE</div>', unsafe_allow_html=True)
     c1, c2 = st.columns([1.7, 0.8], gap="large")
     with c1:
-        st.markdown('<div class="panel"><div class="panel-head"><div class="panel-title">ACTIVITY S-CURVE · SUFFOLK / HELIX CONSTRUCTION</div><div class="panel-note">Cumulative activity count · baseline / current forecast / actual completions</div></div>', unsafe_allow_html=True)
+        st.markdown('<div class="panel"><div class="panel-head"><div class="panel-title">PROGRESS S-CURVE</div><div class="panel-note">Cumulative activity count · baseline / current forecast / actual completions</div></div>', unsafe_allow_html=True)
         df = m.scurve()
         if df.empty:
             st.info("Activity S-curve could not be constructed from the XER finish dates.")
@@ -281,8 +280,7 @@ def render_scurve_and_status(m: DC7Model):
 
 
 def render_windows(m: DC7Model):
-    st.markdown('<div class="section-caption">AREA START–FINISH COMPARISON · BASELINE VS CURRENT</div>', unsafe_allow_html=True)
-    st.markdown('<div class="small-note">Gray = Baseline representative Start → Baseline Finish. Color = Current/Actual representative Start → Current Forecast Finish. The Start uses the same meaningful production anchor activity in Baseline and Current, avoiding isolated early underground/underslab work. Red = later finish, green = earlier finish, blue = no finish-date change.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-caption">SCHEDULE SUMMARY · BASELINE VS CURRENT UPDATE</div>', unsafe_allow_html=True)
     df = m.area_windows()
     if df.empty:
         st.info("No QTS - AREA assignments found for HELIX scope.")
@@ -406,7 +404,7 @@ def render_stats(m: DC7Model, title: str):
 
 
 def render_progress_detail(m: DC7Model, view: str):
-    st.markdown(f'<div class="section-caption">{view} PROJECT PROGRESS DETAIL</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-caption">PROJECT PROGRESS DETAIL</div>', unsafe_allow_html=True)
     area = st.selectbox("Area / Data Hall", m.areas(), index=0, key=f"dc7_area_{view.lower()}")
     consolidated = view == "HELIX" and area.upper().startswith("DH")
     p6_wbs = view == "SUFFOLK" and area in ("FOH", "BOH")
@@ -430,7 +428,7 @@ def render_progress_detail(m: DC7Model, view: str):
                          "SUMMARY BY FUNCTIONAL GROUP" if consolidated else
                          "SUMMARY BY QTS - DASH")
         first_column = "P6 WBS GROUP" if p6_wbs or dh_p6_wbs else "Area"
-        h = f'<div class="panel"><div class="panel-head"><div class="panel-title">{area} · {summary_title}</div></div><table class="detail-table"><thead><tr><th>{first_column}</th><th>Tasks</th><th>Activity Completion %</th><th>Not Started</th><th>In Progress</th><th>Completed</th></tr></thead><tbody>'
+        h = f'<div class="panel"><div class="panel-head"><div class="panel-title">{area} · {summary_title}</div></div><table class="detail-table"><thead><tr><th>{first_column}</th><th>Total Tasks</th><th>Activity Completion %</th><th>Not Started</th><th>In Progress</th><th>Completed</th></tr></thead><tbody>'
         for _, r in df.iterrows():
             label = _safe(r.Area)
             h += f'<tr><td>{label}</td><td>{int(r.Tasks)}</td><td>{r["Activity Completion %"]:.1f}%</td><td>{int(r["Not Started"])} </td><td>{int(r["In Progress"])} </td><td>{int(r.Completed)}</td></tr>'
@@ -516,7 +514,7 @@ def render_lineups_detail(m: DC7Model, area: str):
     )
     c1, c2 = st.columns([1.15, 1], gap="large")
     with c1:
-        h = f'<div class="panel"><div class="panel-head"><div class="panel-title">{area} · SUMMARY BY LINE-UP</div></div><table class="detail-table"><thead><tr><th>Line-Up</th><th>Tasks</th><th>Activity Completion %</th><th>Not Started</th><th>In Progress</th><th>Completed</th></tr></thead><tbody>'
+        h = f'<div class="panel"><div class="panel-head"><div class="panel-title">{area} · SUMMARY BY LINE-UP</div></div><table class="detail-table"><thead><tr><th>Line-Up</th><th>Total Tasks</th><th>Activity Completion %</th><th>Not Started</th><th>In Progress</th><th>Completed</th></tr></thead><tbody>'
         for _, r in df.iterrows():
             h += f'<tr><td>{_safe(r["Line-Up"])}</td><td>{int(r.Tasks)}</td><td>{r["Activity Completion %"]:.1f}%</td><td>{int(r["Not Started"])}</td><td>{int(r["In Progress"])}</td><td>{int(r.Completed)}</td></tr>'
         st.markdown(h + '</tbody></table></div>', unsafe_allow_html=True)
