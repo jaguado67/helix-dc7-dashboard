@@ -16,7 +16,7 @@ This release has two selectable views. SUFFOLK displays the main DC7 project sco
 
 ## v0.2.36 — HELIX U01, independent BL–Current reconciliation and FB review (19 October 2026)
 
-**Official Google Drive sources — DH/DC7:**
+**Official Google Drive sources — DH/DC7 (both schedules updated):**
 
 - Independent HELIX baseline: `226021-HE.B.xer`, Data Date 29-Sep-2026.
 - New independent HELIX Current: `226021-HE.U01.xer`, **Data Date 14-Oct-2026**,
@@ -24,8 +24,25 @@ This release has two selectable views. SUFFOLK displays the main DC7 project sco
   seven UTF-8 base64 text parts, reassembled and verified against the
   exact **SHA256 e5398c6e17c4797d7e269273e2104971730c7c0e3fd4e010f246924ca3bec472**,
   raw size **3,044,612 bytes**.
-- SUFFOLK source remains separate: `226021.005.MO-BL.xer` and
-  `226021.010.MO-UP-C.xer`. **No Suffolk Current file was changed**.
+- SUFFOLK independently updated: baseline `226021.005.MO-BL.xer`,
+  official Current `226021.022.MO-UP-08.xer` (Data Date **30-Sep-2026**;
+  P6 added **15-Oct-2026**). XER size **5,071,788 bytes**, SHA256
+  **2860a45ccdc71cb70905eaafc9b6cb56fa87985fdd9c448ed8be9f9201c6e73e**,
+  stored in twelve lossless ASCII base64 parts. Earlier
+  `226021.010.MO-UP-C.xer` (Data Date 26-Aug-2026) remains the
+  previous update for Activity-ID reconciliation; it is no longer the Current.
+
+**SUFFOLK Current-C → UP08 audit.** Active construction tasks coded HELIX
+move from **2,545 (187 C / 32 IP / 2,326 NS)** to **2,519 (454 C / 70 IP /
+1,995 NS)**. There are **2,518 common Activity IDs**, **27 exits**, and
+**one new Current Activity ID `B120004.3046`**, which lacks a matching
+approved baseline Activity ID. Consequently, 2,518 of the 2,519 current
+activities have an approved BL match; the unmatched task contributes to
+current progress but is never assigned fabricated BL dates. Scope reduction
+is recorded as audit churn, not silently interpreted as completed progress.
+The full SUFFOLK project finish is unchanged at **22-Jun-2027**. All
+construction/commissioning filters and original P6 WBS assignments remain
+in force.
 
 **Strict P6 scope reconciliation:** both independent HELIX files have 4,689
 TASK rows; 4,197 `QTS - Subcontractor = HELIX` activities, of which
@@ -36,7 +53,7 @@ Activity IDs and WBS/Line-Up assignments in BL and U01.
 | Scope | Baseline Completed | U01 Completed | U01 In Progress | U01 Not Started |
 |---|---:|---:|---:|---:|
 | HELIX Line-Ups + MOH (4,153) | 2 | 42 | 11 | 4,100 |
-| SUFFOLK HELIX Construction (2,545) | — | 187 | 32 | 2,326 |
+| SUFFOLK HELIX Construction (2,519) | — | 454 | 70 | 1,995 |
 
 **HELIX VIEW** now shows independent BL vs **U01** in the KPI strip,
 3-series cumulative activity S-curve (BL planned, U01 forecast and
@@ -68,8 +85,9 @@ removed from the executive display (internal audit and automated
 regression are preserved), progress S-curves/area summaries
 retitled, **Total Activities** standardized, Line-Up percentages
 retained, and milestone variance labels corrected to state the exact
-baseline/current comparison. SUFFOLK numerical data, P6 original
-WBS and its seven-group detail remain unchanged.
+baseline/current comparison. SUFFOLK progress numbers are refreshed from UP08, while the
+original scope selection rules, P6 WBS and its seven-group detail remain
+unchanged.
 
 ## v0.2.35 — SUFFOLK Area Start–Finish labels: days only
 
