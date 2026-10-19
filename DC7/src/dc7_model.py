@@ -317,6 +317,9 @@ class DC7Model:
     auxiliary_tasks: Optional[pd.DataFrame] = None
     auxiliary_project: Optional[pd.Series] = None
     auxiliary_tables: Optional[dict[str, pd.DataFrame]] = None
+    auxiliary_update_path: Optional[Path] = None
+    auxiliary_update_project: Optional[pd.Series] = None
+    auxiliary_update_tables: Optional[dict[str, pd.DataFrame]] = None
     audit_reports: Optional[dict[str, pd.DataFrame]] = None
 
     @property
@@ -744,6 +747,18 @@ class DC7Model:
             self.auxiliary_tables, str(self.auxiliary_project["proj_id"])
         )
 
+    def independent_helix_update(self) -> Optional[dict[str, pd.DataFrame]]:
+        """Official independent HELIX U01. Never substitute Suffolk Current-C."""
+        if self.auxiliary_update_path is None or self.auxiliary_update_tables is None:
+            return None
+        if self.auxiliary_update_path.name != "226021-HE.U01.xer":
+            raise ValueError("Unapproved independent HELIX Current schedule")
+        return summarize_approved_baseline(
+            self.auxiliary_update_tables,
+            str(self.auxiliary_update_project["proj_id"]),
+            snapshot_role="Current",
+        )
+
     def lineup_stats(self, area: str) -> pd.DataFrame:
         """Equipment Line-Ups from the exact HELIX baseline, if available.
 
@@ -1027,6 +1042,22 @@ def build_dc7_model(data_dir: Path) -> DC7Model:
         aux_tasks["Area"] = aux_tasks["task_id"].astype(str).map(a_area_map).fillna("Unclassified")
         aux_tasks["Subarea"] = "Other HELIX Electrical Scope"
 
+    # Authorized HELIX U01 is independent of Suffolk's current schedule.
+    current_helix_files = sorted(Path(data_dir).rglob("226021-HE.U01.xer"))
+    if len(current_helix_files) != 1:
+        raise ValueError("Exactly one official independent HELIX U01 is required")
+    auxiliary_update_path = current_helix_files[0]
+    auxiliary_update_tables = parse_xer(auxiliary_update_path, WANTED)
+    current_projects = auxiliary_update_tables["PROJECT"]
+    current_rows = current_projects[
+        current_projects["proj_short_name"].fillna("").astype(str).str.strip().eq("226021-HE.U01")
+    ]
+    if len(current_rows) != 1:
+        raise ValueError("Incorrect independent HELIX U01 project ID")
+    auxiliary_update_project = current_rows.iloc[0]
+    if pd.Timestamp(auxiliary_update_project["last_recalc_date"]).normalize() != pd.Timestamp("2026-10-14"):
+        raise ValueError("Unexpected independent HELIX U01 Data Date")
+
     # Trace the exact source activities, including the previous active update.
     previous_active = None
     previous_path = next(iter(sorted(Path(data_dir).rglob("226021.010.MO-UP.xer"))), None)
@@ -1048,6 +1079,9 @@ def build_dc7_model(data_dir: Path) -> DC7Model:
         auxiliary_tasks=aux_tasks,
         auxiliary_project=aux_project,
         auxiliary_tables=aux_tables,
+        auxiliary_update_path=auxiliary_update_path,
+        auxiliary_update_project=auxiliary_update_project,
+        auxiliary_update_tables=auxiliary_update_tables,
         audit_reports=audit_reports,
     )
 
