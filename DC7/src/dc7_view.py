@@ -267,6 +267,14 @@ def render_scurve_and_status(m: DC7Model):
             fig.update_yaxes(range=[0, max(1, total * 1.04)], tickformat=",d", gridcolor=GRID)
             fig.update_xaxes(type="date", dtick="M3", tickformat="%b\n%Y", gridcolor=GRID)
             st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+            scope_audit = m.audit_reports or {}
+            mismatched = scope_audit.get("up08_baseline_unmatched", pd.DataFrame())
+            if len(mismatched):
+                st.caption(
+                    f"Baseline: {len(m.baseline_tasks):,} matched activities; "
+                    f"Current UP08: {len(m.current_tasks):,}. "
+                    "One added Current activity has no approved Baseline match."
+                )
         st.markdown('</div>', unsafe_allow_html=True)
     with c2:
         counts = m.status_counts(); ratio = m.activity_completion_ratio
