@@ -223,12 +223,11 @@ def render_helix_baseline_scurve_and_status(m: DC7Model):
         )
         fig.update_layout(
             **_layout(440, 54, 100, 42), title=dict(text=""),
-            legend=dict(orientation="h", yanchor="top", y=-0.27,
-                        xanchor="center", x=0.5, font=dict(size=11)),
 
             yaxis_title="Cumulative Activities", xaxis_title="Date",
             legend_title_text="",
         )
+        fig.update_layout(legend=dict(orientation="h", yanchor="top", y=-0.27, xanchor="center", x=0.5, font=dict(size=11)))
         fig.update_yaxes(range=[0, total * 1.05], tickformat=",d", gridcolor=GRID)
         fig.update_xaxes(type="date", dtick="M1", tickformat="%b\n%Y", gridcolor=GRID)
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
