@@ -42,89 +42,16 @@ def _project_row(tables: dict[str, pd.DataFrame], path: Path) -> pd.Series:
 
 
 def _find_files(data_dir: Path) -> tuple[Path, Path]:
-    data_dir = Path(data_dir)
-    if not data_dir.exists():
-        raise FileNotFoundError(f"Data directory not found: {data_dir}")
-
-    all_xer = sorted(data_dir.rglob("*.xer"))
-    if not all_xer:
-        raise FileNotFoundError(f"No XER files found below data directory: {data_dir}")
-
-    exact_bl = [p for p in all_xer if p.name.casefold() == "226021.005.mo-bl.xer"]
-    if not any(p.name.casefold() == "226021.010.mo-up-c.xer" for p in all_xer):
-        raise FileNotFoundError("Required verified Current-C XER was not found; refusing to load an older update.")
-    exact_up = [p for p in all_xer if p.name.casefold() == "226021.010.mo-up-c.xer"]
-
-    if exact_bl and exact_up:
-        pairs = [(b, u) for b in exact_bl for u in exact_up if b.parent == u.parent]
-        if pairs:
-            def pair_rank(pair):
-                b, _ = pair
-                rel_depth = len(b.parent.relative_to(data_dir).parts) if b.parent != data_dir else 0
-                dc7_penalty = 0 if b.parent.name.strip().upper() == "DC7" else 1
-                return (dc7_penalty, rel_depth, str(b.parent).lower())
-            return sorted(pairs, key=pair_rank)[0]
-        if len(exact_bl) == 1 and len(exact_up) == 1:
-            return exact_bl[0], exact_up[0]
-
-    roots = []
-    if data_dir.name.strip().upper() == "DC7":
-        roots.append(data_dir)
-    else:
-        roots.extend([p for p in data_dir.rglob("*") if p.is_dir() and p.name.strip().upper() == "DC7"])
-        roots.append(data_dir)
-
-    seen = set()
-    roots = [r for r in roots if not (str(r.resolve()).casefold() in seen or seen.add(str(r.resolve()).casefold()))]
-
-    def eligible(p: Path) -> bool:
-        text = " ".join(x.upper() for x in p.parts)
-        return "TFO" not in text and "MIL" not in p.stem.upper()
-
-    def is_dc7_main(path: Path) -> bool:
-        try:
-            t = parse_xer(path, ["PROJECT", "TASK"])
-            row = _project_row(t, path)
-            short = str(row.get("proj_short_name", "")).upper()
-            name = str(row.get("proj_name", "")).upper()
-            return short.startswith("226021.") or "DC7" in name
-        except Exception:
-            return False
-
-    candidates = []
-    for root in roots:
-        files = [p for p in root.rglob("*.xer") if eligible(p)] if root != data_dir else [p for p in all_xer if eligible(p)]
-        for p in files:
-            if p not in candidates:
-                candidates.append(p)
-
-    bl = [p for p in candidates if re.search(r"(?:^|[._-])BL(?:[._-]|$)", p.stem, re.I) and is_dc7_main(p)]
-    up = [p for p in candidates if re.search(r"(?:^|[._-])UP(?:[._-]|$)", p.stem, re.I) and is_dc7_main(p)]
-
-    if not bl or not up:
-        names = ", ".join(p.name for p in all_xer[:20])
-        suffix = " ..." if len(all_xer) > 20 else ""
-        raise FileNotFoundError(
-            "DC7 BL/UP pair not found. Expected official files "
-            "226021.005.MO-BL.xer and 226021.010.MO-UP-C.xer either directly "
-            f"inside {data_dir} or in a DC7 subfolder. XERs seen: {names}{suffix}"
-        )
-
-    def dd_key(path: Path):
-        try:
-            t = parse_xer(path, ["PROJECT", "TASK"])
-            p = _project_row(t, path)
-            dd = pd.to_datetime(p.get("data_date"), errors="coerce")
-            if pd.isna(dd):
-                dd = pd.to_datetime(p.get("last_recalc_date"), errors="coerce")
-            return dd if pd.notna(dd) else pd.Timestamp.min
-        except Exception:
-            return pd.Timestamp.min
-
-    bl_path = max(bl, key=lambda p: (dd_key(p), p.stat().st_mtime))
-    up_path = max(up, key=lambda p: (dd_key(p), p.stat().st_mtime))
-    return bl_path, up_path
-
+    """Read only the two verified SUFFOLK versions for DC7."""
+    folder = Path(data_dir)
+    if folder.name.upper() != "DC7":
+        folder = folder / "DC7"
+    baseline = folder / "226021.005.MO-BL.xer"
+    current = folder / "226021.022.MO-UP-08.xer"
+    for required in (baseline, current):
+        if not required.is_file():
+            raise FileNotFoundError(f"SUFFOLK schedule source missing: {required}")
+    return baseline, current
 
 def _type_id(tables: dict[str, pd.DataFrame], type_name: str) -> Optional[str]:
     df = tables.get("ACTVTYPE", pd.DataFrame())
@@ -317,6 +244,9 @@ class DC7Model:
     auxiliary_tasks: Optional[pd.DataFrame] = None
     auxiliary_project: Optional[pd.Series] = None
     auxiliary_tables: Optional[dict[str, pd.DataFrame]] = None
+    auxiliary_current_path: Optional[Path] = None
+    auxiliary_current_project: Optional[pd.Series] = None
+    auxiliary_current_tables: Optional[dict[str, pd.DataFrame]] = None
     audit_reports: Optional[dict[str, pd.DataFrame]] = None
 
     @property
@@ -734,6 +664,17 @@ class DC7Model:
         out["_rank"] = out["Area"].map(rank).fillna(50)
         return out.sort_values(["_rank", "Area"]).drop(columns="_rank").reset_index(drop=True)
 
+    def independent_helix_current(self) -> Optional[dict[str, pd.DataFrame]]:
+        """Only the official independent HELIX U01; no SUFFOLK substitution."""
+        if self.auxiliary_current_path is None or self.auxiliary_current_tables is None:
+            return None
+        if self.auxiliary_current_path.name != "226021-HE.U01.xer":
+            raise ValueError("Unexpected HELIX Current source filename")
+        return summarize_approved_baseline(
+            self.auxiliary_current_tables,
+            str(self.auxiliary_current_project["proj_id"]),
+        )
+
     def independent_helix_baseline(self) -> Optional[dict[str, pd.DataFrame]]:
         """Only the approved independent HELIX baseline, no SUFFOLK fallback."""
         if self.auxiliary_path is None or self.auxiliary_tables is None:
@@ -1027,9 +968,34 @@ def build_dc7_model(data_dir: Path) -> DC7Model:
         aux_tasks["Area"] = aux_tasks["task_id"].astype(str).map(a_area_map).fillna("Unclassified")
         aux_tasks["Subarea"] = "Other HELIX Electrical Scope"
 
+    # U01 is a separate HELIX-owned P6 project, paired to HE.B by Activity ID.
+    current_helix_files = sorted(Path(data_dir).rglob("226021-HE.U01.xer"))
+    if len(current_helix_files) != 1 or aux_tables is None:
+        raise ValueError("Expected exactly one HELIX U01 and one official HE.B")
+    aux_current_path = current_helix_files[0]
+    aux_current_tables = parse_xer(aux_current_path, WANTED)
+    uproj = aux_current_tables["PROJECT"]
+    urows = uproj[
+        uproj["proj_short_name"].fillna("").astype(str).str.strip().str.upper().eq("226021-HE.U01")
+    ]
+    if len(urows) != 1:
+        raise ValueError("Independent HELIX U01 Project ID is ambiguous")
+    aux_current_project = urows.iloc[0]
+    baseline_helix_data = summarize_approved_baseline(aux_tables, str(aux_project["proj_id"]))
+    current_helix_data = summarize_approved_baseline(
+        aux_current_tables, str(aux_current_project["proj_id"])
+    )
+    b_ids = set(baseline_helix_data["_audit"]["Activity ID"])
+    u_ids = set(current_helix_data["_audit"]["Activity ID"])
+    if len(b_ids) != 4153 or b_ids != u_ids:
+        raise ValueError(
+            f"BL/U01 Line-Up+MOH activity matching failed: BL {len(b_ids)}, U01 {len(u_ids)}, "
+            f"removed {len(b_ids-u_ids)}, added {len(u_ids-b_ids)}"
+        )
+
     # Trace the exact source activities, including the previous active update.
     previous_active = None
-    previous_path = next(iter(sorted(Path(data_dir).rglob("226021.010.MO-UP.xer"))), None)
+    previous_path = next(iter(sorted(Path(data_dir).rglob("226021.010.MO-UP-C.xer"))), None)
     if previous_path is not None:
         pt = parse_xer(previous_path, WANTED)
         pp = _project_row(pt, previous_path)
@@ -1048,6 +1014,9 @@ def build_dc7_model(data_dir: Path) -> DC7Model:
         auxiliary_tasks=aux_tasks,
         auxiliary_project=aux_project,
         auxiliary_tables=aux_tables,
+        auxiliary_current_path=aux_current_path,
+        auxiliary_current_project=aux_current_project,
+        auxiliary_current_tables=aux_current_tables,
         audit_reports=audit_reports,
     )
 
