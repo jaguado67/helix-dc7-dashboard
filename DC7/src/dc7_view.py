@@ -231,23 +231,6 @@ def render_helix_baseline_scurve_and_status(m: DC7Model):
         fig.update_yaxes(range=[0, total * 1.05], tickformat=",d", gridcolor=GRID)
         fig.update_xaxes(type="date", dtick="M1", tickformat="%b\n%Y", gridcolor=GRID)
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
-        planned = info["Planned at Data Date"]
-        actual = info["Actual at Data Date"]
-        gap = info["Variance vs Baseline at Data Date"]
-        st.markdown(
-            f'<div style="font-size:.88rem;font-weight:700;margin:0 0 8px;">'
-            f'AT DATA DATE · {_safe(_fmt_date(info["Current Data Date"]))}</div>',
-            unsafe_allow_html=True,
-        )
-        k1, k2, k3 = st.columns(3)
-        k1.metric("Planned", f"{planned:,} activities")
-        k2.metric("Actual", f"{actual:,} activities")
-        k3.metric("Gap vs Baseline", f"{gap:+,} activities")
-        st.caption(
-            f"By {_fmt_date(info['Current Data Date'])}, the baseline expected "
-            f"{planned:,} completed activities; actual completions reached {actual:,}. "
-            "Counts are not weighted physical progress."
-        )
         st.markdown('</div>', unsafe_allow_html=True)
     with c2:
         st.markdown(
