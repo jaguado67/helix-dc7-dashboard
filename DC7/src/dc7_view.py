@@ -222,7 +222,7 @@ def render_helix_baseline_scurve_and_status(m: DC7Model):
             annotation_position="top right",
         )
         fig.update_layout(
-            **_layout(410, 42, 52, 48), title=dict(text=""),
+            **_layout(440, 54, 100, 42), title=dict(text=""),
             legend=dict(orientation="h", yanchor="top", y=-0.27,
                         xanchor="center", x=0.5, font=dict(size=11)),
 
