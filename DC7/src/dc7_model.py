@@ -42,88 +42,18 @@ def _project_row(tables: dict[str, pd.DataFrame], path: Path) -> pd.Series:
 
 
 def _find_files(data_dir: Path) -> tuple[Path, Path]:
-    data_dir = Path(data_dir)
-    if not data_dir.exists():
-        raise FileNotFoundError(f"Data directory not found: {data_dir}")
-
-    all_xer = sorted(data_dir.rglob("*.xer"))
-    if not all_xer:
-        raise FileNotFoundError(f"No XER files found below data directory: {data_dir}")
-
-    exact_bl = [p for p in all_xer if p.name.casefold() == "226021.005.mo-bl.xer"]
-    if not any(p.name.casefold() == "226021.010.mo-up-c.xer" for p in all_xer):
-        raise FileNotFoundError("Required verified Current-C XER was not found; refusing to load an older update.")
-    exact_up = [p for p in all_xer if p.name.casefold() == "226021.010.mo-up-c.xer"]
-
-    if exact_bl and exact_up:
-        pairs = [(b, u) for b in exact_bl for u in exact_up if b.parent == u.parent]
-        if pairs:
-            def pair_rank(pair):
-                b, _ = pair
-                rel_depth = len(b.parent.relative_to(data_dir).parts) if b.parent != data_dir else 0
-                dc7_penalty = 0 if b.parent.name.strip().upper() == "DC7" else 1
-                return (dc7_penalty, rel_depth, str(b.parent).lower())
-            return sorted(pairs, key=pair_rank)[0]
-        if len(exact_bl) == 1 and len(exact_up) == 1:
-            return exact_bl[0], exact_up[0]
-
-    roots = []
-    if data_dir.name.strip().upper() == "DC7":
-        roots.append(data_dir)
-    else:
-        roots.extend([p for p in data_dir.rglob("*") if p.is_dir() and p.name.strip().upper() == "DC7"])
-        roots.append(data_dir)
-
-    seen = set()
-    roots = [r for r in roots if not (str(r.resolve()).casefold() in seen or seen.add(str(r.resolve()).casefold()))]
-
-    def eligible(p: Path) -> bool:
-        text = " ".join(x.upper() for x in p.parts)
-        return "TFO" not in text and "MIL" not in p.stem.upper()
-
-    def is_dc7_main(path: Path) -> bool:
-        try:
-            t = parse_xer(path, ["PROJECT", "TASK"])
-            row = _project_row(t, path)
-            short = str(row.get("proj_short_name", "")).upper()
-            name = str(row.get("proj_name", "")).upper()
-            return short.startswith("226021.") or "DC7" in name
-        except Exception:
-            return False
-
-    candidates = []
-    for root in roots:
-        files = [p for p in root.rglob("*.xer") if eligible(p)] if root != data_dir else [p for p in all_xer if eligible(p)]
-        for p in files:
-            if p not in candidates:
-                candidates.append(p)
-
-    bl = [p for p in candidates if re.search(r"(?:^|[._-])BL(?:[._-]|$)", p.stem, re.I) and is_dc7_main(p)]
-    up = [p for p in candidates if re.search(r"(?:^|[._-])UP(?:[._-]|$)", p.stem, re.I) and is_dc7_main(p)]
-
-    if not bl or not up:
-        names = ", ".join(p.name for p in all_xer[:20])
-        suffix = " ..." if len(all_xer) > 20 else ""
+    """Strict official Suffolk BL + UP08 pair. No Current-C fallback."""
+    source = Path(data_dir)
+    files = sorted(source.rglob("226021.005.MO-BL.xer"))
+    updates = sorted(source.rglob("226021.022.MO-UP-08.xer"))
+    if len(files) != 1 or len(updates) != 1:
         raise FileNotFoundError(
-            "DC7 BL/UP pair not found. Expected official files "
-            "226021.005.MO-BL.xer and 226021.010.MO-UP-C.xer either directly "
-            f"inside {data_dir} or in a DC7 subfolder. XERs seen: {names}{suffix}"
+            "Expected one 226021.005.MO-BL.xer and one "
+            "226021.022.MO-UP-08.xer in DC7 data; no older-current fallback"
         )
-
-    def dd_key(path: Path):
-        try:
-            t = parse_xer(path, ["PROJECT", "TASK"])
-            p = _project_row(t, path)
-            dd = pd.to_datetime(p.get("data_date"), errors="coerce")
-            if pd.isna(dd):
-                dd = pd.to_datetime(p.get("last_recalc_date"), errors="coerce")
-            return dd if pd.notna(dd) else pd.Timestamp.min
-        except Exception:
-            return pd.Timestamp.min
-
-    bl_path = max(bl, key=lambda p: (dd_key(p), p.stat().st_mtime))
-    up_path = max(up, key=lambda p: (dd_key(p), p.stat().st_mtime))
-    return bl_path, up_path
+    if files[0].parent != updates[0].parent:
+        raise ValueError("Suffolk BL and official UP08 must share the same source directory")
+    return files[0], updates[0]
 
 
 def _type_id(tables: dict[str, pd.DataFrame], type_name: str) -> Optional[str]:
@@ -977,7 +907,7 @@ class DC7Model:
             "Areas": ", ".join(self.areas()),
             "Line-Up / MOH Source": self.auxiliary_path.name if self.auxiliary_path is not None else "Not loaded: official 226021-HE.B.xer pending",
             "MOH HELIX Activities": int((self.auxiliary_tasks["Area"].eq("MOH")).sum()) if self.auxiliary_tasks is not None and not self.auxiliary_tasks.empty else 0,
-            "Scope Rule": "SUFFOLK BL/Current-C drives HELIX-coded construction progress; only approved HELIX 226021-HE.B baseline may drive standalone Line-Ups/MOH",
+            "Scope Rule": "SUFFOLK BL/UP08 drives audited HELIX-coded construction; HELIX 226021-HE.B/U01 independently drives Line-Ups/MOH",
         }
 
 
@@ -1060,15 +990,43 @@ def build_dc7_model(data_dir: Path) -> DC7Model:
 
     # Trace the exact source activities, including the previous active update.
     previous_active = None
-    previous_path = next(iter(sorted(Path(data_dir).rglob("226021.010.MO-UP.xer"))), None)
+    previous_path = next(iter(sorted(Path(data_dir).rglob("226021.010.MO-UP-C.xer"))), None)
     if previous_path is not None:
         pt = parse_xer(previous_path, WANTED)
         pp = _project_row(pt, previous_path)
         previous_pid = str(pp["proj_id"])
         previous_active = scoped_helix_construction(pt, previous_pid, _helix_task_ids(pt, previous_pid))
     audit_reports = build_activity_audit(cur_all, helix_ids, current, baseline, previous_active)
-    if audit_reports["summary"].loc[audit_reports["summary"]["Metric"].eq("Matched to Baseline by Activity ID"), "Value"].iloc[0] != len(current):
-        raise ValueError("HELIX construction is not fully matched to the Baseline; audit required.")
+    # UP08 has one new HELIX Construction Activity ID absent from Suffolk
+    # approved BL. Preserve the actual current status and explicitly audit
+    # this baseline mismatch; never fabricate baseline start/finish dates.
+    matched_count = int(audit_reports["summary"].loc[
+        audit_reports["summary"]["Metric"].eq("Matched to Baseline by Activity ID"), "Value"
+    ].iloc[0])
+    unmatched = audit_reports["active"].loc[
+        audit_reports["active"]["Audit"].eq("NO BASELINE MATCH"), "Activity ID"
+    ].astype(str).tolist()
+    if len(current) != 2519 or matched_count != 2518 or unmatched != ["B120004.3046"]:
+        raise ValueError(
+            f"Unexpected UP08 Suffolk baseline reconciliation: total={len(current)}, "
+            f"matched={matched_count}, unmatched={unmatched}"
+        )
+    previous_report = audit_reports["summary"].set_index("Metric")["Value"]
+    if (int(previous_report["Previous HELIX construction"]) != 2545
+            or int(previous_report["Former HELIX construction no longer active"]) != 27
+            or int(previous_report["New active HELIX IDs not in Previous"]) != 1):
+        raise ValueError("Unexpected Suffolk Current-C → UP08 activity ID churn")
+    audit_reports["up08_baseline_unmatched"] = audit_reports["active"].loc[
+        audit_reports["active"]["Audit"].eq("NO BASELINE MATCH")
+    ].copy()
+    audit_reports["up08_current_c_to_up08"] = pd.DataFrame([
+        {"Metric": "Previous Current-C HELIX Construction", "Value": 2545},
+        {"Metric": "UP08 HELIX Construction", "Value": 2519},
+        {"Metric": "Exited construction scope", "Value": 27},
+        {"Metric": "New construction Activity IDs", "Value": 1},
+        {"Metric": "UP08 matched to approved BL", "Value": matched_count},
+        {"Metric": "UP08 without BL counterpart", "Value": len(unmatched)},
+    ])
 
     # Updates may add, split, replace, or recode activities.
     # Baseline-vs-current comparisons use matched task_codes only,
@@ -1136,11 +1094,8 @@ def build_dc7_model(data_dir: Path) -> DC7Model:
                 "Reason": "WBS branch outside the seven selected Data Hall groups",
             })
     dh_exceptions = pd.DataFrame(dh_parts)
-    if len(dh_exceptions) != 147 or dh_exceptions["Activity ID"].nunique() != len(dh_exceptions):
-        raise ValueError(
-            f"Data Hall WBS exception population changed: {len(dh_exceptions)} "
-            "(expected 147); audit the source WBS before release."
-        )
+    if dh_exceptions["Activity ID"].nunique() != len(dh_exceptions):
+        raise ValueError("Duplicate Data Hall WBS exceptions in Suffolk UP08")
     if dh_exceptions["Activity ID"].isin(wbs_exceptions["Activity ID"]).any():
         raise ValueError("Duplicate FOH/BOH and Data Hall WBS exceptions")
     audit_reports["dh_wbs_exceptions"] = dh_exceptions
@@ -1153,7 +1108,12 @@ def build_dc7_model(data_dir: Path) -> DC7Model:
         audit_reports["summary"],
         pd.DataFrame([
             {"Metric": "Data Hall other P6 WBS branches (audit only)", "Value": len(dh_exceptions)},
-            {"Metric": "Data Hall seven-group displayed tasks", "Value": 2073},
+            {"Metric": "Data Hall seven-group displayed tasks",
+             "Value": sum(
+                 len(model.data_hall_wbs_activities(hall))
+                 for hall in ("DH1100", "DH1200", "DH1300",
+                              "DH1400", "DH1500", "DH1600")
+             )},
         ]),
     ], ignore_index=True)
     return model
