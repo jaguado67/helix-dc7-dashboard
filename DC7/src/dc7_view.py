@@ -228,6 +228,18 @@ def render_helix_baseline_scurve_and_status(m: DC7Model):
         fig.update_yaxes(range=[0, total * 1.05], tickformat=",d", gridcolor=GRID)
         fig.update_xaxes(type="date", dtick="M3", tickformat="%b\n%Y", gridcolor=GRID)
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
+        planned = info["Planned at Data Date"]
+        forecast = info["Current Forecast at Data Date"]
+        actual = info["Actual at Data Date"]
+        variance = info["Variance vs Baseline at Data Date"]
+        st.caption("Daily activity-finish counts · actual through Data Date only; later U01 finishes are forecast.")
+        k1, k2, k3 = st.columns(3)
+        k1.metric("Baseline Planned · Data Date", f"{planned:,}", f"{100*planned/total:.2f}% of scope")
+        k2.metric("Actual Completed · Data Date", f"{actual:,}", f"{100*actual/total:.2f}% of scope")
+        k3.metric("Variance vs Baseline · Data Date", f"{variance:+,} activities",
+                  f"{100*variance/total:+.2f} percentage points", delta_color="normal")
+        st.caption(f"U01 cumulative forecast at Data Date: {forecast:,} activities · "
+                   "Activity counts, not weighted physical progress.")
         st.markdown('</div>', unsafe_allow_html=True)
     with c2:
         st.markdown(
