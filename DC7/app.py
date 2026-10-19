@@ -31,6 +31,8 @@ def _materialize_cloud_xers(data_root: Path) -> Path:
     # Only the official HELIX project baseline is authorized as a separate source.
     # The historical "-4" copy must never be materialized or silently substituted.
     helix_baseline = "226021-HE.B.xer"
+    helix_update = "226021-HE.U01.xer"
+    helix_update_sha = "e5398c6e17c4797d7e269273e2104971730c7c0e3fd4e010f246924ca3bec472"
     required = official + (previous,)
 
     runtime_root = Path(tempfile.gettempdir()) / "helix_dc7_runtime_data"
@@ -87,6 +89,25 @@ def _materialize_cloud_xers(data_root: Path) -> Path:
     baseline_target = runtime_dc7 / helix_baseline
     if not baseline_target.is_file() or baseline_target.read_bytes() != payload:
         baseline_target.write_bytes(payload)
+
+    # Independent HELIX U01 (14-Oct-2026 Data Date) is a separate P6
+    # schedule from Suffolk Current-C. Preserve the exact XER byte stream.
+    source_update = dc7 / helix_update
+    encoded_parts = sorted(dc7.glob(f"{helix_update}.raw.b64.part*"))
+    if source_update.is_file():
+        current_payload = source_update.read_bytes()
+    elif encoded_parts:
+        current_payload = base64.b64decode(
+            "".join(part.read_text(encoding="ascii").strip() for part in encoded_parts),
+            validate=True,
+        )
+    else:
+        raise FileNotFoundError("Official HELIX U01 XER not found (no Suffolk substitution)")
+    if len(current_payload) != 3044612 or hashlib.sha256(current_payload).hexdigest() != helix_update_sha:
+        raise ValueError("Independent HELIX U01 failed byte-size or SHA-256 verification")
+    update_target = runtime_dc7 / helix_update
+    if not update_target.is_file() or update_target.read_bytes() != current_payload:
+        update_target.write_bytes(current_payload)
     return runtime_root
 
 source_data_dir = Path(os.environ.get("HELIX_PROJECT_DATA_DIR", str(DATA_DIR)))
@@ -100,7 +121,7 @@ if not source_data_dir.exists():
 
 data_dir = _materialize_cloud_xers(source_data_dir)
 
-MODEL_VERSION = "dc7-2026-10-12-helix-approved-baseline-activity-counts-v1"
+MODEL_VERSION = "dc7-2026-10-19-helix-u01-data-date-2026-10-14-fb-review-v036"
 
 @st.cache_resource(show_spinner="Reading DC7 baseline/update XER and building HELIX scope…")
 def load_model(path_text: str, model_version: str):
@@ -113,8 +134,8 @@ try:
 except Exception as exc:
     st.error(f"DC7 dashboard could not be built: {exc}")
     st.info(
-        "DC7 reads the main project only. Expected official pair: "
-        "226021.005.MO-BL.xer + 226021.010.MO-UP-C.xer."
+        "Required schedules: SUFFOLK 226021.005.MO-BL / 226021.010.MO-UP-C "
+        "and independent HELIX 226021-HE.B / 226021-HE.U01."
     )
     st.stop()
 
