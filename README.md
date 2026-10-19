@@ -2,7 +2,7 @@
 
 Cloud-ready Streamlit package for the HELIX DC7 schedule dashboard.
 
-**Version:** 0.2.35
+**Version:** 0.2.36
 
 ## Data scope
 
@@ -13,6 +13,63 @@ This release has two selectable views. SUFFOLK displays the main DC7 project sco
 - No `DC7-MIL`
 - No `DC7.TFO-B`
 - No external-project relationships in dashboard analytics
+
+## v0.2.36 — HELIX U01, independent BL–Current reconciliation and FB review (19 October 2026)
+
+**Official Google Drive sources — DH/DC7:**
+
+- Independent HELIX baseline: `226021-HE.B.xer`, Data Date 29-Sep-2026.
+- New independent HELIX Current: `226021-HE.U01.xer`, **Data Date 14-Oct-2026**,
+  created/added to Drive 19-Oct-2026. The raw U01 is pinned in
+  seven UTF-8 base64 text parts, reassembled and verified against the
+  exact **SHA256 e5398c6e17c4797d7e269273e2104971730c7c0e3fd4e010f246924ca3bec472**,
+  raw size **3,044,612 bytes**.
+- SUFFOLK source remains separate: `226021.005.MO-BL.xer` and
+  `226021.010.MO-UP-C.xer`. **No Suffolk Current file was changed**.
+
+**Strict P6 scope reconciliation:** both independent HELIX files have 4,689
+TASK rows; 4,197 `QTS - Subcontractor = HELIX` activities, of which
+**4,153** belong to the six Data Hall Electrical Line-Ups or MOH/Equipment.
+There are 654 activities per Data Hall, 229 MOH, with identical original
+Activity IDs and WBS/Line-Up assignments in BL and U01.
+
+| Scope | Baseline Completed | U01 Completed | U01 In Progress | U01 Not Started |
+|---|---:|---:|---:|---:|
+| HELIX Line-Ups + MOH (4,153) | 2 | 42 | 11 | 4,100 |
+| SUFFOLK HELIX Construction (2,545) | — | 187 | 32 | 2,326 |
+
+**HELIX VIEW** now shows independent BL vs **U01** in the KPI strip,
+3-series cumulative activity S-curve (BL planned, U01 forecast and
+actual completed through Data Date), 2×2 overall status, summary
+by Data Hall, and per-Line-Up progress. All percentages
+equal Completed / Total Activities, **not weighted physical progress**.
+The Line-Up/MOH planned finish changes from **09-Mar-2027 (BL)** to
+**20-Mar-2027 (U01)**; the signed dashboard KPI is
+**−11 calendar days (Baseline − Current)**. These are activity-scope
+finishes, not the full-P6 project contract finish milestones.
+
+**Contract milestone review** compares **P6 Baseline Finish versus U01
+Current Finish** using the previously approved **US federal Mon–Fri
+working-day calendar**, with a separate **U01 named contractual-date
+versus U01 Finish** calculation. Five IST Activity Names change the
+written contractual year 2026→2027 between the original files. These
+original source strings are retained and flagged rather than silently
+edited. QC 2.2 and IST workstream milestones are only in the HELIX
+table if `QTS - Subcontractor=HELIX`. **DH1100 M.1100 and IST.1100
+are not coded HELIX in either file**: their absence is explicitly
+identified as a coding exception; they are never relabeled as HELIX.
+The FB request for **FTE Complete** milestones remains open pending
+the exact P6 Activity IDs from **Juan Pablo**. The 72 separate
+`Ready for FTE` Line-Up tasks are not substituted for FTE Complete.
+
+**FB review document (16-Oct-2026):** presentation headings and scope
+corrected, duplicated explanatory text and audit/download widgets
+removed from the executive display (internal audit and automated
+regression are preserved), progress S-curves/area summaries
+retitled, **Total Activities** standardized, Line-Up percentages
+retained, and milestone variance labels corrected to state the exact
+baseline/current comparison. SUFFOLK numerical data, P6 original
+WBS and its seven-group detail remain unchanged.
 
 ## v0.2.35 — SUFFOLK Area Start–Finish labels: days only
 
