@@ -74,21 +74,38 @@ jobs:
               "e5398c6e17c4797d7e269273e2104971730c7c0e3fd4e010f246924ca3bec472"
           )
           (root / name).write_bytes(raw)
+          # New Suffolk UP08 is stored losslessly as 12 ASCII base64
+          # segments. Independently verify source size and SHA-256.
+          suffolk_name = "226021.022.MO-UP-08.xer"
+          suffolk_parts = sorted(src.glob(f"{suffolk_name}.raw.b64.part*"))
+          assert len(suffolk_parts) == 12
+          suffolk_payload = base64.b64decode(
+              "".join(p.read_text(encoding="ascii").strip() for p in suffolk_parts),
+              validate=True,
+          )
+          assert len(suffolk_payload) == 5071788
+          assert hashlib.sha256(suffolk_payload).hexdigest() == (
+              "2860a45ccdc71cb70905eaafc9b6cb56fa87985fdd9c448ed8be9f9201c6e73e"
+          )
+          (root / suffolk_name).write_bytes(suffolk_payload)
           helix = build_dc7_model(root)
           suffolk = build_suffolk_model(helix)
           assert str(helix.auxiliary_project["proj_short_name"]) == "226021-HE.B"
           assert str(helix.auxiliary_update_project["proj_short_name"]) == "226021-HE.U01"
           assert str(pd.Timestamp(helix.auxiliary_update_project["last_recalc_date"]).date()) == "2026-10-14"
-          assert str(suffolk.data_date.date()) == "2026-08-26"
+          assert str(suffolk.data_date.date()) == "2026-09-30"
           assert suffolk.status_counts() == {
-              "Total":2545, "Completed":187, "In Progress":32, "Not Started":2326
+              "Total":2519, "Completed":454, "In Progress":70, "Not Started":1995
           }
           assert int(helix.audit_reports["summary"].loc[
               helix.audit_reports["summary"]["Metric"].eq("Matched to Baseline by Activity ID"),
               "Value"
-          ].iloc[0]) == 2545
+          ].iloc[0]) == 2518
           assert set(helix.audit_reports["wbs_exceptions"]["Activity ID"]) == {"FDN.1296","FDN.1300"}
-          print("PASS: Suffolk BL/Current-C 2545 Construction HELIX, 187/32/2326; audits intact")
+          assert len(helix.audit_reports["departures"]) == 27
+          assert len(helix.audit_reports["active"]) == 2519
+          assert helix.audit_reports["up08_baseline_unmatched"]["Activity ID"].tolist() == ["B120004.3046"]
+          print("PASS: Suffolk BL/UP08 2519 Construction HELIX 454/70/1995; 27 departures + 1 BL mismatch audited")
 
           baseline=helix.independent_helix_baseline()
           current=helix.independent_helix_update()
