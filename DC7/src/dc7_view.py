@@ -225,7 +225,7 @@ def render_helix_baseline_scurve_and_status(m: DC7Model):
             **_layout(410, 42, 52, 48), title=dict(text=""),
             legend=dict(orientation="h", yanchor="top", y=-0.27,
                         xanchor="center", x=0.5, font=dict(size=11)),
-            margin=dict(l=54, r=16, t=45, b=86),
+
             yaxis_title="Cumulative Activities", xaxis_title="Date",
             legend_title_text="",
         )
