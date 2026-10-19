@@ -22,6 +22,7 @@ def _materialize_cloud_xers(data_root: Path) -> Path:
     dc7 = data_root
     official = (
         "DC7.TFO-BL.xer",
+        "DC7.TFO-U03.xer",
         "DC7.TFO-U04.xer",
     )
 
@@ -68,7 +69,7 @@ if not source_data_dir.exists():
 
 data_dir = _materialize_cloud_xers(source_data_dir)
 
-MODEL_VERSION = "dc7-tfo-2026-10-19-U04-v1"
+MODEL_VERSION = "dc7-tfo-2026-10-19-U03-U04-DD-v2"
 
 @st.cache_resource(show_spinner="Reading DC7.TFO baseline/update XER and building HELIX scope…")
 def load_model(path_text: str, model_version: str):
@@ -80,7 +81,7 @@ except Exception as exc:
     st.error(f"DC7.TFO dashboard could not be built: {exc}")
     st.info(
         "DC7.TFO reads the TFO project only. Expected official pair: "
-        "DC7.TFO-BL.xer + DC7.TFO-U04.xer."
+        "DC7.TFO-BL.xer + DC7.TFO-U03.xer + DC7.TFO-U04.xer."
     )
     st.stop()
 

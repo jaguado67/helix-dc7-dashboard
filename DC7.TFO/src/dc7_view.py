@@ -89,7 +89,8 @@ def render_header(m: DC7Model):
       <div><div class="brand-title">{BRAND_NAME} {APP_TITLE}</div><div class="brand-subtitle">{APP_SUBTITLE}</div></div>
       <div class="header-center"><span class="header-chip">DC7.TFO PROJECT DETAIL</span><span class="header-chip">v{VERSION}</span></div>
       <div class="header-meta">
-        <div class="line">Latest Data Date&nbsp;&nbsp;<span class="value">{_fmt_date(m.data_date)}</span></div>
+        <div class="line">U03 Data Date&nbsp;&nbsp;<span class="value">{_fmt_date(m.previous_data_date)}</span></div>
+        <div class="line">U04 Data Date&nbsp;&nbsp;<span class="value">{_fmt_date(m.data_date)}</span></div>
         <div class="line">Current Update&nbsp;&nbsp;<span class="value">{_safe(m.update_path.stem)}</span></div>
         <div class="line">Scope&nbsp;&nbsp;<span class="value">HELIX Electric</span></div>
       </div>
@@ -113,7 +114,7 @@ def render_kpis(m: DC7Model):
         ("In Progress Activities", _fmt_pct(p["In Progress %"]), f"{counts['In Progress']:,} of {counts['Total']:,}", "neutral" if p["In Progress %"] > 0 else ""),
         ("Not Started Activities", _fmt_pct(p["Not Started %"]), f"{counts['Not Started']:,} of {counts['Total']:,}", "bad" if p["Not Started %"] > 0 else ""),
         ("HELIX Scope Activities", f"{counts['Total']:,}", f"{counts['Completed']} C · {counts['In Progress']} IP · {counts['Not Started']} NS", ""),
-        ("Current Data Date", _fmt_date(m.data_date), "P6 last recalculation / Data Date", ""),
+        ("Current Data Date · U04", _fmt_date(m.data_date), f"Previous U03: {_fmt_date(m.previous_data_date)}", ""),
     ]
     h = '<div class="kpi-grid">'
     for a, b, c, d in cards:

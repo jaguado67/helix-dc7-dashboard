@@ -409,6 +409,12 @@ class DC7Model:
     current_tasks: pd.DataFrame
     baseline_tables: dict[str, pd.DataFrame]
     update_tables: dict[str, pd.DataFrame]
+    previous_path: Path
+    previous_project: pd.Series
+
+    @property
+    def previous_data_date(self):
+        return _project_date(self.previous_project, "data_date", "last_recalc_date", "last_schedule_date")
 
     @property
     def data_date(self):
@@ -852,6 +858,8 @@ class DC7Model:
             "Baseline XER": self.baseline_path.name,
             "Baseline proj_id": str(self.baseline_project.get("proj_id", "")),
             "Baseline Data Date": self.baseline_data_date,
+            "Previous Update XER": self.previous_path.name,
+            "Previous Update Data Date": self.previous_data_date,
             "Update XER": self.update_path.name,
             "Update proj_id": str(self.update_project.get("proj_id", "")),
             "Update Data Date": self.data_date,
@@ -866,6 +874,11 @@ class DC7Model:
 
 def build_dc7_model(data_dir: Path) -> DC7Model:
     bl_path, up_path = _find_files(data_dir)
+    previous_path = up_path.parent / "DC7.TFO-U03.xer"
+    if not previous_path.is_file():
+        raise FileNotFoundError(f"Previous DC7.TFO update missing: {previous_path.name}")
+    previous_tables = parse_xer(previous_path, ["PROJECT", "TASK"])
+    previous_project = _project_row(previous_tables, previous_path)
     bt = parse_xer(bl_path, WANTED)
     ut = parse_xer(up_path, WANTED)
     bp = _project_row(bt, bl_path)
@@ -898,4 +911,4 @@ def build_dc7_model(data_dir: Path) -> DC7Model:
     # A schedule update may legitimately add, split, replace, or recode activities.
     # Baseline-vs-current date comparisons use only task_codes present in both files,
     # while current-status/progress analytics retain the full current HELIX scope.
-    return DC7Model(bl_path, up_path, bp, up, baseline, current, bt, ut)
+    return DC7Model(bl_path, up_path, bp, up, baseline, current, bt, ut, previous_path, previous_project)
