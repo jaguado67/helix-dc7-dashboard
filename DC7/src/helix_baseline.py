@@ -218,6 +218,107 @@ def helix_baseline_overview(
     }
     return info, series
 
+
+def helix_current_overview(
+    baseline: Mapping[str, pd.DataFrame],
+    update: Mapping[str, pd.DataFrame],
+    update_tables: Mapping[str, pd.DataFrame],
+    current_data_date,
+) -> tuple[dict, pd.DataFrame]:
+    """Paired independent HELIX Line-Up/MOH BL vs U01 S-curves and KPI data.
+
+    Three series: BL planned finish, U01 remaining forecast/actual finish,
+    and actual recorded finishes through U01's data date. All 4,153 matched
+    HELIX Activity IDs. No Suffolk task contributes to any quantity.
+    """
+    ba = baseline["_audit"].copy()
+    ua = update["_audit"].copy()
+    if ba["Activity ID"].duplicated().any() or ua["Activity ID"].duplicated().any():
+        raise ValueError("Duplicated HELIX Activity ID in BL/U01")
+    b_ids = set(ba["Activity ID"])
+    u_ids = set(ua["Activity ID"])
+    if b_ids != u_ids or len(b_ids) != 4153:
+        raise ValueError("HELIX BL/U01 Activity IDs are not the same 4153")
+    if not ba["QTS - Subcontractor"].eq("HELIX").all() or not ua[
+        "QTS - Subcontractor"
+    ].eq("HELIX").all():
+        raise ValueError("Unassigned or third-party Line-Up included")
+    tasks = to_task_frame(update_tables["TASK"])
+    tasks = tasks[tasks["task_code"].astype(str).isin(u_ids)].copy()
+    if len(tasks) != len(u_ids) or tasks["task_code"].duplicated().any():
+        raise ValueError("U01 source TASK records cannot reconcile to HELIX Line-Up IDs")
+
+    joined = ua[["Activity ID", "Status"]].merge(
+        tasks[["task_code", "act_end_date", "reend_date",
+               "target_end_date", "early_end_date"]],
+        left_on="Activity ID", right_on="task_code", how="left", validate="one_to_one"
+    )
+    actual = pd.to_datetime(joined["act_end_date"], errors="coerce").dt.normalize()
+    remaining = pd.to_datetime(joined["reend_date"], errors="coerce").dt.normalize()
+    target = pd.to_datetime(joined["target_end_date"], errors="coerce").dt.normalize()
+    early = pd.to_datetime(joined["early_end_date"], errors="coerce").dt.normalize()
+    current_finish = actual.where(joined["Status"].eq("Completed"))
+    current_finish = current_finish.where(current_finish.notna(), remaining)
+    current_finish = current_finish.where(current_finish.notna(), target)
+    current_finish = current_finish.where(current_finish.notna(), early)
+
+    if current_finish.isna().any():
+        raise ValueError("U01 Line-Up Current Finish dates are missing")
+    if (joined["Status"].eq("Completed") & actual.isna()).any():
+        raise ValueError("U01 completed Line-Up activities without P6 Actual Finish")
+
+    date = pd.to_datetime(current_data_date, errors="coerce")
+    if pd.isna(date):
+        raise ValueError("No valid HELIX U01 Data Date")
+    date = pd.Timestamp(date).normalize()
+    recorded = actual.where(joined["Status"].eq("Completed") & actual.le(date))
+    baseline_finish = pd.to_datetime(ba["Baseline Finish"], errors="coerce").dt.normalize()
+    if baseline_finish.isna().any():
+        raise ValueError("HELIX baseline schedule finish dates missing")
+    complete = int(joined["Status"].eq("Completed").sum())
+    in_progress = int(joined["Status"].eq("In Progress").sum())
+    not_started = int(joined["Status"].eq("Not Started").sum())
+    if complete+in_progress+not_started != len(u_ids):
+        raise ValueError("HELIX status codes do not reconcile")
+    if int(recorded.notna().sum()) != complete:
+        raise ValueError("Recorded actual finishes do not reconcile to Completed")
+
+    from_date = min(baseline_finish.min(), current_finish.min(), date)
+    until = max(baseline_finish.max(), current_finish.max(), date)
+    time_index = pd.DatetimeIndex(pd.date_range(
+        from_date.replace(day=1), until + pd.offsets.MonthEnd(0),
+        freq="ME"
+    ))
+    time_index = pd.DatetimeIndex(sorted(set(
+        list(time_index) + [date, baseline_finish.max(), current_finish.max()]
+    )))
+    def cumulative(series):
+        return [int(series.le(x).sum()) for x in time_index]
+    graph = pd.DataFrame({
+        "Date":time_index,
+        "Baseline Planned Activities":cumulative(baseline_finish),
+        "Current Forecast Activities":cumulative(current_finish),
+        "Actual Completed Activities":cumulative(recorded),
+    })
+    graph.loc[graph["Date"] > date, "Actual Completed Activities"] = np.nan
+    if int(graph["Baseline Planned Activities"].iloc[-1]) != 4153 or int(
+        graph["Current Forecast Activities"].iloc[-1]
+    ) != 4153:
+        raise ValueError("HELIX independent S-curve does not close at 4153")
+    info = {
+        "Counts":{
+            "Total":4153, "Completed":complete,
+            "In Progress":in_progress, "Not Started":not_started
+        },
+        "Baseline Finish":baseline_finish.max(),
+        "Current Forecast Finish":current_finish.max(),
+        "Current Data Date":date,
+        "Source BL":"226021-HE.B.xer",
+        "Source Current":"226021-HE.U01.xer",
+    }
+    return info, graph
+
+
 def lineup_area_status_summary(data: Mapping[str, pd.DataFrame] | None) -> pd.DataFrame:
     """Suffolk-style activity status summary, but for independent HELIX BL.
 
