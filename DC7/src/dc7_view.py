@@ -633,10 +633,6 @@ def render_helix_lineup_stats(m: DC7Model):
         if total_tasks != completed + in_progress + not_started:
             raise ValueError("HELIX U01 status totals do not reconcile")
         st.markdown(h + '</tbody></table></div>', unsafe_allow_html=True)
-        st.caption(
-            f"HELIX Line-Ups and MOH: {total_tasks:,} unique Activity IDs. "
-            "Current progress from official HELIX U01."
-        )
     with right:
         fig = go.Figure(go.Bar(
             x=df["Activity Completion %"],
@@ -654,7 +650,7 @@ def render_helix_lineup_stats(m: DC7Model):
             showlegend=False,
             xaxis_title="Activity Completion %",
             yaxis_title="",
-            title=dict(text=""),
+            title="OVERALL % COMPLETE",
         )
         fig.update_xaxes(
             range=[0, max(1.0, highest * 1.35 + 0.2)],
