@@ -269,8 +269,10 @@ def lineup_area_status_summary(data: Mapping[str, pd.DataFrame] | None) -> pd.Da
                 raise ValueError(f"HELIX baseline {display} counts do not reconcile")
     return summary
 
-def summarize_approved_baseline(tables: Mapping[str, pd.DataFrame], project_id: str) -> dict[str, pd.DataFrame]:
-    """Audit real HELIX-coded P6 TASK/PROJWBS/TASKACTV associations."""
+def summarize_approved_baseline(tables: Mapping[str, pd.DataFrame], project_id: str, snapshot_role: str = "Baseline") -> dict[str, pd.DataFrame]:
+    """Audit real HELIX-coded TASK/PROJWBS/TASKACTV, baseline or U01."""
+    if snapshot_role not in ("Baseline", "Current"):
+        raise ValueError("Unknown independent HELIX schedule role")
     required = ("PROJWBS","TASK","ACTVTYPE","ACTVCODE","TASKACTV")
     for key in required:
         if key not in tables or tables[key].empty:
@@ -343,12 +345,24 @@ def summarize_approved_baseline(tables: Mapping[str, pd.DataFrame], project_id: 
     task["_LineUp"] = mapped.map(lambda x:x[1])
     task["_WBS Path"] = paths.map(lambda x:" / ".join(x))
     task["_Included"] = task["_Sub"].eq("HELIX") & task["_LineUp"].notna()
-    task["_Start"] = pd.to_datetime(task.get("target_start_date"),errors="coerce")
-    task["_Finish"] = pd.to_datetime(task.get("target_end_date"),errors="coerce")
-    if not task["_Start"].notna().any():
-        task["_Start"]=pd.to_datetime(task.get("early_start_date"),errors="coerce")
-    if not task["_Finish"].notna().any():
-        task["_Finish"]=pd.to_datetime(task.get("early_end_date"),errors="coerce")
+    if snapshot_role == "Current":
+        # For completed work use actual dates; for unfinished work use P6
+        # Remaining Start/Finish (not the static BL target dates).
+        actual_start = pd.to_datetime(task.get("act_start_date"), errors="coerce")
+        actual_finish = pd.to_datetime(task.get("act_end_date"), errors="coerce")
+        restart = pd.to_datetime(task.get("restart_date"), errors="coerce")
+        reend = pd.to_datetime(task.get("reend_date"), errors="coerce")
+        task["_Start"] = actual_start.where(task["Status"].eq("Completed"), restart)
+        task["_Start"] = task["_Start"].fillna(actual_start).fillna(pd.to_datetime(task.get("target_start_date"),errors="coerce"))
+        task["_Finish"] = actual_finish.where(task["Status"].eq("Completed"), reend)
+        task["_Finish"] = task["_Finish"].fillna(reend).fillna(pd.to_datetime(task.get("target_end_date"),errors="coerce"))
+    else:
+        task["_Start"] = pd.to_datetime(task.get("target_start_date"),errors="coerce")
+        task["_Finish"] = pd.to_datetime(task.get("target_end_date"),errors="coerce")
+        if not task["_Start"].notna().any():
+            task["_Start"]=pd.to_datetime(task.get("early_start_date"),errors="coerce")
+        if not task["_Finish"].notna().any():
+            task["_Finish"]=pd.to_datetime(task.get("early_end_date"),errors="coerce")
 
     included = task[task["_Included"]].copy()
     valid_statuses = {"Not Started", "In Progress", "Completed"}
@@ -379,7 +393,13 @@ def summarize_approved_baseline(tables: Mapping[str, pd.DataFrame], project_id: 
         "Original P6 WBS":included["_WBS Path"].astype(str),
         "Baseline Start":included["_Start"],
         "Baseline Finish":included["_Finish"],
+        "Actual Finish":pd.to_datetime(included.get("act_end_date"),errors="coerce"),
     }).reset_index(drop=True)
+    if snapshot_role == "Current":
+        audit = audit.rename(columns={
+            "Baseline Start": "Current Start",
+            "Baseline Finish": "Current Finish",
+        })
     # Contractual dates are embedded in ORIGINAL Activity Names, not P6
     # contractual-date UDFs. Only assigned HELIX tasks in Milestones WBS.
     # The official 226021-HE.B.xer is a baseline, NOT an independent Current.
@@ -468,13 +488,18 @@ def summarize_approved_baseline(tables: Mapping[str, pd.DataFrame], project_id: 
                 f"{len(all_milestones)} assigned; "
                 f"{len(milestones)} with contract date; {len(no_contract_date)} without"
             )
+    if snapshot_role == "Current" and not milestones.empty:
+        milestones = milestones.rename(columns={"Baseline Finish": "Current Finish"})
     out["_contract_milestones"] = milestones
     out["_contract_milestone_audit"] = {
         "helix_milestone_total": int(len(all_milestones)),
         "contract_date_extracted": int(len(milestones)),
         "no_contract_date_in_name": int(len(no_contract_date)),
         "no_contract_date_ids": sorted(no_contract_date),
-        "schedule_source": "226021-HE.B independent baseline",
+        "schedule_source": (
+            "226021-HE.U01 independent Current" if snapshot_role == "Current"
+            else "226021-HE.B independent baseline"
+        ),
     }
 
     # Keep the Line-Up and MOH population separate from milestone audit.
