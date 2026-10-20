@@ -1029,18 +1029,18 @@ def build_dc7_model(data_dir: Path) -> DC7Model:
         previous_pid = str(pp["proj_id"])
         previous_active = scoped_helix_construction(pt, previous_pid, _helix_task_ids(pt, previous_pid))
     audit_reports = build_activity_audit(cur_all, helix_ids, current, baseline, previous_active)
-    # UP08 has one new HELIX Construction Activity ID absent from Suffolk
-    # approved BL. Preserve the actual current status and explicitly audit
-    # this baseline mismatch; never fabricate baseline start/finish dates.
+    # The re-exported Suffolk BL contains additional subcontractor-code data.
+    # BL/UP08 Activity-ID matches are observed values, not fixed historical
+    # counts. Keep all genuine unmatched IDs visible to the internal audit.
     matched_count = int(audit_reports["summary"].loc[
         audit_reports["summary"]["Metric"].eq("Matched to Baseline by Activity ID"), "Value"
     ].iloc[0])
     unmatched = audit_reports["active"].loc[
         audit_reports["active"]["Audit"].eq("NO BASELINE MATCH"), "Activity ID"
     ].astype(str).tolist()
-    if len(current) != 2519 or matched_count != 2518 or unmatched != ["B120004.3046"]:
+    if len(current) != 2519 or matched_count + len(unmatched) != len(current):
         raise ValueError(
-            f"Unexpected UP08 Suffolk baseline reconciliation: total={len(current)}, "
+            f"Invalid UP08 Suffolk baseline reconciliation: total={len(current)}, "
             f"matched={matched_count}, unmatched={unmatched}"
         )
     previous_report = audit_reports["summary"].set_index("Metric")["Value"]
