@@ -270,14 +270,6 @@ def render_scurve_and_status(m: DC7Model):
             fig.update_yaxes(range=[0, max(1, total * 1.04)], tickformat=",d", gridcolor=GRID)
             fig.update_xaxes(type="date", dtick="M3", tickformat="%b\n%Y", gridcolor=GRID)
             st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
-            scope_audit = m.audit_reports or {}
-            mismatched = scope_audit.get("up08_baseline_unmatched", pd.DataFrame())
-            if len(mismatched):
-                st.caption(
-                    f"Baseline: {len(m.baseline_tasks):,} matched activities; "
-                    f"Current UP08: {len(m.current_tasks):,}. "
-                    "One added Current activity has no approved Baseline match."
-                )
         st.markdown('</div>', unsafe_allow_html=True)
     with c2:
         counts = m.status_counts(); ratio = m.activity_completion_ratio
@@ -286,7 +278,7 @@ def render_scurve_and_status(m: DC7Model):
         for lab, val in [("Total", counts['Total']), ("Completed", counts['Completed']), ("In Progress", counts['In Progress']), ("Not Started", counts['Not Started'])]:
             h += f'<div class="activity-card"><div class="num">{val:,}</div><div class="lab">{lab}</div></div>'
         p = m.status_percentages()
-        h += f'</div><div class="scope-note">Completed: <b>{p["Completed %"]:.1f}%</b><br>In Progress: <b>{p["In Progress %"]:.1f}%</b><br>Not Started: <b>{p["Not Started %"]:.1f}%</b><br>Open HELIX Activities: <b>{counts["In Progress"] + counts["Not Started"]:,}</b></div></div>'
+        h += f'</div><div class="scope-note">Completed: <b>{p["Completed %"]:.1f}%</b><br>In Progress: <b>{p["In Progress %"]:.1f}%</b><br>Not Started: <b>{p["Not Started %"]:.1f}%</b></div></div>'
         st.markdown(h, unsafe_allow_html=True)
 
 
@@ -402,7 +394,7 @@ def render_stats(m: DC7Model, title: str):
         return
     left, right = st.columns([1.45, 1], gap="large")
     with left:
-        h = '<div class="panel"><table class="stats-table"><thead><tr><th>Area</th><th>Total Tasks</th><th>Activity Completion %</th><th>Completed</th><th>In Progress</th><th>Not Started</th></tr></thead><tbody>'
+        h = '<div class="panel"><table class="stats-table"><thead><tr><th>Area</th><th>Total Activities</th><th>Activity Completion %</th><th>Completed</th><th>In Progress</th><th>Not Started</th></tr></thead><tbody>'
         for _, r in df.iterrows():
             h += f'<tr><td>{_safe(r.Area)}</td><td>{int(r["Total Tasks"]):,}</td><td>{r["Activity Completion %"]:.1f}%</td><td>{int(r.Completed)}</td><td>{int(r["In Progress"])}</td><td>{int(r["Not Started"])}</td></tr>'
         st.markdown(h + '</tbody></table></div>', unsafe_allow_html=True)
@@ -439,7 +431,7 @@ def render_progress_detail(m: DC7Model, view: str):
                          "SUMMARY BY FUNCTIONAL GROUP" if consolidated else
                          "SUMMARY BY QTS - DASH")
         first_column = "P6 WBS GROUP" if p6_wbs or dh_p6_wbs else "Area"
-        h = f'<div class="panel"><div class="panel-head"><div class="panel-title">{area} · {summary_title}</div></div><table class="detail-table"><thead><tr><th>{first_column}</th><th>Total Tasks</th><th>Activity Completion %</th><th>Not Started</th><th>In Progress</th><th>Completed</th></tr></thead><tbody>'
+        h = f'<div class="panel"><div class="panel-head"><div class="panel-title">{area} · {summary_title}</div></div><table class="detail-table"><thead><tr><th>{first_column}</th><th>Total Activities</th><th>Activity Completion %</th><th>Not Started</th><th>In Progress</th><th>Completed</th></tr></thead><tbody>'
         for _, r in df.iterrows():
             label = _safe(r.Area)
             h += f'<tr><td>{label}</td><td>{int(r.Tasks)}</td><td>{r["Activity Completion %"]:.1f}%</td><td>{int(r["Not Started"])} </td><td>{int(r["In Progress"])} </td><td>{int(r.Completed)}</td></tr>'
@@ -475,7 +467,7 @@ def render_lineups_detail(m: DC7Model, area: str):
     )
     c1, c2 = st.columns([1.15, 1], gap="large")
     with c1:
-        h = f'<div class="panel"><div class="panel-head"><div class="panel-title">{area} · SUMMARY BY LINE-UP</div></div><table class="detail-table"><thead><tr><th>Line-Up</th><th>Total Tasks</th><th>Activity Completion %</th><th>Not Started</th><th>In Progress</th><th>Completed</th></tr></thead><tbody>'
+        h = f'<div class="panel"><div class="panel-head"><div class="panel-title">{area} · SUMMARY BY LINE-UP</div></div><table class="detail-table"><thead><tr><th>Line-Up</th><th>Total Activities</th><th>Activity Completion %</th><th>Not Started</th><th>In Progress</th><th>Completed</th></tr></thead><tbody>'
         for _, r in df.iterrows():
             h += f'<tr><td>{_safe(r["Line-Up"])}</td><td>{int(r.Tasks)}</td><td>{r["Activity Completion %"]:.1f}%</td><td>{int(r["Not Started"])}</td><td>{int(r["In Progress"])}</td><td>{int(r.Completed)}</td></tr>'
         st.markdown(h + '</tbody></table></div>', unsafe_allow_html=True)
@@ -624,7 +616,7 @@ def render_helix_lineup_stats(m: DC7Model):
     with left:
         h = (
             '<div class="panel"><table class="stats-table"><thead><tr>'
-            '<th>Area</th><th>Total Tasks</th><th>Activity Completion %</th>'
+            '<th>Area</th><th>Total Activities</th><th>Activity Completion %</th>'
             '<th>Completed</th><th>In Progress</th><th>Not Started</th>'
             '</tr></thead><tbody>'
         )
