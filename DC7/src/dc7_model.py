@@ -395,7 +395,21 @@ class DC7Model:
                 cs = actuals.dropna().min() if actuals.notna().any() else _date_min(c_all, ["early_start_date", "restart_date", "target_start_date"])
 
             bf = _date_max(b_all, ["target_end_date", "early_end_date", "reend_date"])
-            cf = _date_max(c_all, ["reend_date", "early_end_date", "act_end_date", "target_end_date"])
+            # Current finish must be status-aware. A completed task's old
+            # target_end_date must never extend the forecast window.
+            current_status = c_all["status_code"].fillna("").astype(str).str.upper()
+            completed = current_status.eq("TK_COMPLETE")
+            actual_finish = pd.to_datetime(c_all["act_end_date"], errors="coerce")
+            remaining_finish = pd.to_datetime(c_all["reend_date"], errors="coerce")
+            remaining_finish = remaining_finish.fillna(
+                pd.to_datetime(c_all["early_end_date"], errors="coerce")
+            )
+            if actual_finish[completed].isna().any():
+                raise ValueError(f"Missing actual finish for completed HELIX scope in {area}")
+            if remaining_finish[~completed].isna().any():
+                raise ValueError(f"Missing remaining forecast finish in {area}")
+            status_finish = actual_finish.where(completed, remaining_finish)
+            cf = status_finish.max()
             rows.append({
                 "Area": area,
                 "Baseline Start": bs,
