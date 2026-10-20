@@ -817,7 +817,7 @@ def render_helix_contract_milestones(m: DC7Model):
 
     left, right = st.columns([1.55, 1], gap="large")
     with left:
-        st.dataframe(display, use_container_width=True, hide_index=True, height=475,
+        st.dataframe(display, use_container_width=True, hide_index=True, height="content",
                      column_config={
                          "Variance (Working Days)": st.column_config.NumberColumn(
                              "Variance (Working Days)", format="%+d"
