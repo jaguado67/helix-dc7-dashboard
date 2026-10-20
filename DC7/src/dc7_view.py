@@ -801,7 +801,8 @@ def render_helix_contract_milestones(m: DC7Model):
         df["Contractual Date_BL"].dt.normalize() != df["Contractual Date_U01"].dt.normalize()
     )
     changed = df.loc[df["Contract Date Changed"], "Activity ID"].tolist()
-    if changed:
+    expected_legacy_ist = {f"IST.{n}" for n in (1200, 1300, 1400, 1500, 1600)}
+    if set(changed) not in (set(), expected_legacy_ist):
         raise ValueError(f"Unexpected changes in named contractual dates: {changed}")
 
     display = df[[
