@@ -823,16 +823,10 @@ def render_helix_contract_milestones(m: DC7Model):
             "Baseline Finish": bd, "Current Finish": cd,
             "Variance (Working Days)": us_federal_workday_delay(bd, cd),
         })
-    extra_rows.append({
-        "Area": "DH1250", "Milestone": "FTE Complete", "Activity ID": "Pending P6 ID",
-        "Baseline Finish": pd.Timestamp("2026-03-30"),
-        "Current Finish": pd.Timestamp("2026-09-05"),
-        "Variance (Working Days)": float("nan"),
-    })
     milestone_rows = pd.concat([df, pd.DataFrame(extra_rows)], ignore_index=True)
     milestone_rows["Area"] = pd.Categorical(
         milestone_rows["Area"],
-        categories=["DH1100", "DH1200", "DH1250", "DH1300", "DH1400", "DH1500", "DH1600"],
+        categories=["DH1100", "DH1200", "DH1300", "DH1400", "DH1500", "DH1600"],
         ordered=True,
     )
     milestone_rows = milestone_rows.sort_values(
