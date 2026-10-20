@@ -70,6 +70,11 @@ def _materialize_cloud_xers(data_root: Path) -> Path:
             if actual != expected:
                 raise ValueError(f"Current-C integrity error (SHA256 {actual})")
 
+    # Approved Suffolk baseline source, including QTS Subcontractor codes.
+    suffolk_bl = runtime_dc7 / "226021.005.MO-BL.xer"
+    if hashlib.sha256(suffolk_bl.read_bytes()).hexdigest() != "c63ae17acdba3b6ee36f8a14aefa10cceaf25fa0758a02a9f31a35f104821f41":
+        raise ValueError("Suffolk Baseline SHA-256 mismatch")
+
     # Import SHA-verified original HELIX P6 Baseline; never the rejected -4.
     approved_baseline = dc7 / helix_baseline
     approved_manifest = dc7 / f"{helix_baseline}.sha256"
@@ -142,7 +147,7 @@ if not source_data_dir.exists():
 
 data_dir = _materialize_cloud_xers(source_data_dir)
 
-MODEL_VERSION = "dc7-2026-10-20-helix-xer-refresh-v037"
+MODEL_VERSION = "dc7-2026-10-20-suffolk-bl-refresh-v038"
 
 @st.cache_resource(show_spinner="Reading DC7 baseline/update XER and building HELIX scope…")
 def load_model(path_text: str, model_version: str):
