@@ -124,13 +124,13 @@ def render_kpis(m: DC7Model, view: str):
     st.markdown(f'<div class="panel schedule"><div class="panel-head"><div><span class="time-pill">TIME</span><span class="panel-title">SCHEDULE PERFORMANCE</span></div></div>', unsafe_allow_html=True)
     cards = [
         ("Baseline Completion", _fmt_date(m.baseline_finish), m.baseline_path.stem, ""),
-        ("Current Forecast Finish", _fmt_date(m.current_finish), _fmt_days(fv) + " vs Baseline", _var_class(fv)),
-        ("Finish Date Shift", _fmt_days(fv), "Baseline − Current", _var_class(fv)),
-        ("Completed Activities", _fmt_pct(p["Completed %"]), f"{counts['Completed']:,} of {counts['Total']:,}", "good" if p["Completed %"] > 0 else ""),
-        ("In Progress Activities", _fmt_pct(p["In Progress %"]), f"{counts['In Progress']:,} of {counts['Total']:,}", "neutral" if p["In Progress %"] > 0 else ""),
-        ("Not Started Activities", _fmt_pct(p["Not Started %"]), f"{counts['Not Started']:,} of {counts['Total']:,}", "bad" if p["Not Started %"] > 0 else ""),
-        ("Total Activities", f"{counts['Total']:,}", f"{counts['Completed']} C · {counts['In Progress']} IP · {counts['Not Started']} NS", ""),
-        ("Current Data Date", _fmt_date(m.data_date), "P6 last recalculation / Data Date", ""),
+        ("Current Forecast Finish", _fmt_date(m.current_finish), m.update_path.stem, _var_class(fv)),
+        ("Finish Date Shift", _fmt_days(fv), "", _var_class(fv)),
+        ("Completed Activities", _fmt_pct(p["Completed %"]), "", "good" if p["Completed %"] > 0 else ""),
+        ("In Progress Activities", _fmt_pct(p["In Progress %"]), "", "neutral" if p["In Progress %"] > 0 else ""),
+        ("Not Started Activities", _fmt_pct(p["Not Started %"]), "", "bad" if p["Not Started %"] > 0 else ""),
+        ("Total Activities", f"{counts['Total']:,}", "", ""),
+        ("Current Data Date", _fmt_date(m.data_date), "", ""),
     ]
     h = '<div class="kpi-grid">'
     for a, b, c, d in cards:
@@ -163,12 +163,12 @@ def render_helix_kpis(m: DC7Model):
     cards = [
         ("Baseline Completion", _fmt_date(info["Baseline Finish"]), "226021-HE.B", ""),
         ("Current Forecast Finish", _fmt_date(info["Current Finish"]), "226021-HE.U01", ""),
-        ("Finish Date Shift", f"{shift:+d} days", "Baseline − U01 · calendar days", _var_class(shift)),
-        ("Completed Activities", pct("Completed"), f'{count["Completed"]:,} of {total:,}', ""),
-        ("In Progress Activities", pct("In Progress"), f'{count["In Progress"]:,} of {total:,}', ""),
-        ("Not Started Activities", pct("Not Started"), f'{count["Not Started"]:,} of {total:,}', ""),
-        ("Total Activities", f"{total:,}", f'{count["Completed"]} C · {count["In Progress"]} IP · {count["Not Started"]} NS', ""),
-        ("Current Data Date", _fmt_date(info["Current Data Date"]), "226021-HE.U01", ""),
+        ("Finish Date Shift", f"{shift:+d} days", "", _var_class(shift)),
+        ("Completed Activities", pct("Completed"), "", ""),
+        ("In Progress Activities", pct("In Progress"), "", ""),
+        ("Not Started Activities", pct("Not Started"), "", ""),
+        ("Total Activities", f"{total:,}", "", ""),
+        ("Current Data Date", _fmt_date(info["Current Data Date"]), "", ""),
     ]
     h = '<div class="kpi-grid">'
     for label, value, sub, css in cards:
