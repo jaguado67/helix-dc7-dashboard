@@ -209,7 +209,6 @@ def render_helix_baseline_scurve_and_status(m: DC7Model):
             fig.add_trace(go.Scatter(
                 x=curve["Date"], y=curve[field], name=field,
                 mode="lines+markers" if actual else "lines",
-                line_shape="hv",
                 line=dict(color=color, width=3),
                 marker=dict(size=5 if actual else 0),
                 connectgaps=False,
@@ -759,16 +758,6 @@ def render_helix_lineups(m: DC7Model):
                             config={"displayModeBar": False},
                             key=f"helix_lineup_chart_{area}",
                         )
-                if data is not None:
-                    st.caption(
-                        f"{area}: {int(table['Total Activities'].sum()):,} HELIX activities. "
-                        "Not Started + In Progress + Completed = Total Activities."
-                    )
-            if data is not None and is_moh:
-                st.caption(
-                    "MOH Equipment: U01 statuses for HELIX-assigned "
-                    "activities only; other subcontractors are excluded."
-                )
 
 
 
@@ -818,30 +807,20 @@ def render_helix_contract_milestones(m: DC7Model):
     display = df[[
         "Area", "Milestone", "Activity ID", "Baseline Finish",
         "Current Finish", "Variance (Working Days)",
-        "Contractual Date_U01", "Contract Delay (Working Days)",
     ]].copy().rename(columns={
         "Area": "Data Hall",
         "Baseline Finish": "Baseline Date",
         "Current Finish": "Current Finish Date",
-        "Contractual Date_U01": "Contractual Date (U01 Name)",
     })
-    for date_field in ("Baseline Date", "Current Finish Date", "Contractual Date (U01 Name)"):
+    for date_field in ("Baseline Date", "Current Finish Date"):
         display[date_field] = display[date_field].apply(_fmt_date)
 
-    st.caption(
-        "Variance = U01 Finish − Baseline Finish in US federal working days "
-        "(Monday–Friday, observed federal holidays excluded). Positive = later / delayed. "
-        "Contract Delay is a separate comparison to the date in the U01 Activity Name."
-    )
-    left, right = st.columns([1.34, 1], gap="large")
+    left, right = st.columns([1.55, 1], gap="large")
     with left:
         st.dataframe(display, use_container_width=True, hide_index=True, height=475,
                      column_config={
                          "Variance (Working Days)": st.column_config.NumberColumn(
                              "Variance (Working Days)", format="%+d"
-                         ),
-                         "Contract Delay (Working Days)": st.column_config.NumberColumn(
-                             "Contract Delay (Working Days)", format="%+d"
                          ),
                      })
     with right:
@@ -866,19 +845,6 @@ def render_helix_contract_milestones(m: DC7Model):
         fig.update_yaxes(autorange="reversed")
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
-    st.warning(
-        "P6 coding review: DH1100 M.1100 and IST.1100 exist but are NOT coded "
-        "QTS - Subcontractor = HELIX in BL/U01; excluded from the HELIX-only "
-        "variance table until their assignment is confirmed. "
-        "The contractual year in five IST Activity Names changed from 2026 "
-        "in BL to 2027 in U01; the dashboard preserves both original sources."
-    )
-    st.caption(
-        "FTE Complete milestones: FB review requests adding five items "
-        "(DH1250, DH1350, DH1450, DH1550, DH1650). Corresponding P6 "
-        "Activity IDs must be confirmed with Juan Pablo before they can be "
-        "included; Line-Up 'Ready for FTE' tasks are not a substitute."
-    )
 
 def render_dashboard(helix: DC7Model, suffolk: DC7Model):
     view = st.session_state.get("dc7_schedule_view", "SUFFOLK")
