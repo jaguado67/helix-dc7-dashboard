@@ -34,7 +34,7 @@ def _materialize_cloud_xers(data_root: Path) -> Path:
     suffolk_update = "226021.022.MO-UP-08.xer"
     suffolk_update_sha = "2860a45ccdc71cb70905eaafc9b6cb56fa87985fdd9c448ed8be9f9201c6e73e"
     helix_update = "226021-HE.U01.xer"
-    helix_update_sha = "e5398c6e17c4797d7e269273e2104971730c7c0e3fd4e010f246924ca3bec472"
+    helix_update_sha = "25c2147a28092762e375d9ae6afb39bc8e34890f806046be229e6b8239943e7a"
     required = official + (previous,)
 
     runtime_root = Path(tempfile.gettempdir()) / "helix_dc7_runtime_data"
@@ -73,7 +73,7 @@ def _materialize_cloud_xers(data_root: Path) -> Path:
     # Import SHA-verified original HELIX P6 Baseline; never the rejected -4.
     approved_baseline = dc7 / helix_baseline
     approved_manifest = dc7 / f"{helix_baseline}.sha256"
-    pinned = "1057564634e2392de2f5a3f825d15363a50f5a8f9b152bc1733c128dbf1d8d2b"
+    pinned = "e7b6ed260af314eb34e51d7ac504edfe577051b21eca7ea6efe13ac98d110dc3"
     if not approved_manifest.is_file():
         raise FileNotFoundError("Official HELIX Baseline checksum manifest missing")
     if approved_manifest.read_text(encoding="ascii").split()[0] != pinned:
@@ -86,7 +86,7 @@ def _materialize_cloud_xers(data_root: Path) -> Path:
             raise FileNotFoundError("Official HELIX baseline encoded XER package missing")
         encoded = "".join(p.read_text(encoding="ascii").strip() for p in parts)
         payload = gzip.decompress(base64.b64decode(encoded))
-    if len(payload) != 3042495 or hashlib.sha256(payload).hexdigest() != pinned:
+    if len(payload) != 3042490 or hashlib.sha256(payload).hexdigest() != pinned:
         raise ValueError("Official HELIX Baseline failed size or SHA-256 verification")
     baseline_target = runtime_dc7 / helix_baseline
     if not baseline_target.is_file() or baseline_target.read_bytes() != payload:
@@ -142,7 +142,7 @@ if not source_data_dir.exists():
 
 data_dir = _materialize_cloud_xers(source_data_dir)
 
-MODEL_VERSION = "dc7-2026-10-19-suffolk-up08-helix-u01-fb-review-v036"
+MODEL_VERSION = "dc7-2026-10-20-helix-xer-refresh-v037"
 
 @st.cache_resource(show_spinner="Reading DC7 baseline/update XER and building HELIX scope…")
 def load_model(path_text: str, model_version: str):
