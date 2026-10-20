@@ -349,10 +349,44 @@ class DC7Model:
         baseline dates; current completed tasks use actual start/finish and
         incomplete tasks use the remaining forecast.
         """
+        def wbs_area_ids(tables: dict[str, pd.DataFrame], area: str) -> set[str]:
+            wbs = tables["PROJWBS"]
+            names = dict(zip(wbs["wbs_id"].astype(str), wbs["wbs_name"].astype(str)))
+            parents = dict(zip(wbs["wbs_id"].astype(str), wbs["parent_wbs_id"].astype(str)))
+            target = ("Front of House (FOH)" if area == "FOH" else
+                      "Back of House (BOH)" if area == "BOH" else
+                      "Data Hall " + area[2:])
+            expected = (["Construction", "Interior Build-Outs", "House Systems", target]
+                        if area in ("FOH", "BOH") else
+                        ["Construction", "Interior Build-Outs", target])
+            result = set()
+            for wid in names:
+                lineage, node, visited = [], wid, set()
+                while node in names and node not in visited:
+                    visited.add(node)
+                    lineage.append(names[node].strip())
+                    node = parents.get(node, "")
+                lineage.reverse()
+                if len(lineage) >= len(expected) + 1 and lineage[1:1 + len(expected)] == expected:
+                    result.add(wid)
+            if not result:
+                raise ValueError(f"No P6 WBS for HELIX Suffolk area {area}: {expected}")
+            return result
+
         rows = []
         for area in self._main_areas():
-            b_all = self.baseline_tasks[self.baseline_tasks["Area"].eq(area)].copy()
-            c_all = self.current_tasks[self.current_tasks["Area"].eq(area)].copy()
+            # Source selection is independent in each XER, and P6 WBS (not
+            # QTS-AREA alone) controls the eight summary windows.
+            b_ids = wbs_area_ids(self.baseline_tables, area)
+            c_ids = wbs_area_ids(self.update_tables, area)
+            b_all = self.baseline_tasks[
+                self.baseline_tasks["Area"].eq(area) &
+                self.baseline_tasks["wbs_id"].astype(str).isin(b_ids)
+            ].copy()
+            c_all = self.current_tasks[
+                self.current_tasks["Area"].eq(area) &
+                self.current_tasks["wbs_id"].astype(str).isin(c_ids)
+            ].copy()
             if b_all.empty or c_all.empty:
                 raise ValueError(f"Missing Suffolk HELIX baseline/current area: {area}")
 
