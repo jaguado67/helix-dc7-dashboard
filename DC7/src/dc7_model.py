@@ -342,88 +342,72 @@ class DC7Model:
         return pd.DataFrame(rows)
 
     def area_windows(self) -> pd.DataFrame:
-        """Baseline vs current area spans using a representative start anchor.
+        """HELIX-only Suffolk Construction area windows from independent BL/UP08 XER.
 
-        The finish remains the latest finish in the full HELIX area scope.  The
-        start is no longer the absolute minimum activity start, because isolated
-        early underground/underslab work can distort the apparent start of an
-        entire Data Hall.  Instead we select the earliest meaningful QTS-DASH
-        activity in the current area (positive duration, non-milestone, not
-        marked "No apply", and not in the dashboard-derived Electrical
-        Infrastructure & Equipment bucket) and compare that *same task_code*
-        against Baseline.  This keeps the Start comparison like-for-like.
+        Use all qualifying activity dates for each area, not a chosen current
+        activity as the start anchor. Baseline matches retain the original P6
+        baseline dates; current completed tasks use actual start/finish and
+        incomplete tasks use the remaining forecast.
         """
         rows = []
         for area in self._main_areas():
             b_all = self.baseline_tasks[self.baseline_tasks["Area"].eq(area)].copy()
             c_all = self.current_tasks[self.current_tasks["Area"].eq(area)].copy()
+            if b_all.empty or c_all.empty:
+                raise ValueError(f"Missing Suffolk HELIX baseline/current area: {area}")
 
-            # Representative start anchor from the current coded production scope.
-            cand = c_all[c_all["Subarea"].ne("Other HELIX Electrical Scope")].copy()
-            dur = pd.to_numeric(cand.get("target_drtn_hr_cnt", pd.Series(np.nan, index=cand.index)), errors="coerce").fillna(0)
-            typ = cand.get("task_type", pd.Series("", index=cand.index)).fillna("").astype(str).str.upper()
-            names = cand.get("task_name", pd.Series("", index=cand.index)).fillna("").astype(str).str.lower()
-            cand = cand[(dur > 0) & (~typ.str.contains("MILE", na=False)) & (~names.str.contains("no apply", na=False))].copy()
+            # Baseline: one scheduled start/finish per matched HELIX task.
+            baseline_start = pd.to_datetime(b_all["target_start_date"], errors="coerce")
+            baseline_start = baseline_start.fillna(
+                pd.to_datetime(b_all["early_start_date"], errors="coerce")
+            )
+            baseline_finish = pd.to_datetime(b_all["target_end_date"], errors="coerce")
+            baseline_finish = baseline_finish.fillna(
+                pd.to_datetime(b_all["early_end_date"], errors="coerce")
+            ).fillna(pd.to_datetime(b_all["reend_date"], errors="coerce"))
 
-            anchor_code = ""
-            anchor_name = ""
-            bs = pd.NaT
-            cs = pd.NaT
-            if not cand.empty:
-                current_start = pd.to_datetime(cand.get("act_start_date"), errors="coerce")
-                for col in ["early_start_date", "restart_date", "target_start_date"]:
-                    if col in cand.columns:
-                        current_start = current_start.where(current_start.notna(), pd.to_datetime(cand[col], errors="coerce"))
-                if current_start.notna().any():
-                    idx = current_start.idxmin()
-                    anchor = cand.loc[idx]
-                    cs = pd.Timestamp(current_start.loc[idx])
-                    anchor_code = str(anchor.get("task_code", ""))
-                    anchor_name = str(anchor.get("task_name", anchor_code))
-                    bmatch = b_all[b_all["task_code"].astype(str).eq(anchor_code)] if "task_code" in b_all.columns else pd.DataFrame()
-                    if not bmatch.empty:
-                        br = bmatch.iloc[0]
-                        bs = pd.to_datetime(br.get("target_start_date"), errors="coerce")
-                        if pd.isna(bs):
-                            bs = pd.to_datetime(br.get("early_start_date"), errors="coerce")
+            # Update: actual dates when available; otherwise remaining forecast.
+            current_start = pd.to_datetime(c_all["act_start_date"], errors="coerce")
+            current_start = current_start.fillna(
+                pd.to_datetime(c_all["early_start_date"], errors="coerce")
+            ).fillna(pd.to_datetime(c_all["restart_date"], errors="coerce")
+            ).fillna(pd.to_datetime(c_all["target_start_date"], errors="coerce"))
 
-            # Defensive fallback if a representative anchor cannot be identified.
-            if pd.isna(bs):
-                bs = _date_min(b_all, ["target_start_date", "early_start_date"])
-            if pd.isna(cs):
-                actuals = pd.to_datetime(c_all.get("act_start_date"), errors="coerce") if "act_start_date" in c_all.columns else pd.Series(pd.NaT, index=c_all.index)
-                cs = actuals.dropna().min() if actuals.notna().any() else _date_min(c_all, ["early_start_date", "restart_date", "target_start_date"])
-
-            bf = _date_max(b_all, ["target_end_date", "early_end_date", "reend_date"])
-            # Current finish must be status-aware. A completed task's old
-            # target_end_date must never extend the forecast window.
-            current_status = c_all["status_code"].fillna("").astype(str).str.upper()
-            completed = current_status.eq("TK_COMPLETE")
+            completed = c_all["status_code"].fillna("").astype(str).str.upper().eq("TK_COMPLETE")
             actual_finish = pd.to_datetime(c_all["act_end_date"], errors="coerce")
-            remaining_finish = pd.to_datetime(c_all["reend_date"], errors="coerce")
-            remaining_finish = remaining_finish.fillna(
+            forecast_finish = pd.to_datetime(c_all["reend_date"], errors="coerce").fillna(
                 pd.to_datetime(c_all["early_end_date"], errors="coerce")
             )
-            if actual_finish[completed].isna().any():
-                raise ValueError(f"Missing actual finish for completed HELIX scope in {area}")
-            if remaining_finish[~completed].isna().any():
-                raise ValueError(f"Missing remaining forecast finish in {area}")
-            status_finish = actual_finish.where(completed, remaining_finish)
-            cf = status_finish.max()
+            current_finish = actual_finish.where(completed, forecast_finish)
+            for label, dates in (
+                ("Baseline Start", baseline_start), ("Baseline Finish", baseline_finish),
+                ("Current Start", current_start), ("Current Finish", current_finish),
+            ):
+                if dates.isna().any():
+                    missing = b_all if label.startswith("Baseline") else c_all
+                    examples = missing.loc[dates.isna(), "task_code"].head(5).tolist()
+                    raise ValueError(f"Missing {label} in {area}: {examples}")
+
+            bs, bf = baseline_start.min(), baseline_finish.max()
+            cs, cf = current_start.min(), current_finish.max()
+            if bs > bf or cs > cf:
+                raise ValueError(f"Invalid HELIX area window in {area}")
+
             rows.append({
                 "Area": area,
                 "Baseline Start": bs,
                 "Baseline Finish": bf,
                 "Current Start": cs,
                 "Current Forecast Finish": cf,
-                "Start Date Shift (d)": (bs.normalize() - cs.normalize()).days if pd.notna(cs) and pd.notna(bs) else np.nan,
-                "Finish Date Shift (d)": (bf.normalize() - cf.normalize()).days if pd.notna(cf) and pd.notna(bf) else np.nan,
-                "Duration Change (d)": ((bf - bs) - (cf - cs)).days if all(pd.notna(x) for x in [bs, bf, cs, cf]) else np.nan,
+                "Start Date Shift (d)": (bs.normalize() - cs.normalize()).days,
+                "Finish Date Shift (d)": (bf.normalize() - cf.normalize()).days,
+                "Duration Change (d)": ((bf - bs) - (cf - cs)).days,
                 "Activity Completion %": _activity_completion_pct(c_all),
-                "Start Anchor ID": anchor_code,
-                "Start Anchor": anchor_name,
+                "Start Anchor ID": str(b_all.loc[baseline_start.idxmin(), "task_code"]),
+                "Start Anchor": str(b_all.loc[baseline_start.idxmin(), "task_name"]),
             })
         return pd.DataFrame(rows)
+
 
     def wbs_area_activities(self, area: str, include_exceptions: bool = False) -> pd.DataFrame:
         """Return FOH/BOH HELIX Construction grouped by the genuine P6 WBS.
