@@ -845,6 +845,54 @@ def render_helix_contract_milestones(m: DC7Model):
         fig.update_yaxes(autorange="reversed")
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
+    # FB 16-Oct review: display the requested exceptions without assigning
+    # an unsupported HELIX subcontractor code or inventing FTE Activity IDs.
+    additional = []
+    source_b = m.auxiliary_tables["TASK"]
+    source_u = m.auxiliary_update_tables["TASK"]
+    for activity_id, category in (("M.1100", "QC 2.2"), ("IST.1100", "IST / L4 Cx")):
+        br = source_b[source_b["task_code"].eq(activity_id)]
+        ur = source_u[source_u["task_code"].eq(activity_id)]
+        if len(br) != 1 or len(ur) != 1:
+            raise ValueError(f"Cannot uniquely reconcile FB DH1100 milestone {activity_id}")
+        bd = pd.to_datetime(br.iloc[0]["target_end_date"], errors="coerce")
+        cd = pd.to_datetime(ur.iloc[0]["reend_date"], errors="coerce")
+        if pd.isna(bd) or pd.isna(cd):
+            raise ValueError(f"Missing date in XER milestone {activity_id}")
+        additional.append({
+            "Data Hall": "DH1100", "Milestone": category, "Activity ID": activity_id,
+            "Baseline Date": _fmt_date(bd), "Current Finish Date": _fmt_date(cd),
+            "Variance (Working Days)": f"{us_federal_workday_delay(bd, cd):+d}",
+            "Source / Status": "P6 BL/U01 · Not coded HELIX",
+        })
+
+    # Dates transcribed from the FB review (page 11). These are NOT
+    # independently verified P6 milestones: no matching FTE Complete IDs
+    # exist in the supplied independent HELIX BL/U01 files.
+    fb_fte = (
+        ("DH1250", "30-Mar-2026", "05-Sep-2026"),
+        ("DH1350", "25-Apr-2026", "18-Sep-2026"),
+        ("DH1450", "22-May-2026", "28-Sep-2026"),
+        ("DH1550", "24-Jun-2026", "14-Sep-2026"),
+        ("DH1650", "25-Jul-2026", "28-Sep-2026"),
+    )
+    for hall, bl_date, cur_date in fb_fte:
+        additional.append({
+            "Data Hall": hall, "Milestone": "FTE Complete",
+            "Activity ID": "Pending P6 ID", "Baseline Date": bl_date,
+            "Current Finish Date": cur_date, "Variance (Working Days)": "—",
+            "Source / Status": "FB review · Not verified in HELIX XER",
+        })
+    st.markdown(
+        '<div class="section-caption">ADDITIONAL FB MILESTONES · SOURCE RECONCILIATION</div>',
+        unsafe_allow_html=True,
+    )
+    st.dataframe(pd.DataFrame(additional), use_container_width=True,
+                 hide_index=True, height="content")
+    st.caption("DH1100 dates are verified against P6 but the activities are not coded HELIX. "
+               "FTE Complete dates come from the FB review and remain provisional until "
+               "the corresponding P6 Activity IDs and source schedule are confirmed.")
+
 
 def render_dashboard(helix: DC7Model, suffolk: DC7Model):
     view = st.session_state.get("dc7_schedule_view", "SUFFOLK")
