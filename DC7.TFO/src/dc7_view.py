@@ -19,11 +19,20 @@ CSS=f"""
 [data-testid="stToolbar"]{{display:none!important}} [data-testid="stSidebar"]{{display:none!important}} [data-testid="collapsedControl"]{{display:none!important}}
 .block-container{{padding-top:.6rem;padding-bottom:2rem;max-width:1680px}} [data-testid="stAppViewContainer"]{{background:#fff}}
 html,body,[class*="css"]{{font-family:Arial,Helvetica,sans-serif;color:{TEXT}}} [data-testid="stVerticalBlock"]{{gap:.55rem}}
-.helix-header{{background:{NAVY};color:#fff;min-height:84px;padding:11px 17px;display:grid;grid-template-columns:105px minmax(500px,1.65fr) 250px 295px 112px;align-items:center;column-gap:16px}}
-.logo-card{{background:#fff;border-radius:5px;height:55px;padding:4px 8px;display:flex;align-items:center;justify-content:center}} .logo-card img{{max-width:100%;max-height:47px;object-fit:contain}}
-.brand-title{{font-size:26px;font-weight:850;line-height:1.02;white-space:nowrap}} .brand-subtitle{{font-size:13px;font-weight:650;margin-top:7px;color:#d7e2ed}}
-.header-center{{display:flex;justify-content:center;gap:8px;align-items:center;white-space:nowrap}} .header-chip{{border:1px solid #6f87a2;border-radius:6px;padding:9px 14px;font-size:12px;font-weight:850}}
-.header-meta{{text-align:right;white-space:nowrap;line-height:1.35}} .header-meta .line{{font-size:12px;font-weight:800;margin:2px 0}} .header-meta .value{{font-size:13px;font-weight:900}}
+.helix-header{{display:grid;grid-template-columns:minmax(170px,0.9fr) minmax(0,5fr) minmax(170px,0.9fr);gap:12px;align-items:stretch;background:#fff;color:{TEXT};min-height:108px;width:100%}}
+.helix-header .logo-card{{background:#fff;border:1px solid {BORDER};border-radius:7px;padding:10px 12px;min-width:0;min-height:108px;display:flex;align-items:center;justify-content:center}}
+.helix-header .logo-card img{{display:block;width:100%;height:80px;max-height:80px;object-fit:contain}}
+.helix-header .header-main{{background:{NAVY};color:#fff;border-radius:7px;min-width:0;padding:18px 24px;display:flex;align-items:center;justify-content:space-between;gap:18px}}
+.helix-header .header-title-block{{min-width:0;flex:1 1 auto}}
+.helix-header .brand-title{{font-size:clamp(18px,1.55vw,26px);font-weight:850;line-height:1.13}}
+.helix-header .brand-subtitle{{font-size:13px;font-weight:600;margin-top:8px;color:#d7e2ed}}
+.helix-header .header-center{{display:flex;gap:7px;align-items:center;white-space:nowrap;flex:0 0 auto}}
+.helix-header .header-chip{{border:1px solid #879cb3;border-radius:6px;padding:10px 12px;font-size:11px;font-weight:850}}
+.helix-header .header-meta{{text-align:right;white-space:nowrap;line-height:1.35;flex:0 0 auto}}
+.helix-header .header-meta .line{{font-size:11px;font-weight:700;margin:3px 0}}
+.helix-header .header-meta .value{{font-size:12px;font-weight:900}}
+@media(max-width:1220px){{.helix-header{{grid-template-columns:minmax(120px,0.85fr) minmax(0,5fr) minmax(120px,0.85fr);gap:7px}}.helix-header .header-main{{flex-wrap:wrap;gap:9px;padding:14px}}.helix-header .header-meta{{text-align:left}}.helix-header .logo-card{{min-height:100px}}.helix-header .logo-card img{{height:70px}}}}
+@media(max-width:700px){{.helix-header{{grid-template-columns:1fr 1fr}}.helix-header .header-main{{grid-column:1/-1;grid-row:1}}.helix-header .logo-card{{min-height:65px}}.helix-header .logo-card img{{height:52px}}.helix-header .header-center{{flex-wrap:wrap}}.helix-header .header-meta{{white-space:normal}}}}
 .project-strip{{margin-top:14px;background:{NAVY};color:#fff;padding:11px 15px;border-radius:3px;display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:850}} .project-strip .right{{font-weight:600;color:#dce6f0}}
 .section-caption{{font-size:17px;font-weight:900;color:#000;margin:16px 0 3px 12px}} .panel{{background:#fff;border:1px solid {BORDER};border-radius:5px;padding:10px 12px 12px}}
 .panel.schedule{{background:#f5fbf8;border-top:4px solid {GREEN}}} .panel-head{{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;gap:12px}} .panel-title{{font-size:17px;font-weight:900;color:{NAVY}}} .panel-note{{font-size:12px;color:{MUTED};text-align:right}}
@@ -41,7 +50,7 @@ html,body,[class*="css"]{{font-family:Arial,Helvetica,sans-serif;color:{TEXT}}} 
 .gate-legend .item{{display:flex;align-items:center;gap:6px}} .gate-legend .diamond{{width:10px;height:10px;background:#7048c7;transform:rotate(45deg);display:inline-block}} .gate-legend .dot{{width:10px;height:10px;border-radius:50%;background:{BLUE};display:inline-block}} .gate-legend .line-late{{width:24px;height:4px;background:{RED};display:inline-block;border-radius:4px}} .gate-legend .line-early{{width:24px;height:4px;background:{EARLY};display:inline-block;border-radius:4px}} .gate-legend .line-zero{{width:24px;height:4px;background:{BLUE};display:inline-block;border-radius:4px}}
 .small-note{{font-size:12px;color:{MUTED};margin:0 0 8px 2px;line-height:1.35}}
 @media(max-width:1450px){{.kpi-grid{{grid-template-columns:repeat(4,1fr)}}}}
-@media(max-width:1200px){{.helix-header{{grid-template-columns:90px minmax(360px,1fr) 210px 260px 92px;column-gap:10px}}.brand-title{{font-size:20px}}.kpi-grid{{grid-template-columns:repeat(3,1fr)}}}}
+@media(max-width:1200px){{.kpi-grid{{grid-template-columns:repeat(3,1fr)}}}}
 </style>
 """
 
@@ -85,16 +94,18 @@ def render_header(m: DC7Model):
     st.markdown(CSS, unsafe_allow_html=True)
     st.markdown(f"""
     <div class="helix-header">
-      <div class="logo-card"><img src="{_logo('toro')}"></div>
-      <div><div class="brand-title">{BRAND_NAME} {APP_TITLE}</div><div class="brand-subtitle">{APP_SUBTITLE}</div></div>
-      <div class="header-center"><span class="header-chip">DC7.TFO PROJECT DETAIL</span><span class="header-chip">v{VERSION}</span></div>
-      <div class="header-meta">
-        <div class="line">U03 Data Date&nbsp;&nbsp;<span class="value">{_fmt_date(m.previous_data_date)}</span></div>
-        <div class="line">U04 Data Date&nbsp;&nbsp;<span class="value">{_fmt_date(m.data_date)}</span></div>
-        <div class="line">Current Update&nbsp;&nbsp;<span class="value">{_safe(m.update_path.stem)}</span></div>
-        <div class="line">Scope&nbsp;&nbsp;<span class="value">HELIX Electric</span></div>
+      <div class="logo-card"><img src="{_logo('helix')}" alt="HELIX Electric"></div>
+      <div class="header-main">
+        <div class="header-title-block"><div class="brand-title">{BRAND_NAME} {APP_TITLE}</div><div class="brand-subtitle">{APP_SUBTITLE}</div></div>
+        <div class="header-center"><span class="header-chip">DC7.TFO PROJECT DETAIL</span><span class="header-chip">v{VERSION}</span></div>
+        <div class="header-meta">
+          <div class="line">U03 Data Date&nbsp;&nbsp;<span class="value">{_fmt_date(m.previous_data_date)}</span></div>
+          <div class="line">U04 Data Date&nbsp;&nbsp;<span class="value">{_fmt_date(m.data_date)}</span></div>
+          <div class="line">Current Update&nbsp;&nbsp;<span class="value">{_safe(m.update_path.stem)}</span></div>
+          <div class="line">Scope&nbsp;&nbsp;<span class="value">HELIX Electric</span></div>
+        </div>
       </div>
-      <div class="logo-card"><img src="{_logo('helix')}"></div>
+      <div class="logo-card"><img src="{_logo('toro')}" alt="TORO Project Management Consultants"></div>
     </div>
     <div class="project-strip"><span>DC7.TFO VIEW</span><span class="right">Full-project finish · HELIX Activity Code scope analytics</span></div>
     """, unsafe_allow_html=True)
