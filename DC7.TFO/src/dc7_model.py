@@ -411,6 +411,7 @@ class DC7Model:
     update_tables: dict[str, pd.DataFrame]
     previous_path: Path
     previous_project: pd.Series
+    previous_tasks: pd.DataFrame
 
     @property
     def previous_data_date(self):
@@ -703,6 +704,7 @@ class DC7Model:
     def scurve(self) -> pd.DataFrame:
         b = self.baseline_tasks.copy()
         c = self.current_tasks.copy()
+        p = self.previous_tasks.copy()
 
         def pick_date(df: pd.DataFrame, cols: list[str]) -> pd.Series:
             out = pd.Series(pd.NaT, index=df.index, dtype="datetime64[ns]")
@@ -714,9 +716,10 @@ class DC7Model:
 
         b_finish = pick_date(b, ["target_end_date", "early_end_date", "reend_date"])
         c_finish = pick_date(c, ["act_end_date", "reend_date", "early_end_date", "target_end_date"])
+        p_finish = pick_date(p, ["act_end_date", "reend_date", "early_end_date", "target_end_date"])
         actual_finish = pd.to_datetime(c.get("act_end_date"), errors="coerce") if "act_end_date" in c.columns else pd.Series(pd.NaT, index=c.index)
 
-        candidates = pd.concat([b_finish.dropna(), c_finish.dropna(), actual_finish.dropna()])
+        candidates = pd.concat([b_finish.dropna(), p_finish.dropna(), c_finish.dropna(), actual_finish.dropna()])
         if candidates.empty:
             return pd.DataFrame()
 
@@ -733,6 +736,7 @@ class DC7Model:
         out = pd.DataFrame({
             "Date": grid,
             "Baseline Planned Activities": cumulative_count(b_finish),
+            "U04 Forecast Activities": cumulative_count(p_finish),
             "Current Forecast Activities": cumulative_count(c_finish),
             "Actual Completed Activities": cumulative_count(actual_finish),
         })
@@ -877,8 +881,13 @@ def build_dc7_model(data_dir: Path) -> DC7Model:
     previous_path = up_path.parent / "DC7.TFO-U04.xer"
     if not previous_path.is_file():
         raise FileNotFoundError(f"Previous DC7.TFO update missing: {previous_path.name}")
-    previous_tables = parse_xer(previous_path, ["PROJECT", "TASK"])
+    previous_tables = parse_xer(previous_path, WANTED)
     previous_project = _project_row(previous_tables, previous_path)
+    previous_id = str(previous_project["proj_id"])
+    previous_all = to_task_frame(previous_tables["TASK"])
+    previous_all = previous_all[previous_all["proj_id"].astype(str).eq(previous_id)].copy()
+    previous_ids = _helix_task_ids(previous_tables, previous_id)
+    previous_tasks = previous_all[previous_all["task_id"].astype(str).isin(previous_ids)].copy()
     bt = parse_xer(bl_path, WANTED)
     ut = parse_xer(up_path, WANTED)
     bp = _project_row(bt, bl_path)
@@ -911,4 +920,4 @@ def build_dc7_model(data_dir: Path) -> DC7Model:
     # A schedule update may legitimately add, split, replace, or recode activities.
     # Baseline-vs-current date comparisons use only task_codes present in both files,
     # while current-status/progress analytics retain the full current HELIX scope.
-    return DC7Model(bl_path, up_path, bp, up, baseline, current, bt, ut, previous_path, previous_project)
+    return DC7Model(bl_path, up_path, bp, up, baseline, current, bt, ut, previous_path, previous_project, previous_tasks)
