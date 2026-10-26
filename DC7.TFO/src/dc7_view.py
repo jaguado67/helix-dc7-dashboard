@@ -99,8 +99,6 @@ def render_header(m: DC7Model):
         <div class="header-title-block"><div class="brand-title">{BRAND_NAME} {APP_TITLE}</div><div class="brand-subtitle">{APP_SUBTITLE}</div></div>
         <div class="header-center"><span class="header-chip">DC7.TFO PROJECT DETAIL</span><span class="header-chip">v{VERSION}</span></div>
         <div class="header-meta">
-          <div class="line">U04 Data Date&nbsp;&nbsp;<span class="value">{_fmt_date(m.previous_data_date)}</span></div>
-          <div class="line">U05 Data Date&nbsp;&nbsp;<span class="value">{_fmt_date(m.data_date)}</span></div>
           <div class="line">Current Update&nbsp;&nbsp;<span class="value">{_safe(m.update_path.stem)}</span></div>
           <div class="line">Scope&nbsp;&nbsp;<span class="value">HELIX Electric</span></div>
         </div>
@@ -289,6 +287,10 @@ def render_progress_detail(m: DC7Model):
     area = st.selectbox("Area / Data Hall", m.areas(), index=0, key="dc7_area")
 
     df = m.subarea_stats(area)
+    # Milestones remain in the XER and overall HELIX scope totals;
+    # exclude them only from FOH/BOH package summaries and charts.
+    if area in {"FOH", "BOH"}:
+        df = df[df["Area"].astype(str).ne("Milestones")].copy()
     c1, c2 = st.columns([1.15, 1], gap="large")
     with c1:
         h = f'<div class="panel"><div class="panel-head"><div class="panel-title">{area} · {"FUNCTIONAL PACKAGE SUMMARY" if area in {"FOH", "BOH"} else ("WBS PACKAGE SUMMARY" if str(area).upper().startswith("DH") else "SUMMARY BY QTS - DASH")}</div></div><table class="detail-table"><thead><tr><th>Area</th><th>Tasks</th><th>Activity Completion %</th><th>Not Started</th><th>In Progress</th><th>Completed</th></tr></thead><tbody>'
