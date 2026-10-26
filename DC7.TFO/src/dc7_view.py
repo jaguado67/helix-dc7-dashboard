@@ -148,7 +148,8 @@ def render_scurve_and_status(m: DC7Model):
             if pd.notna(m.data_date):
                 fig.add_vline(x=m.data_date, line_dash="dash", line_color="#6d7f92", annotation_text=f"Data Date · {_fmt_date(m.data_date)}", annotation_position="top right")
             total = m.status_counts()["Total"]
-            fig.update_layout(**_layout(410, 70, 55, 34), yaxis_title="Cumulative Activities", xaxis_title="Date", title=dict(text=""), legend_title_text="", legend=dict(itemclick="toggle", itemdoubleclick="toggleothers"), uirevision="dc7-tfo-scurve-u05")
+            fig.update_layout(**_layout(410, 70, 55, 34), yaxis_title="Cumulative Activities", xaxis_title="Date", title=dict(text=""), legend_title_text="", uirevision="dc7-tfo-scurve-u05")
+            fig.update_layout(legend=dict(itemclick="toggle", itemdoubleclick="toggleothers"))
             fig.update_yaxes(range=[0, max(1, total * 1.04)], tickformat=",d", gridcolor=GRID)
             fig.update_xaxes(type="date", dtick="M3", tickformat="%b\n%Y", gridcolor=GRID)
             st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
