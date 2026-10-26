@@ -143,7 +143,8 @@ def render_scurve_and_status(m: DC7Model):
             fig = go.Figure()
             fig.add_trace(go.Scatter(x=df.Date, y=df["Baseline Planned Activities"], name="Baseline Planned Activities", mode="lines", line=dict(color="#446a9e", width=3), hovertemplate="<b>Baseline Planned Activities</b><br>%{x|%d-%b-%Y}<br>%{y:,.0f} activities<extra></extra>"))
             fig.add_trace(go.Scatter(x=df.Date, y=df["U04 Forecast Activities"], name="U04 Forecast Activities", mode="lines", line=dict(color="#9483b6", width=3, dash="dot"), hovertemplate="<b>U04 Forecast Activities</b><br>%{x|%d-%b-%Y}<br>%{y:,.0f} activities<extra></extra>"))
-            fig.add_trace(go.Scatter(x=df.Date, y=df["Current Forecast Activities"], name="U05 Current Forecast Activities", mode="lines", line=dict(color="#d36b32", width=3), hovertemplate="<b>U05 Current Forecast Activities</b><br>%{x|%d-%b-%Y}<br>%{y:,.0f} activities<extra></extra>"))
+            u05_vs_u04 = df["Current Forecast Activities"] - df["U04 Forecast Activities"]
+            fig.add_trace(go.Scatter(x=df.Date, y=df["Current Forecast Activities"], name="U05 Current Forecast Activities", mode="lines", line=dict(color="#d36b32", width=3), customdata=u05_vs_u04, hovertemplate="<b>U05 Current Forecast Activities</b><br>%{x|%d-%b-%Y}<br>U05: %{y:,.0f} activities<br>U05 − U04: %{customdata:+,.0f} activities<extra></extra>"))
             fig.add_trace(go.Scatter(x=df.Date, y=df["Actual Completed Activities"], name="Actual Completed Activities", mode="lines+markers", line=dict(color=GREEN, width=3), marker=dict(size=7), connectgaps=False, hovertemplate="<b>Actual Completed Activities</b><br>%{x|%d-%b-%Y}<br>%{y:,.0f} completed<extra></extra>"))
             if pd.notna(m.data_date):
                 fig.add_vline(x=m.data_date, line_dash="dash", line_color="#6d7f92", annotation_text=f"Data Date · {_fmt_date(m.data_date)}", annotation_position="top right")
