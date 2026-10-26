@@ -61,7 +61,7 @@ def _find_files(data_dir: Path) -> tuple[Path, Path]:
         raise FileNotFoundError(f"No XER files found below data directory: {data_dir}")
 
     exact_bl = [p for p in all_xer if p.name.casefold() == "dc7.tfo-bl.xer"]
-    exact_up = [p for p in all_xer if p.name.casefold() == "dc7.tfo-u04.xer"]
+    exact_up = [p for p in all_xer if p.name.casefold() == "dc7.tfo-u05.xer"]
 
     if exact_bl and exact_up:
         pairs = [(b, u) for b in exact_bl for u in exact_up if b.parent == u.parent]
@@ -114,7 +114,7 @@ def _find_files(data_dir: Path) -> tuple[Path, Path]:
         suffix = " ..." if len(all_xer) > 20 else ""
         raise FileNotFoundError(
             "DC7.TFO BL/Update pair not found. Expected official files "
-            "DC7.TFO-BL.xer and DC7.TFO-U04.xer either directly "
+            "DC7.TFO-BL.xer and DC7.TFO-U05.xer either directly "
             f"inside {data_dir} or in a DC7.TFO subfolder. XERs seen: {names}{suffix}"
         )
 
@@ -874,7 +874,7 @@ class DC7Model:
 
 def build_dc7_model(data_dir: Path) -> DC7Model:
     bl_path, up_path = _find_files(data_dir)
-    previous_path = up_path.parent / "DC7.TFO-U03.xer"
+    previous_path = up_path.parent / "DC7.TFO-U04.xer"
     if not previous_path.is_file():
         raise FileNotFoundError(f"Previous DC7.TFO update missing: {previous_path.name}")
     previous_tables = parse_xer(previous_path, ["PROJECT", "TASK"])
