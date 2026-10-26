@@ -135,19 +135,20 @@ def render_scurve_and_status(m: DC7Model):
     st.markdown('<div class="section-caption">ACTIVITY PERFORMANCE</div>', unsafe_allow_html=True)
     c1, c2 = st.columns([1.7, 0.8], gap="large")
     with c1:
-        st.markdown('<div class="panel"><div class="panel-head"><div class="panel-title">ACTIVITY S-CURVE · HELIX SCOPE</div><div class="panel-note">Cumulative activity count · baseline / current forecast / actual completions</div></div>', unsafe_allow_html=True)
+        st.markdown('<div class="panel"><div class="panel-head"><div class="panel-title">ACTIVITY S-CURVE · HELIX SCOPE</div><div class="panel-note">Cumulative activity count · baseline / U04 forecast / U05 forecast / actual completions</div></div>', unsafe_allow_html=True)
         df = m.scurve()
         if df.empty:
             st.info("Activity S-curve could not be constructed from the XER finish dates.")
         else:
             fig = go.Figure()
             fig.add_trace(go.Scatter(x=df.Date, y=df["Baseline Planned Activities"], name="Baseline Planned Activities", mode="lines", line=dict(color="#446a9e", width=3), hovertemplate="<b>Baseline Planned Activities</b><br>%{x|%d-%b-%Y}<br>%{y:,.0f} activities<extra></extra>"))
-            fig.add_trace(go.Scatter(x=df.Date, y=df["Current Forecast Activities"], name="Current Forecast Activities", mode="lines", line=dict(color="#d36b32", width=3), hovertemplate="<b>Current Forecast Activities</b><br>%{x|%d-%b-%Y}<br>%{y:,.0f} activities<extra></extra>"))
+            fig.add_trace(go.Scatter(x=df.Date, y=df["U04 Forecast Activities"], name="U04 Forecast Activities", mode="lines", line=dict(color="#9483b6", width=3, dash="dot"), hovertemplate="<b>U04 Forecast Activities</b><br>%{x|%d-%b-%Y}<br>%{y:,.0f} activities<extra></extra>"))
+            fig.add_trace(go.Scatter(x=df.Date, y=df["Current Forecast Activities"], name="U05 Current Forecast Activities", mode="lines", line=dict(color="#d36b32", width=3), hovertemplate="<b>U05 Current Forecast Activities</b><br>%{x|%d-%b-%Y}<br>%{y:,.0f} activities<extra></extra>"))
             fig.add_trace(go.Scatter(x=df.Date, y=df["Actual Completed Activities"], name="Actual Completed Activities", mode="lines+markers", line=dict(color=GREEN, width=3), marker=dict(size=7), connectgaps=False, hovertemplate="<b>Actual Completed Activities</b><br>%{x|%d-%b-%Y}<br>%{y:,.0f} completed<extra></extra>"))
             if pd.notna(m.data_date):
                 fig.add_vline(x=m.data_date, line_dash="dash", line_color="#6d7f92", annotation_text=f"Data Date · {_fmt_date(m.data_date)}", annotation_position="top right")
             total = m.status_counts()["Total"]
-            fig.update_layout(**_layout(410, 70, 55, 34), yaxis_title="Cumulative Activities", xaxis_title="Date", title=dict(text=""), legend_title_text="")
+            fig.update_layout(**_layout(410, 70, 55, 34), yaxis_title="Cumulative Activities", xaxis_title="Date", title=dict(text=""), legend_title_text="", legend=dict(itemclick="toggle", itemdoubleclick="toggleothers"), uirevision="dc7-tfo-scurve-u05")
             fig.update_yaxes(range=[0, max(1, total * 1.04)], tickformat=",d", gridcolor=GRID)
             fig.update_xaxes(type="date", dtick="M3", tickformat="%b\n%Y", gridcolor=GRID)
             st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
