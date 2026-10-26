@@ -99,8 +99,8 @@ def render_header(m: DC7Model):
         <div class="header-title-block"><div class="brand-title">{BRAND_NAME} {APP_TITLE}</div><div class="brand-subtitle">{APP_SUBTITLE}</div></div>
         <div class="header-center"><span class="header-chip">DC7.TFO PROJECT DETAIL</span><span class="header-chip">v{VERSION}</span></div>
         <div class="header-meta">
-          <div class="line">U05 Data Date&nbsp;&nbsp;<span class="value">{_fmt_date(m.previous_data_date)}</span></div>
-          <div class="line">U04 Data Date&nbsp;&nbsp;<span class="value">{_fmt_date(m.data_date)}</span></div>
+          <div class="line">U04 Data Date&nbsp;&nbsp;<span class="value">{_fmt_date(m.previous_data_date)}</span></div>
+          <div class="line">U05 Data Date&nbsp;&nbsp;<span class="value">{_fmt_date(m.data_date)}</span></div>
           <div class="line">Current Update&nbsp;&nbsp;<span class="value">{_safe(m.update_path.stem)}</span></div>
           <div class="line">Scope&nbsp;&nbsp;<span class="value">HELIX Electric</span></div>
         </div>
