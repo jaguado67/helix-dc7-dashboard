@@ -32,7 +32,7 @@ def _materialize_cloud_xers(data_root: Path) -> Path:
     # The historical "-4" copy must never be materialized or silently substituted.
     helix_baseline = "226021-HE.B.xer"
     suffolk_update = "226021.022.MO-UP-08.xer"
-    suffolk_update_sha = "2860a45ccdc71cb70905eaafc9b6cb56fa87985fdd9c448ed8be9f9201c6e73e"
+    suffolk_update_sha = "c1d04c9b13a7504dc9f20b279398a6c4cb57cd346d87b4157d42bf175dbc73ac"
     helix_update = "226021-HE.U02.xer"
     helix_update_sha = "bbe3545be853972e745e96f8072cca9cc1561486ce24b51d5d2fa0519f7c8d14"
     required = official + (previous,)
@@ -129,7 +129,7 @@ def _materialize_cloud_xers(data_root: Path) -> Path:
         )
     else:
         raise FileNotFoundError("Official Suffolk UP08 not found")
-    if len(suffolk_payload) != 5071788 or hashlib.sha256(suffolk_payload).hexdigest() != suffolk_update_sha:
+    if len(suffolk_payload) != 5071859 or hashlib.sha256(suffolk_payload).hexdigest() != suffolk_update_sha:
         raise ValueError("Suffolk UP08 byte-size/SHA-256 verification failed")
     suffolk_target = runtime_dc7 / suffolk_update
     if not suffolk_target.is_file() or suffolk_target.read_bytes() != suffolk_payload:
@@ -155,7 +155,7 @@ if not source_data_dir.exists():
 
 data_dir = _materialize_cloud_xers(source_data_dir)
 
-MODEL_VERSION = "dc7-2026-10-27-helix-u02-overlay-v039"
+MODEL_VERSION = "dc7-2026-10-27-suffolk-up08-refresh-v040"
 
 @st.cache_resource(show_spinner="Reading DC7 baseline/update XER and building HELIX scope…")
 def load_model(path_text: str, model_version: str):
