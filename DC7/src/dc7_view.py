@@ -840,6 +840,12 @@ def render_helix_contract_milestones(m: DC7Model):
         categories=["DH1100", "DH1200", "DH1300", "DH1400", "DH1500", "DH1600"],
         ordered=True,
     )
+    # Executive order: Data Hall ascending, QC 2.2 before IST / L4 Cx.
+    milestone_rows["Milestone"] = pd.Categorical(
+        milestone_rows["Milestone"],
+        categories=["QC 2.2", "IST / L4 Cx"],
+        ordered=True,
+    )
     milestone_rows = milestone_rows.sort_values(
         ["Area", "Milestone"], kind="stable"
     ).reset_index(drop=True)
