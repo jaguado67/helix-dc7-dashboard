@@ -206,7 +206,7 @@ def render_helix_baseline_scurve_and_status(m: DC7Model):
     """HELIX BL vs independent U02 forecast and actual activity completions."""
     from src.helix_baseline import helix_bl_current_overview
     bl, cur = m.independent_helix_baseline(), m.independent_helix_update()
-    st.markdown('<div class="section-caption">SCHEDULE PERFORMANCE</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-caption">ACTIVITY PERFORMANCE</div>', unsafe_allow_html=True)
     if bl is None or cur is None:
         st.warning("Independent HELIX BL and U02 are both required for progress S-curve.")
         return
@@ -217,40 +217,41 @@ def render_helix_baseline_scurve_and_status(m: DC7Model):
     with c1:
         st.markdown(
             '<div class="panel"><div class="panel-head">'
-            '<div class="panel-title">PROGRESS S-CURVE</div>'
-            '<div class="panel-note">HELIX Electrical Line-Ups & MOH · activity count</div>'
+            '<div class="panel-title">ACTIVITY S-CURVE · HELIX SCOPE</div>'
+            '<div class="panel-note">Cumulative activity count · baseline / U01 forecast / U02 forecast / actual completions</div>'
             '</div>', unsafe_allow_html=True,
         )
+        historical = m.independent_helix_u01()
+        show_u01 = st.toggle("U01 forecast", value=True, key="dc7_helix_u01_overlay") if historical is not None else False
         fig = go.Figure()
         for field, color in (
-            ("Baseline Planned Activities", "#4B91F1"),
-            ("Current Forecast Activities", "#59BA75"),
-            ("Actual Completed Activities", "#F28A58"),
+            ("Baseline Planned Activities", "#456FA6"),
+            ("Current Forecast Activities", "#E77638"),
+            ("Actual Completed Activities", "#27976C"),
         ):
             actual = field == "Actual Completed Activities"
             fig.add_trace(go.Scatter(
-                x=curve["Date"], y=curve[field], name=field,
+                x=curve["Date"], y=curve[field], name=("U02 Current Forecast Activities" if field == "Current Forecast Activities" else field),
                 mode="lines+markers" if actual else "lines",
                 line=dict(color=color, width=3),
                 marker=dict(size=5 if actual else 0),
                 connectgaps=False,
                 hovertemplate=f"%{{x|%d-%b-%Y}}<br>%{{y:,.0f}} {field}<extra></extra>",
             ))
-        # Optional historical forecast from the independent HELIX U01 XER.
-        historical = m.independent_helix_u01()
-        if historical is not None:
-            show_u01 = st.checkbox("Show U01 forecast", value=True, key="dc7_helix_u01_overlay")
-            if show_u01:
-                previous_date = m.historical_helix_project["last_recalc_date"]
-                _, previous_curve = helix_bl_current_overview(bl, historical, previous_date)
-                fig.add_trace(go.Scatter(
-                    x=previous_curve["Date"],
-                    y=previous_curve["Current Forecast Activities"],
-                    name="U01 Forecast",
-                    mode="lines",
-                    line=dict(color="#8A72BA", width=2, dash="dash"),
-                    hovertemplate="%{x|%d-%b-%Y}<br>%{y:,.0f} U01 forecast<extra></extra>",
-                ))
+        if show_u01:
+            previous_date = m.historical_helix_project["last_recalc_date"]
+            _, previous_curve = helix_bl_current_overview(bl, historical, previous_date)
+            fig.add_trace(go.Scatter(
+                x=previous_curve["Date"], y=previous_curve["Current Forecast Activities"],
+                name="U01 Forecast Activities", mode="lines",
+                line=dict(color="#A987B8", width=2.5, dash="dot"),
+                hovertemplate="%{x|%d-%b-%Y}<br>%{y:,.0f} U01 forecast<extra></extra>",
+            ))
+        # Match TFO legend order while preserving Plotly legend click-to-hide.
+        order = {"Baseline Planned Activities": 0, "U01 Forecast Activities": 1,
+                 "U02 Current Forecast Activities": 2, "Actual Completed Activities": 3}
+        for trace in fig.data:
+            trace.legendrank = order.get(trace.name, 9)
         dd = info["Current Data Date"]
         fig.add_vline(
             x=dd, line_dash="dash", line_color="#6d7f92",
@@ -258,12 +259,12 @@ def render_helix_baseline_scurve_and_status(m: DC7Model):
             annotation_position="top right",
         )
         fig.update_layout(
-            **_layout(440, 54, 100, 42), title=dict(text=""),
+            **_layout(440, 54, 65, 95), title=dict(text=""),
 
             yaxis_title="Cumulative Activities", xaxis_title="Date",
             legend_title_text="",
         )
-        fig.update_layout(legend=dict(orientation="h", yanchor="top", y=-0.27, xanchor="center", x=0.5, font=dict(size=11)))
+        fig.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.025, xanchor="center", x=0.5, font=dict(size=11)))
         fig.update_yaxes(range=[0, total * 1.05], tickformat=",d", gridcolor=GRID)
         fig.update_xaxes(type="date", dtick="M1", tickformat="%b\n%Y", gridcolor=GRID)
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
