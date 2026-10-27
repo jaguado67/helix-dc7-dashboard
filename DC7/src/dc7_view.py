@@ -968,7 +968,14 @@ def render_suffolk_l3_milestones(m: DC7Model):
         ("DH1600", "DH1600-060", "Milestone 7 - Substantial Completion - TCO", "2027-06-01", "DH2300.4020"),
     ]
     results = []
+    previous_area = None
     for area, reference, name, baseline_iso, code in template_rows:
+        if area != previous_area:
+            results.append({
+                "Reference": "", "Milestones": area,
+                "Baseline": "", "Forecast": "", "Variance": "",
+            })
+            previous_area = area
         baseline = pd.Timestamp(baseline_iso)
         current = pd.NaT
         if code is not None:
