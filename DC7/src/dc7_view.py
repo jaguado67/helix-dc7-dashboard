@@ -896,28 +896,37 @@ def render_helix_contract_milestones(m: DC7Model):
 
 
 def render_suffolk_l3_milestones(m: DC7Model):
-    """L3 Start and L3 Cx Complete dates explicitly identified in Suffolk UP-08.
+    """L3 and project handover milestones identified in Suffolk UP-08.
 
     These interface milestones belong to the Suffolk schedule. Do not claim
     they are HELIX-coded or create baseline comparisons for IDs missing in BL.
     """
     st.markdown(
-        '<div class="section-caption">DATA HALL · L3 MILESTONES</div>',
+        '<div class="section-caption">DATA HALL · L3 & HANDOVER MILESTONES</div>',
         unsafe_allow_html=True,
     )
     task = m.update_tables["TASK"].copy()
     project_id = str(m.update_project["proj_id"])
     task = task[task["proj_id"].astype(str).eq(project_id)]
     rows = []
-    for hall, start_id, complete_id in (
-        ("DH1100", "DH1100.L3CX.000", "DH1100.L3CX.009"),
-        ("DH1200", "DH1200.L3CX.39", "DH1200.L3CX.29"),
-        ("DH1300", "DH1300.L3CX.59", "DH1300.L3CX.49"),
-        ("DH1400", "DH1400.L3CX.79", "DH1400.L3CX.69"),
-        ("DH1500", "DH1500.L3CX.99", "DH1500.L3CX.89"),
-        ("DH1600", "DH1600.L3CX.19", "DH1600.L3CX.9"),
+    # These project-interface milestones are shown for HELIX coordination,
+    # not counted as HELIX subcontractor progress activities. Preserve the
+    # Activity IDs used by Suffolk, including DH2100/2200/2300 prefixes.
+    for hall, start_id, complete_id, access_id, substantial_id, final_id in (
+        ("DH1100", "DH1100.L3CX.000", "DH1100.L3CX.009", "M1150", "DH1100.4020", "DH1100.4030"),
+        ("DH1200", "DH1200.L3CX.39", "DH1200.L3CX.29", "DH1200.4010", "DH1200.4020", "DH1200.4030"),
+        ("DH1300", "DH1300.L3CX.59", "DH1300.L3CX.49", "DH1300.4010", "DH1300.4020", "DH1300.4030"),
+        ("DH1400", "DH1400.L3CX.79", "DH1400.L3CX.69", "DH2100.4010", "DH2100.4020", "DH2100.4030"),
+        ("DH1500", "DH1500.L3CX.99", "DH1500.L3CX.89", "DH2200.4010", "DH2200.4020", "DH2200.4030"),
+        ("DH1600", "DH1600.L3CX.19", "DH1600.L3CX.9", "DH2300.4010", "DH2300.4020", "DH2300.4030"),
     ):
-        for label, code in (("L3 Start", start_id), ("L3 Cx Complete", complete_id)):
+        for label, code in (
+            ("L3 Start", start_id),
+            ("L3 Cx Complete", complete_id),
+            ("Early Access", access_id),
+            ("Substantial Completion", substantial_id),
+            ("Final Completion", final_id),
+        ):
             match = task[task["task_code"].astype(str).eq(code)]
             if len(match) != 1:
                 raise ValueError(f"Expected one Suffolk UP-08 L3 milestone {code}; found {len(match)}")
