@@ -997,6 +997,28 @@ def render_suffolk_l3_milestones(m: DC7Model):
                 "Milestone Type": label,
                 "Current Date": _fmt_date(finish),
             })
+    # Fixed management baseline from the supplied Excel MILESTONES sheet.
+    # Only exact milestone-type equivalents receive dates. Missing references
+    # (L3 Cx Complete, Final Completion, DH1600 L3/TCO) remain unassigned.
+    approved_milestone_baseline = {
+        ("FOH", "L3 Start-Up"): "2026-08-10",
+        ("FOH", "Substantial Completion"): "2026-12-31",
+        ("BOH", "L3 Start-Up"): "2026-11-03",
+        ("BOH", "Substantial Completion"): "2026-12-31",
+        ("DH1100", "L3 Start"): "2026-11-04",
+        ("DH1100", "Substantial Completion"): "2026-12-31",
+        ("DH1200", "L3 Start"): "2026-10-27",
+        ("DH1200", "Substantial Completion"): "2027-02-01",
+        ("DH1300", "L3 Start"): "2026-10-28",
+        ("DH1300", "Substantial Completion"): "2027-03-01",
+        ("DH1400", "L3 Start"): "2027-01-29",
+        ("DH1400", "Substantial Completion"): "2027-04-01",
+        ("DH1500", "L3 Start"): "2026-11-23",
+        ("DH1500", "Substantial Completion"): "2027-04-30",
+    }
+    for row in rows:
+        fixed = approved_milestone_baseline.get((row["Data Hall"], row["Milestone Type"]))
+        row["Baseline Date"] = _fmt_date(pd.Timestamp(fixed)) if fixed else "—"
     milestones = pd.DataFrame(rows)
     milestones["Data Hall"] = pd.Categorical(
         milestones["Data Hall"],
@@ -1017,7 +1039,7 @@ def render_suffolk_l3_milestones(m: DC7Model):
         unsafe_allow_html=True,
     )
     st.dataframe(
-        milestones.loc[milestones["Milestone Type"].isin(l3_names), ["Data Hall", "Milestone", "Current Date"]],
+        milestones.loc[milestones["Milestone Type"].isin(l3_names), ["Data Hall", "Milestone", "Baseline Date", "Current Date"]],
         use_container_width=True, hide_index=True, height="content",
     )
     st.markdown(
