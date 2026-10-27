@@ -919,7 +919,7 @@ def render_helix_contract_milestones(m: DC7Model):
 
 
 def render_suffolk_l3_milestones(m: DC7Model):
-    """Reproduce the user's Excel MILESTONES sheet using fixed baseline dates.
+    """Reproduce the approved 30-row MILESTONES control list using fixed baseline dates.
 
     The sheet is the immutable baseline reference. Forecast is sourced from
     Suffolk UP-08 only when an unambiguous P6 activity can be identified.
@@ -931,50 +931,36 @@ def render_suffolk_l3_milestones(m: DC7Model):
     )
     task = m.update_tables["TASK"]
     task = task[task["proj_id"].astype(str).eq(str(m.update_project["proj_id"]))]
-    # Immutable baseline/reference/name snapshot from Dashboard Milestones.xlsx (MILESTONES!B7:D57).
+    # Fixed baseline/reference/name snapshot from user-approved MILESTONES list (30 activities).
     # Forecast remains calculated solely from current Suffolk P6 XER.
     template_rows = [
-        ("FOH", "FOH-010", "Priority Rooms - Ready to Receive Equipment", "2026-08-03", None),
         ("FOH", "FOH.MS-2", "Early Access", "2026-12-03", "FOH.MS-2"),
         ("FOH", "HSE-SYS-STU-1", "Commissioning & Start Up // L3 Start-Up", "2026-08-10", "HSE-SYS-STU-1"),
         ("FOH", "FOH.MS-4", "Substantial Completion - TCO", "2027-01-01", "FOH.MS-4"),
-        ("BOH", "BOH-010", "Priority Rooms - Ready to Receive Equipment", "2026-09-25", None),
         ("BOH", "BOH-MS-2", "Early Access", "2026-12-03", "BOH-MS-2"),
         ("BOH", "HSE-SYS-STU-4", "Commissioning & Start Up // L3 Start-Up", "2026-10-30", "HSE-SYS-STU-4"),
         ("BOH", "BOH-MS-4", "Substantial Completion - TCO", "2027-01-01", "BOH-MS-4"),
-        ("DH1100", "DH1100-010", "Electrical Room - Ready to Receive Equipment", "2026-08-10", None),
         ("DH1100", "ER.5101.3109", "OFCI - First Skid Shipment Delivery", "2026-08-31", "ER.5101.3109"),
-        ("DH1100", "DH1100-030", "Electrical Equipment - FTE Ready", "2026-10-08", "DH1100.L3CX.ELEC.01"),
         ("DH1100", "DH1100.L3CX.000", "L3 Commissioning - Start", "2026-10-24", "DH1100.L3CX.000"),
         ("DH1100", "M1150", "Milestone 1 - Early Access", "2026-12-03", "M1150"),
         ("DH1100", "DH1100.4020", "Milestone 7 - Substantial Completion - TCO", "2026-12-31", "DH1100.4020"),
-        ("DH1200", "DH1200-010", "Electrical Room - Ready to Receive Equipment", "2026-08-12", None),
         ("DH1200", "B120001.3219", "OFCI - First Skid Shipment Delivery", "2026-09-30", "B120001.3219"),
-        ("DH1200", "DH1200-030", "Electrical Equipment - FTE Ready", "2026-10-26", "DH1200.L3CX.ELEC.63"),
         ("DH1200", "DH1200.L3CX.39", "L3 Commissioning - Start", "2026-11-18", "DH1200.L3CX.39"),
         ("DH1200", "DH1200.4010", "Milestone 2 - Early Access", "2027-01-01", "DH1200.4010"),
         ("DH1200", "DH1200.4020", "Milestone 8 - Substantial Completion TCO", "2027-02-01", "DH1200.4020"),
-        ("DH1300", "DH1300-010", "Electrical Room - Ready to Receive Equipment", "2026-08-11", None),
         ("DH1300", "DH.1300.3069", "OFCI - First Skid Shipment Delivery", "2026-11-02", "DH.1300.3069"),
-        ("DH1300", "DH1300-030", "Electrical Equipment - FTE Ready", "2026-12-30", "DH1300.L3CX.ELEC.83"),
         ("DH1300", "DH1300.L3CX.59", "L3 Commissioning - Start", "2026-12-28", "DH1300.L3CX.59"),
         ("DH1300", "DH1300.4010", "Milestone 3 - Early Access", "2027-02-01", "DH1300.4010"),
         ("DH1300", "DH1300.4020", "Milestone 9 - Substantial Completion TCO", "2027-03-01", "DH1300.4020"),
-        ("DH1400", "DH1400-010", "Electrical Room - Ready to Receive Equipment", "2026-09-16", None),
         ("DH1400", "DH.1300.3070", "OFCI - First Skid Shipment Delivery", "2026-12-02", "DH.1300.3070"),
-        ("DH1400", "DH1400-030", "Electrical Equipment - FTE Ready", "2027-02-01", "DH1400.L3CX.ELEC.103"),
         ("DH1400", "DH1400.L3CX.79", "L3 Commissioning - Start", "2027-01-25", "DH1400.L3CX.79"),
         ("DH1400", "DH2100.4010", "Milestone 4 - Early Access", "2027-03-01", "DH2100.4010"),
         ("DH1400", "DH2100.4020", "Milestone 10 - Substantial Completion TCO", "2027-04-01", "DH2100.4020"),
-        ("DH1500", "DH1500-010", "Electrical Room - Ready to Receive Equipment", "2026-08-24", None),
         ("DH1500", "ER.5101.3110", "OFCI - First Skid Shipment Delivery", "2027-01-04", "ER.5101.3110"),
-        ("DH1500", "DH1500-030", "Electrical Equipment - FTE Ready", "2027-03-04", "DH1500.L3CX.ELEC.123"),
         ("DH1500", "DH1500.L3CX.99", "L3 Commissioning - Start", "2027-02-26", "DH1500.L3CX.99"),
         ("DH1500", "DH2200.4010", "Milestone 5 - Early Access", "2027-04-01", "DH2200.4010"),
         ("DH1500", "DH2200.4020", "Milestone 11 - Substantial Completion TCO", "2027-05-01", "DH2200.4020"),
-        ("DH1600", "DH1600-010", "Electrical Room - Ready to Receive Equipment", "2026-08-17", None),
         ("DH1600", "DH.1600.3061", "OFCI - First Skid Shipment Delivery", "2027-02-01", "DH.1600.3061"),
-        ("DH1600", "DH1600-030", "Electrical Equipment - FTE Ready", "2027-03-19", "DH1600.L3CX.ELEC.43"),
         ("DH1600", "DH1600.L3CX.19", "L3 Commissioning - Start", "2027-03-17", "DH1600.L3CX.19"),
         ("DH1600", "DH2300.4010", "Milestone 6 - Early Access", "2027-05-01", "DH2300.4010"),
         ("DH1600", "DH2300.4020", "Milestone 12 - Substantial Completion TCO", "2027-06-01", "DH2300.4020"),
