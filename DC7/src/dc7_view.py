@@ -1047,47 +1047,51 @@ def render_suffolk_l3_milestones(m: DC7Model):
         })
     # Keep the Excel grouping and row order, including readiness and delivery.
     df = pd.DataFrame(results)
-    # Single-selection accordion: only one FOH/BOH/Data Hall is displayed.
-    # Unlike independent expanders, changing selection closes the previous area.
-    areas = ["FOH", "BOH", "DH1100", "DH1200", "DH1300", "DH1400", "DH1500", "DH1600"]
-    selected_area = st.selectbox(
-        "Area / Data Hall",
-        options=areas,
-        index=None,
-        placeholder="Select FOH, BOH or a Data Hall to expand",
-        key="suffolk_milestone_area",
-    )
-    if selected_area is None:
-        return
-    group_start = df["Reference"].eq("") & df["Milestones"].eq(selected_area)
-    if not group_start.any():
-        raise ValueError(f"Missing Suffolk milestone group: {selected_area}")
-    start = df.index[group_start][0] + 1
-    end = next(
-        (i for i in range(start, len(df)) if not str(df.iloc[i]["Reference"]).strip()),
-        len(df),
-    )
-    subset = df.iloc[start:end]
-    table = ['<div class="suffolk-milestone-wrap"><table class="suffolk-milestone-table">']
-    table.append(
-        '<colgroup><col style="width:13%"><col style="width:43%">'
-        '<col style="width:16%"><col style="width:16%"><col style="width:12%"></colgroup>'
-        '<thead><tr><th>Reference</th><th>Milestones</th><th>Baseline</th>'
-        '<th>Forecast</th><th>Variance</th></tr></thead><tbody>'
-        f'<tr class="suffolk-milestone-group"><td colspan="5">{_safe(selected_area)}</td></tr>'
-    )
-    for _, row in subset.iterrows():
-        cells = [row[col] for col in ("Reference", "Milestones", "Baseline", "Forecast", "Variance")]
-        variance = str(row["Variance"])
-        cls = "var-late" if variance.startswith("-") else ("var-early" if variance.startswith("+") else "")
-        table.append(
-            '<tr>' + ''.join(
-                f'<td class="{cls if idx == 4 else ""}">{_safe(value)}</td>'
-                for idx, value in enumerate(cells)
-            ) + '</tr>'
+    # Align selector and detail table in the left pane; reserve right pane
+    # for a future update-to-update milestone displacement chart.
+    milestones_left, milestones_right = st.columns([2.05, 1], gap="large")
+    with milestones_left:
+        # Single-selection accordion: only one FOH/BOH/Data Hall is displayed.
+        # Unlike independent expanders, changing selection closes the previous area.
+        areas = ["FOH", "BOH", "DH1100", "DH1200", "DH1300", "DH1400", "DH1500", "DH1600"]
+        selected_area = st.selectbox(
+            "Area / Data Hall",
+            options=areas,
+            index=None,
+            placeholder="Select FOH, BOH or a Data Hall to expand",
+            key="suffolk_milestone_area",
         )
-    table.append("</tbody></table></div>")
-    st.markdown("".join(table), unsafe_allow_html=True)
+        if selected_area is None:
+            return
+        group_start = df["Reference"].eq("") & df["Milestones"].eq(selected_area)
+        if not group_start.any():
+            raise ValueError(f"Missing Suffolk milestone group: {selected_area}")
+        start = df.index[group_start][0] + 1
+        end = next(
+            (i for i in range(start, len(df)) if not str(df.iloc[i]["Reference"]).strip()),
+            len(df),
+        )
+        subset = df.iloc[start:end]
+        table = ['<div class="suffolk-milestone-wrap"><table class="suffolk-milestone-table">']
+        table.append(
+            '<colgroup><col style="width:13%"><col style="width:43%">'
+            '<col style="width:16%"><col style="width:16%"><col style="width:12%"></colgroup>'
+            '<thead><tr><th>Reference</th><th>Milestones</th><th>Baseline</th>'
+            '<th>Forecast</th><th>Variance</th></tr></thead><tbody>'
+            f'<tr class="suffolk-milestone-group"><td colspan="5">{_safe(selected_area)}</td></tr>'
+        )
+        for _, row in subset.iterrows():
+            cells = [row[col] for col in ("Reference", "Milestones", "Baseline", "Forecast", "Variance")]
+            variance = str(row["Variance"])
+            cls = "var-late" if variance.startswith("-") else ("var-early" if variance.startswith("+") else "")
+            table.append(
+                '<tr>' + ''.join(
+                    f'<td class="{cls if idx == 4 else ""}">{_safe(value)}</td>'
+                    for idx, value in enumerate(cells)
+                ) + '</tr>'
+            )
+        table.append("</tbody></table></div>")
+        st.markdown("".join(table), unsafe_allow_html=True)
 
 
 def render_dashboard(helix: DC7Model, suffolk: DC7Model):
