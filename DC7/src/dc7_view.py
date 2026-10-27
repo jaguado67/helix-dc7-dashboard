@@ -987,6 +987,45 @@ def render_suffolk_l3_milestones(m: DC7Model):
                 current = pd.to_datetime(activity.get(date_field), errors="coerce")
                 if pd.isna(current) and status != "TK_Complete":
                     current = pd.to_datetime(activity.get("target_end_date"), errors="coerce")
+        if code is None and name in (
+            "Priority Rooms - Ready to Receive Equipment",
+            "Electrical Room - Ready to Receive Equipment",
+        ):
+            # P6 splits the Excel readiness milestones into individual room
+            # activities. Use the latest actual/forecast finish of the relevant
+            # room-ready tasks to represent completion of the complete group.
+            names = task["task_name"].fillna("").astype(str)
+            lowered = names.str.lower()
+            ready = lowered.str.contains("room ready to receive equipment", regex=False)
+            if name.startswith("Priority"):
+                area_mask = lowered.str.startswith(area.lower() + "/")
+                # FOH/BOH priorities are their specifically named room-ready
+                # activities, never generic WBS summary or wall works.
+                candidates = task[area_mask & ready]
+            else:
+                hall = area.removeprefix("DH")
+                room_numbers = {"1100": ("5101", "5104"),
+                                "1200": ("5201", "5204"),
+                                "1300": ("5301", "5304"),
+                                "1400": ("5401", "5404"),
+                                "1500": ("5501", "5504"),
+                                "1600": ("5601", "5604")}.get(hall, ())
+                matches = lowered.str.contains("electrical room", regex=False)
+                matches &= ready
+                matches &= lowered.apply(lambda n: any("#" + x in n for x in room_numbers))
+                candidates = task[matches]
+            if not candidates.empty:
+                finish_dates = []
+                for _, activity in candidates.iterrows():
+                    status = str(activity.get("status_code", ""))
+                    key = "act_end_date" if status == "TK_Complete" else "reend_date"
+                    date = pd.to_datetime(activity.get(key), errors="coerce")
+                    if pd.isna(date) and status != "TK_Complete":
+                        date = pd.to_datetime(activity.get("target_end_date"), errors="coerce")
+                    if pd.notna(date):
+                        finish_dates.append(date)
+                if len(finish_dates) == len(candidates):
+                    current = max(finish_dates)
         # This is a calendar-day difference, not a P6 calendar calculation.
         shift = (baseline.normalize() - current.normalize()).days if pd.notna(current) else None
         results.append({
