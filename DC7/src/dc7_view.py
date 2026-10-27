@@ -909,146 +909,90 @@ def render_helix_contract_milestones(m: DC7Model):
 
 
 def render_suffolk_l3_milestones(m: DC7Model):
-    """L3 and project handover milestones identified in Suffolk UP-08.
+    """Reproduce the user's Excel MILESTONES sheet using fixed baseline dates.
 
-    These interface milestones belong to the Suffolk schedule. Do not claim
-    they are HELIX-coded or create baseline comparisons for IDs missing in BL.
+    The sheet is the immutable baseline reference. Forecast is sourced from
+    Suffolk UP-08 only when an unambiguous P6 activity can be identified.
+    Do not substitute old Excel forecasts or infer readiness/FTE rollups.
     """
     st.markdown(
-        '<div class="section-caption">SUFFOLK · COMMISSIONING & HANDOVER MILESTONES</div>',
+        '<div class="section-caption">SUFFOLK · MILESTONES</div>',
         unsafe_allow_html=True,
     )
-    task = m.update_tables["TASK"].copy()
-    project_id = str(m.update_project["proj_id"])
-    task = task[task["proj_id"].astype(str).eq(project_id)]
-    rows = []
-    # These project-interface milestones are shown for HELIX coordination,
-    # not counted as HELIX subcontractor progress activities. Preserve the
-    # Activity IDs used by Suffolk, including DH2100/2200/2300 prefixes.
-    for hall, start_id, complete_id, access_id, substantial_id, final_id in (
-        ("DH1100", "DH1100.L3CX.000", "DH1100.L3CX.009", "M1150", "DH1100.4020", "DH1100.4030"),
-        ("DH1200", "DH1200.L3CX.39", "DH1200.L3CX.29", "DH1200.4010", "DH1200.4020", "DH1200.4030"),
-        ("DH1300", "DH1300.L3CX.59", "DH1300.L3CX.49", "DH1300.4010", "DH1300.4020", "DH1300.4030"),
-        ("DH1400", "DH1400.L3CX.79", "DH1400.L3CX.69", "DH2100.4010", "DH2100.4020", "DH2100.4030"),
-        ("DH1500", "DH1500.L3CX.99", "DH1500.L3CX.89", "DH2200.4010", "DH2200.4020", "DH2200.4030"),
-        ("DH1600", "DH1600.L3CX.19", "DH1600.L3CX.9", "DH2300.4010", "DH2300.4020", "DH2300.4030"),
-    ):
-        for label, code in (
-            ("L3 Start", start_id),
-            ("L3 Cx Complete", complete_id),
-            ("Early Access", access_id),
-            ("Substantial Completion", substantial_id),
-            ("Final Completion", final_id),
-        ):
-            match = task[task["task_code"].astype(str).eq(code)]
-            if len(match) != 1:
-                raise ValueError(f"Expected one Suffolk UP-08 L3 milestone {code}; found {len(match)}")
-            r = match.iloc[0]
-            status = str(r.get("status_code", ""))
-            date_col = "act_end_date" if status == "TK_Complete" else "reend_date"
-            finish = pd.to_datetime(r.get(date_col), errors="coerce")
-            if pd.isna(finish) and status != "TK_Complete":
-                finish = pd.to_datetime(r.get("target_end_date"), errors="coerce")
-            if pd.isna(finish):
-                raise ValueError(f"Missing Suffolk milestone date: {code}")
-            rows.append({
-                "Data Hall": hall,
-                "Milestone": f"{str(r['task_name']).strip()} ({label})",
-                "Milestone Type": label,
-                "Current Date": _fmt_date(finish),
-            })
-
-    # FOH and BOH interface milestones from Suffolk UP-08.
-    for area, items in (
-        ("FOH", (
-            ("L3 Start-Up", "HSE-SYS-STU-1"),
-            ("L4 Cx", "HSE-SYS-STU-2"),
-            ("L5 Cx", "HSE-SYS-STU-3"),
-            ("Clean & Punch", "HSE-SYS-STU-16"),
-            ("Early Access", "FOH.MS-2"),
-            ("Substantial Completion", "FOH.MS-4"),
-            ("Final Completion", "FOH.MS-5"),
-        )),
-        ("BOH", (
-            ("L3 Start-Up", "HSE-SYS-STU-4"),
-            ("L4 Cx", "HSE-SYS-STU-5"),
-            ("L5 Cx", "HSE-SYS-STU-6"),
-            ("Clean & Punch", "HSE-SYS-STU-17"),
-            ("Early Access", "BOH-MS-2"),
-            ("Substantial Completion", "BOH-MS-4"),
-            ("Final Completion", "BOH-MS-5"),
-        )),
-    ):
-        for label, code in items:
-            match = task[task["task_code"].astype(str).eq(code)]
-            if len(match) != 1:
-                raise ValueError(f"Expected one Suffolk UP-08 interface milestone {code}; found {len(match)}")
-            record = match.iloc[0]
-            status = str(record.get("status_code", ""))
-            field = "act_end_date" if status == "TK_Complete" else "reend_date"
-            finish = pd.to_datetime(record.get(field), errors="coerce")
-            if pd.isna(finish) and status != "TK_Complete":
-                finish = pd.to_datetime(record.get("target_end_date"), errors="coerce")
-            if pd.isna(finish):
-                raise ValueError(f"Missing Suffolk UP-08 milestone date: {code}")
-            rows.append({
-                "Data Hall": area,
-                "Milestone": f"{str(record['task_name']).strip()} ({label})",
-                "Milestone Type": label,
-                "Current Date": _fmt_date(finish),
-            })
-    # Fixed management baseline from the supplied Excel MILESTONES sheet.
-    # Only exact milestone-type equivalents receive dates. Missing references
-    # (L3 Cx Complete, Final Completion, DH1600 L3/TCO) remain unassigned.
-    approved_milestone_baseline = {
-        ("FOH", "L3 Start-Up"): "2026-08-10",
-        ("FOH", "Substantial Completion"): "2026-12-31",
-        ("BOH", "L3 Start-Up"): "2026-11-03",
-        ("BOH", "Substantial Completion"): "2026-12-31",
-        ("DH1100", "L3 Start"): "2026-11-04",
-        ("DH1100", "Substantial Completion"): "2026-12-31",
-        ("DH1200", "L3 Start"): "2026-10-27",
-        ("DH1200", "Substantial Completion"): "2027-02-01",
-        ("DH1300", "L3 Start"): "2026-10-28",
-        ("DH1300", "Substantial Completion"): "2027-03-01",
-        ("DH1400", "L3 Start"): "2027-01-29",
-        ("DH1400", "Substantial Completion"): "2027-04-01",
-        ("DH1500", "L3 Start"): "2026-11-23",
-        ("DH1500", "Substantial Completion"): "2027-04-30",
-    }
-    for row in rows:
-        fixed = approved_milestone_baseline.get((row["Data Hall"], row["Milestone Type"]))
-        row["Baseline Date"] = _fmt_date(pd.Timestamp(fixed)) if fixed else "—"
-    milestones = pd.DataFrame(rows)
-    milestones["Data Hall"] = pd.Categorical(
-        milestones["Data Hall"],
-        categories=["FOH", "BOH", "DH1100", "DH1200", "DH1300", "DH1400", "DH1500", "DH1600"],
-        ordered=True,
-    )
-    milestone_order = {
-        "L3 Start-Up": 0, "L3 Start": 0, "L3 Cx Complete": 1, "L4 Cx": 1,
-        "L5 Cx": 2, "Clean & Punch": 3, "Early Access": 4,
-        "Substantial Completion": 5, "Final Completion": 6,
-    }
-    milestones["_order"] = milestones["Milestone Type"].map(milestone_order)
-    milestones = milestones.sort_values(["Data Hall", "_order"], kind="stable").drop(columns="_order")
-    l3_names = ["L3 Start", "L3 Cx Complete", "L3 Start-Up"]
-    handover_names = ["Substantial Completion", "Final Completion"]
-    st.markdown(
-        '<div class="section-caption">COMMISSIONING MILESTONES</div>',
-        unsafe_allow_html=True,
-    )
+    task = m.update_tables["TASK"]
+    task = task[task["proj_id"].astype(str).eq(str(m.update_project["proj_id"]))]
+    template_rows = [
+        ("FOH", "FOH-010", "Priority Rooms - Ready to Receive Equipment", "2026-08-03", None),
+        ("FOH", "FOH-020", "Early Access", "2026-12-03", "FOH.MS-2"),
+        ("FOH", "FOH-030", "Commissioning & Start Up // L3 Start-Up", "2026-08-10", "HSE-SYS-STU-1"),
+        ("FOH", "FOH-040", "Substantial Completion - TCO", "2026-12-31", "FOH.MS-4"),
+        ("BOH", "BOH-010", "Priority Rooms - Ready to Receive Equipment", "2026-09-25", None),
+        ("BOH", "BOH-020", "Early Access", "2026-11-24", "BOH-MS-2"),
+        ("BOH", "BOH-030", "Commissioning & Start Up // L3 Start-Up", "2026-11-03", "HSE-SYS-STU-4"),
+        ("BOH", "BOH-040", "Substantial Completion - TCO", "2026-12-31", "BOH-MS-4"),
+        ("DH1100", "DH1100-010", "Electrical Room - Ready to Receive Equipment", "2026-08-10", None),
+        ("DH1100", "DH1100-020", "OFCI - First Skid Shipment Delivery", "2026-08-31", "PR11-1730"),
+        ("DH1100", "DH1100-030", "Electrical Equipment - FTE Ready", "2026-10-08", None),
+        ("DH1100", "DH1100-040", "L3 Commissioning - Start", "2026-11-04", "DH1100.L3CX.000"),
+        ("DH1100", "DH1100-050", "Milestone 1 - Early Access", "2026-12-03", "M1150"),
+        ("DH1100", "DH1100-060", "Milestone 7 - Substantial Completion - TCO", "2026-12-31", "DH1100.4020"),
+        ("DH1200", "DH1200-010", "Electrical Room - Ready to Receive Equipment", "2026-08-12", None),
+        ("DH1200", "DH1200-020", "OFCI - First Skid Shipment Delivery", "2026-10-06", "PR12-1960"),
+        ("DH1200", "DH1200-030", "Electrical Equipment - FTE Ready", "2026-10-26", None),
+        ("DH1200", "DH1200-040", "L3 Commissioning - Start", "2026-10-27", "DH1200.L3CX.39"),
+        ("DH1200", "DH1200-050", "Milestone 1 - Early Access", "2026-12-31", "DH1200.4010"),
+        ("DH1200", "DH1200-060", "Milestone 7 - Substantial Completion - TCO", "2027-02-01", "DH1200.4020"),
+        ("DH1300", "DH1300-010", "Electrical Room - Ready to Receive Equipment", "2026-08-11", None),
+        ("DH1300", "DH1300-020", "OFCI - First Skid Shipment Delivery", "2026-11-07", "PR13-2190"),
+        ("DH1300", "DH1300-030", "Electrical Equipment - FTE Ready", "2026-12-30", None),
+        ("DH1300", "DH1300-040", "L3 Commissioning - Start", "2026-10-28", "DH1300.L3CX.59"),
+        ("DH1300", "DH1300-050", "Milestone 1 - Early Access", "2027-02-01", "DH1300.4010"),
+        ("DH1300", "DH1300-060", "Milestone 7 - Substantial Completion - TCO", "2027-03-01", "DH1300.4020"),
+        ("DH1400", "DH1400-010", "Electrical Room - Ready to Receive Equipment", "2026-09-16", None),
+        ("DH1400", "DH1400-020", "OFCI - First Skid Shipment Delivery", "2026-12-08", "PR14-2420"),
+        ("DH1400", "DH1400-030", "Electrical Equipment - FTE Ready", "2027-02-01", None),
+        ("DH1400", "DH1400-040", "L3 Commissioning - Start", "2027-01-29", "DH1400.L3CX.79"),
+        ("DH1400", "DH1400-050", "Milestone 1 - Early Access", "2027-03-01", "DH2100.4010"),
+        ("DH1400", "DH1400-060", "Milestone 7 - Substantial Completion - TCO", "2027-04-01", "DH2100.4020"),
+        ("DH1500", "DH1500-010", "Electrical Room - Ready to Receive Equipment", "2026-08-24", None),
+        ("DH1500", "DH1500-020", "OFCI - First Skid Shipment Delivery", "2027-01-09", "PR15-2650"),
+        ("DH1500", "DH1500-030", "Electrical Equipment - FTE Ready", "2027-03-04", None),
+        ("DH1500", "DH1500-040", "L3 Commissioning - Start", "2026-11-23", "DH1500.L3CX.99"),
+        ("DH1500", "DH1500-050", "Milestone 1 - Early Access", "2027-04-01", "DH2200.4010"),
+        ("DH1500", "DH1500-060", "Milestone 7 - Substantial Completion - TCO", "2027-04-30", "DH2200.4020"),
+        ("DH1600", "DH1600-010", "Electrical Room - Ready to Receive Equipment", "2026-08-17", None),
+        ("DH1600", "DH1600-020", "OFCI - First Skid Shipment Delivery", "2027-02-06", "PR16-2880"),
+        ("DH1600", "DH1600-030", "Electrical Equipment - FTE Ready", "2027-03-19", None),
+        ("DH1600", "DH1600-040", "L3 Commissioning - Start", "2027-03-22", "DH1600.L3CX.19"),
+        ("DH1600", "DH1600-050", "Milestone 1 - Early Access", "2027-04-30", "DH2300.4010"),
+        ("DH1600", "DH1600-060", "Milestone 7 - Substantial Completion - TCO", "2027-06-01", "DH2300.4020"),
+    ]
+    results = []
+    for area, reference, name, baseline_iso, code in template_rows:
+        baseline = pd.Timestamp(baseline_iso)
+        current = pd.NaT
+        if code is not None:
+            matched = task[task["task_code"].astype(str).eq(code)]
+            if len(matched) == 1:
+                activity = matched.iloc[0]
+                status = str(activity.get("status_code", ""))
+                date_field = "act_end_date" if status == "TK_Complete" else "reend_date"
+                current = pd.to_datetime(activity.get(date_field), errors="coerce")
+                if pd.isna(current) and status != "TK_Complete":
+                    current = pd.to_datetime(activity.get("target_end_date"), errors="coerce")
+        # This is a calendar-day difference, not a P6 calendar calculation.
+        shift = (baseline.normalize() - current.normalize()).days if pd.notna(current) else None
+        results.append({
+            "Reference": reference,
+            "Milestones": name,
+            "Baseline": _fmt_date(baseline),
+            "Forecast": _fmt_date(current) if pd.notna(current) else "—",
+            "Variance": f"{shift:+d}" if shift is not None else "—",
+        })
+    # Keep the Excel grouping and row order, including readiness and delivery.
+    df = pd.DataFrame(results)
     st.dataframe(
-        milestones.loc[milestones["Milestone Type"].isin(l3_names), ["Data Hall", "Milestone", "Baseline Date", "Current Date"]],
-        use_container_width=True, hide_index=True, height="content",
-    )
-    st.markdown(
-        '<div class="section-caption">HANDOVER MILESTONES</div>',
-        unsafe_allow_html=True,
-    )
-    st.dataframe(
-        milestones.loc[milestones["Milestone Type"].isin(handover_names), ["Data Hall", "Milestone", "Current Date"]],
-        use_container_width=True, hide_index=True, height="content",
+        df, use_container_width=True, hide_index=True, height="content",
     )
 
 
