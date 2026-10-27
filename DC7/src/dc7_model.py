@@ -441,6 +441,14 @@ class DC7Model:
                 "Activity Completion %": _activity_completion_pct(c_all),
                 "Start Anchor ID": str(b_all.loc[baseline_start.idxmin(), "task_code"]),
                 "Start Anchor": str(b_all.loc[baseline_start.idxmin(), "task_name"]),
+                # The source activity driving the area maximum is auditable.
+                "Current Finish Anchor ID": str(c_all.loc[current_finish.idxmax(), "task_code"]),
+                "Current Finish Anchor Name": str(c_all.loc[current_finish.idxmax(), "task_name"]),
+                "Current Finish Anchor Field": (
+                    "act_end_date" if bool(completed.loc[current_finish.idxmax()])
+                    else "reend_date" if pd.notna(pd.to_datetime(c_all.loc[current_finish.idxmax(), "reend_date"], errors="coerce"))
+                    else "early_end_date"
+                ),
             })
         return pd.DataFrame(rows)
 
