@@ -220,47 +220,43 @@ def helix_baseline_overview(
 
 
 def helix_bl_current_overview(baseline: Mapping, current: Mapping, current_data_date) -> tuple[dict, pd.DataFrame]:
-    """Produce only independently matched HELIX BL/U01 Line-Up+MOH progress.
+    """Produce only independently matched HELIX BL/current Line-Up+MOH progress.
 
     Each of 4153 unique task_codes exists once in each original P6 export.
-    Actual completions are shown only through the U01 Data Date; the
+    Actual completions are shown only through the current Data Date; the
     forecast cumulative curve includes actual finishes and remaining
-    scheduled finishes from U01, never data from the Suffolk project.
+    scheduled finishes from current, never data from the Suffolk project.
     """
     if baseline is None or current is None:
-        raise ValueError("Both independent HELIX BL and U01 are required")
+        raise ValueError("Both independent HELIX BL and current are required")
     b, c = baseline["_audit"].copy(), current["_audit"].copy()
     if not b["Activity ID"].is_unique or not c["Activity ID"].is_unique:
-        raise ValueError("Duplicate HELIX Activity IDs in BL/U01")
+        raise ValueError("Duplicate HELIX Activity IDs in BL/current")
     bi, ci = set(b["Activity ID"]), set(c["Activity ID"])
     if bi != ci or len(b) != 4153:
-        raise ValueError(f"HELIX BL/U01 Activity ID mismatch: deleted={len(bi-ci)} added={len(ci-bi)}")
+        raise ValueError(f"HELIX BL/current Activity ID mismatch: deleted={len(bi-ci)} added={len(ci-bi)}")
     if not b["QTS - Subcontractor"].eq("HELIX").all() or not c["QTS - Subcontractor"].eq("HELIX").all():
-        raise ValueError("HELIX BL/U01 scope includes a third-party subcontractor")
+        raise ValueError("HELIX BL/current scope includes a third-party subcontractor")
     mapping_fields = ["Data Hall / MOH", "Line-Up"]
     aligned = b.set_index("Activity ID")[mapping_fields].sort_index().eq(
         c.set_index("Activity ID")[mapping_fields].sort_index()
     ).all().all()
     if not aligned:
-        raise ValueError("HELIX BL/U01 original P6 Data Hall/Line-Up classification changed")
+        raise ValueError("HELIX BL/current original P6 Data Hall/Line-Up classification changed")
     status_counts = c["Status"].value_counts()
     counts = {key: int(status_counts.get(key, 0)) for key in ("Completed", "In Progress", "Not Started")}
     counts["Total"] = len(c)
     if sum(counts[x] for x in ("Completed", "In Progress", "Not Started")) != counts["Total"]:
-        raise ValueError("U01 HELIX status reconciliation failed")
-    if counts != {"Completed":42, "In Progress":11, "Not Started":4100, "Total":4153}:
-        raise ValueError(f"Unexpected official U01 status data: {counts}")
+        raise ValueError("current HELIX status reconciliation failed")
 
     bl_finish = pd.to_datetime(b["Baseline Finish"],errors="raise").dt.normalize()
     cur_finish = pd.to_datetime(c["Current Finish"],errors="raise").dt.normalize()
     data_date = pd.Timestamp(current_data_date).normalize()
-    if data_date != pd.Timestamp("2026-10-14"):
-        raise ValueError("Official HELIX U01 Data Date must be 14-Oct-2026")
     actual_dates = pd.to_datetime(
         c.loc[c["Status"].eq("Completed"), "Actual Finish"], errors="coerce"
     ).dt.normalize()
     if actual_dates.isna().any() or (actual_dates > data_date).any():
-        raise ValueError("Completed U01 tasks require valid actual dates no later than Data Date")
+        raise ValueError("Completed current tasks require valid actual dates no later than Data Date")
     if bl_finish.isna().any() or cur_finish.isna().any():
         raise ValueError("Missing HELIX baseline/current Finish values")
 
@@ -307,7 +303,7 @@ def helix_bl_current_overview(baseline: Mapping, current: Mapping, current_data_
         "Current Finish": cur_finish.max(),
         "Current Data Date": data_date,
         "Baseline Source": "226021-HE.B.xer",
-        "Current Source": "226021-HE.U01.xer",
+        "Current Source": "HELIX current XER",
         "Finish Shift (calendar days)": int((bl_finish.max() - cur_finish.max()).days),
     }
     return info, points
