@@ -466,7 +466,7 @@ def render_progress_detail(m: DC7Model, view: str):
         df["Area"] = df["Area"].replace({"Priority Walls": "Priority Rooms"})
     c1, c2 = st.columns([1.15, 1], gap="large")
     with c1:
-        summary_title = ("SUMMARY BY P6 WBS" if p6_wbs or dh_p6_wbs else
+        summary_title = ("SUMMARY BY AREA" if p6_wbs or dh_p6_wbs else
                          "FUNCTIONAL PACKAGE SUMMARY" if area == "MOH" else
                          "SUMMARY BY FUNCTIONAL GROUP" if consolidated else
                          "SUMMARY BY QTS - DASH")
