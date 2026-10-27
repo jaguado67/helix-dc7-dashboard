@@ -902,7 +902,7 @@ def render_suffolk_l3_milestones(m: DC7Model):
     they are HELIX-coded or create baseline comparisons for IDs missing in BL.
     """
     st.markdown(
-        '<div class="section-caption">DATA HALL · PROJECT MILESTONES</div>',
+        '<div class="section-caption">SUFFOLK · COMMISSIONING & HANDOVER MILESTONES</div>',
         unsafe_allow_html=True,
     )
     task = m.update_tables["TASK"].copy()
@@ -944,11 +944,61 @@ def render_suffolk_l3_milestones(m: DC7Model):
                 "Activity ID": code,
                 "Current Date": _fmt_date(finish),
             })
+
+    # FOH and BOH interface milestones from Suffolk UP-08.
+    for area, items in (
+        ("FOH", (
+            ("L3 Start-Up", "HSE-SYS-STU-1"),
+            ("L4 Cx", "HSE-SYS-STU-2"),
+            ("L5 Cx", "HSE-SYS-STU-3"),
+            ("Clean & Punch", "HSE-SYS-STU-16"),
+            ("Early Access", "FOH.MS-2"),
+            ("Substantial Completion", "FOH.MS-4"),
+            ("Final Completion", "FOH.MS-5"),
+        )),
+        ("BOH", (
+            ("L3 Start-Up", "HSE-SYS-STU-4"),
+            ("L4 Cx", "HSE-SYS-STU-5"),
+            ("L5 Cx", "HSE-SYS-STU-6"),
+            ("Clean & Punch", "HSE-SYS-STU-17"),
+            ("Early Access", "BOH-MS-2"),
+            ("Substantial Completion", "BOH-MS-4"),
+            ("Final Completion", "BOH-MS-5"),
+        )),
+    ):
+        for label, code in items:
+            match = task[task["task_code"].astype(str).eq(code)]
+            if len(match) != 1:
+                raise ValueError(f"Expected one Suffolk UP-08 interface milestone {code}; found {len(match)}")
+            record = match.iloc[0]
+            status = str(record.get("status_code", ""))
+            field = "act_end_date" if status == "TK_Complete" else "reend_date"
+            finish = pd.to_datetime(record.get(field), errors="coerce")
+            if pd.isna(finish) and status != "TK_Complete":
+                finish = pd.to_datetime(record.get("target_end_date"), errors="coerce")
+            if pd.isna(finish):
+                raise ValueError(f"Missing Suffolk UP-08 milestone date: {code}")
+            rows.append({
+                "Data Hall": area, "Milestone": label,
+                "Activity ID": code, "Current Date": _fmt_date(finish),
+            })
     milestones = pd.DataFrame(rows)
-    l3_names = ["L3 Start", "L3 Cx Complete"]
-    handover_names = ["Early Access", "Substantial Completion", "Final Completion"]
+    milestones["Data Hall"] = pd.Categorical(
+        milestones["Data Hall"],
+        categories=["FOH", "BOH", "DH1100", "DH1200", "DH1300", "DH1400", "DH1500", "DH1600"],
+        ordered=True,
+    )
+    milestone_order = {
+        "L3 Start-Up": 0, "L3 Start": 0, "L3 Cx Complete": 1, "L4 Cx": 1,
+        "L5 Cx": 2, "Clean & Punch": 3, "Early Access": 4,
+        "Substantial Completion": 5, "Final Completion": 6,
+    }
+    milestones["_order"] = milestones["Milestone"].map(milestone_order)
+    milestones = milestones.sort_values(["Data Hall", "_order"], kind="stable").drop(columns="_order")
+    l3_names = ["L3 Start", "L3 Cx Complete", "L3 Start-Up", "L4 Cx", "L5 Cx"]
+    handover_names = ["Clean & Punch", "Early Access", "Substantial Completion", "Final Completion"]
     st.markdown(
-        '<div class="section-caption">LEVEL 1 · L3 COMMISSIONING MILESTONES</div>',
+        '<div class="section-caption">LEVEL 1 · COMMISSIONING MILESTONES</div>',
         unsafe_allow_html=True,
     )
     st.dataframe(
