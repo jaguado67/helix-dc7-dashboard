@@ -895,6 +895,49 @@ def render_helix_contract_milestones(m: DC7Model):
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
 
+def render_suffolk_l3_milestones(m: DC7Model):
+    """L3 Start and L3 Cx Complete dates explicitly identified in Suffolk UP-08.
+
+    These interface milestones belong to the Suffolk schedule. Do not claim
+    they are HELIX-coded or create baseline comparisons for IDs missing in BL.
+    """
+    st.markdown(
+        '<div class="section-caption">DATA HALL · L3 MILESTONES</div>',
+        unsafe_allow_html=True,
+    )
+    task = m.update_tables["TASK"].copy()
+    project_id = str(m.update_project["proj_id"])
+    task = task[task["proj_id"].astype(str).eq(project_id)]
+    rows = []
+    for hall, start_id, complete_id in (
+        ("DH1100", "DH1100.L3CX.000", "DH1100.L3CX.009"),
+        ("DH1200", "DH1200.L3CX.39", "DH1200.L3CX.29"),
+        ("DH1300", "DH1300.L3CX.59", "DH1300.L3CX.49"),
+        ("DH1400", "DH1400.L3CX.79", "DH1400.L3CX.69"),
+        ("DH1500", "DH1500.L3CX.99", "DH1500.L3CX.89"),
+        ("DH1600", "DH1600.L3CX.19", "DH1600.L3CX.9"),
+    ):
+        for label, code in (("L3 Start", start_id), ("L3 Cx Complete", complete_id)):
+            match = task[task["task_code"].astype(str).eq(code)]
+            if len(match) != 1:
+                raise ValueError(f"Expected one Suffolk UP-08 L3 milestone {code}; found {len(match)}")
+            r = match.iloc[0]
+            status = str(r.get("status_code", ""))
+            date_col = "act_end_date" if status == "TK_Complete" else "reend_date"
+            finish = pd.to_datetime(r.get(date_col), errors="coerce")
+            if pd.isna(finish) and status != "TK_Complete":
+                finish = pd.to_datetime(r.get("target_end_date"), errors="coerce")
+            if pd.isna(finish):
+                raise ValueError(f"Missing Suffolk milestone date: {code}")
+            rows.append({
+                "Data Hall": hall,
+                "Milestone": label,
+                "Activity ID": code,
+                "Current Date": _fmt_date(finish),
+            })
+    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True, height="content")
+
+
 def render_dashboard(helix: DC7Model, suffolk: DC7Model):
     view = st.session_state.get("dc7_schedule_view", "SUFFOLK")
     if view not in ("SUFFOLK", "HELIX"):
@@ -939,6 +982,7 @@ def render_dashboard(helix: DC7Model, suffolk: DC7Model):
     render_stats(suffolk, "PROJECT PROGRESS BY AREA")
     render_windows(suffolk)
     render_progress_detail(suffolk, view="SUFFOLK")
+    render_suffolk_l3_milestones(suffolk)
 
     # Maintain the detailed SUFFOLK Construction activity/WBS audit reports
     # in the validated model; do not display separate audit/download panels
