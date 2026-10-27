@@ -111,14 +111,14 @@ def render_header(m: DC7Model, view: str):
         current_label, current_value = "Current Update", m.update_path.stem
         source_label = "SUFFOLK · HELIX Construction"
     else:
-        # Never substitute Suffolk Current-C for independent HELIX U01.
+        # Never substitute Suffolk Current-C for independent HELIX U02.
         current_source = m.auxiliary_update_project
         date_label = "Latest Data Date"
         date_value = _fmt_date(pd.to_datetime(
             current_source.get("last_recalc_date") if current_source is not None else None,
             errors="coerce",
         ))
-        current_label, current_value = "Current Update", "226021-HE.U01"
+        current_label, current_value = "Current Update", "226021-HE.U02"
         source_label = "HELIX Electrical Line-Ups & MOH"
 
     st.markdown(f"""
@@ -162,7 +162,7 @@ def render_kpis(m: DC7Model, view: str):
 
 
 def render_helix_kpis(m: DC7Model):
-    """Independent electrical BL/U01 schedule performance, no SUFFOLK rows."""
+    """Independent electrical BL/U02 schedule performance, no SUFFOLK rows."""
     from src.helix_baseline import helix_bl_current_overview
     bl, cur = m.independent_helix_baseline(), m.independent_helix_update()
     st.markdown('<div class="section-caption">PROJECT STATUS SUMMARY</div>', unsafe_allow_html=True)
@@ -184,7 +184,7 @@ def render_helix_kpis(m: DC7Model):
     )
     cards = [
         ("Baseline Completion", _fmt_date(info["Baseline Finish"]), "226021-HE.B", ""),
-        ("Current Forecast Finish", _fmt_date(info["Current Finish"]), "226021-HE.U01", ""),
+        ("Current Forecast Finish", _fmt_date(info["Current Finish"]), "226021-HE.U02", ""),
         ("Finish Date Shift", f"{shift:+d} days", "", _var_class(shift)),
         ("Completed Activities", pct("Completed"), "", ""),
         ("In Progress Activities", pct("In Progress"), "", ""),
@@ -236,6 +236,21 @@ def render_helix_baseline_scurve_and_status(m: DC7Model):
                 connectgaps=False,
                 hovertemplate=f"%{{x|%d-%b-%Y}}<br>%{{y:,.0f}} {field}<extra></extra>",
             ))
+        # Optional historical forecast from the independent HELIX U01 XER.
+        historical = m.independent_helix_u01()
+        if historical is not None:
+            show_u01 = st.checkbox("Show U01 forecast", value=True, key="dc7_helix_u01_overlay")
+            if show_u01:
+                previous_date = m.historical_helix_project["last_recalc_date"]
+                _, previous_curve = helix_bl_current_overview(bl, historical, previous_date)
+                fig.add_trace(go.Scatter(
+                    x=previous_curve["Date"],
+                    y=previous_curve["Current Forecast Activities"],
+                    name="U01 Forecast",
+                    mode="lines",
+                    line=dict(color="#8A72BA", width=2, dash="dash"),
+                    hovertemplate="%{x|%d-%b-%Y}<br>%{y:,.0f} U01 forecast<extra></extra>",
+                ))
         dd = info["Current Data Date"]
         fig.add_vline(
             x=dd, line_dash="dash", line_color="#6d7f92",
@@ -638,7 +653,7 @@ def render_helix_lineup_stats(m: DC7Model):
         unsafe_allow_html=True,
     )
     if data is None:
-        st.info("Official HELIX U01 required.")
+        st.info("Official HELIX U02 required.")
         return
 
     def percent_label(value: float) -> str:
@@ -668,7 +683,7 @@ def render_helix_lineup_stats(m: DC7Model):
         in_progress = int(df["In Progress"].sum())
         not_started = int(df["Not Started"].sum())
         if total_tasks != completed + in_progress + not_started:
-            raise ValueError("HELIX U01 status totals do not reconcile")
+            raise ValueError("HELIX U02 status totals do not reconcile")
         st.markdown(h + '</tbody></table></div>', unsafe_allow_html=True)
     with right:
         fig = go.Figure(go.Bar(
@@ -718,7 +733,7 @@ def render_helix_lineups(m: DC7Model):
         with st.expander(heading, expanded=(area == "DH1100")):
             table = statuses.copy()
             if data is None:
-                st.info("Activity counts and statuses are pending the official HELIX U01.")
+                st.info("Activity counts and statuses are pending the official HELIX U02.")
             column_config = {
                 "Line-Up": st.column_config.TextColumn(
                     "Line-Up" if not is_moh else "MOH Area"
@@ -744,7 +759,7 @@ def render_helix_lineups(m: DC7Model):
                     )
                 with right:
                     if data is None:
-                        st.info("The chart is pending the official HELIX U01.")
+                        st.info("The chart is pending the official HELIX U02.")
                     else:
                         if table["Line-Up"].tolist() != list(lineup_order(area)):
                             raise ValueError(f"Line-Up P6 order mismatch: {area}")
@@ -819,21 +834,21 @@ def render_helix_contract_milestones(m: DC7Model):
         raise ValueError("Unexpected HELIX QC2.2 / IST contractual milestone population")
     df = bdf[["Activity ID", "Area", "Milestone", "Baseline Finish", "Contractual Date"]].merge(
         udf[["Activity ID", "Current Finish", "Contractual Date", "Activity Name"]],
-        on="Activity ID", how="outer", suffixes=("_BL", "_U01"), validate="one_to_one",
+        on="Activity ID", how="outer", suffixes=("_BL", "_U02"), validate="one_to_one",
         indicator=True,
     )
     if not df["_merge"].eq("both").all():
-        raise ValueError("HELIX milestone BL/U01 Activity ID mismatch")
+        raise ValueError("HELIX milestone BL/U02 Activity ID mismatch")
     df["Variance (Working Days)"] = df.apply(
         lambda r: us_federal_workday_delay(r["Baseline Finish"], r["Current Finish"]),
         axis=1,
     )
     df["Contract Delay (Working Days)"] = df.apply(
-        lambda r: us_federal_workday_delay(r["Contractual Date_U01"], r["Current Finish"]),
+        lambda r: us_federal_workday_delay(r["Contractual Date_U02"], r["Current Finish"]),
         axis=1,
     )
     df["Contract Date Changed"] = (
-        df["Contractual Date_BL"].dt.normalize() != df["Contractual Date_U01"].dt.normalize()
+        df["Contractual Date_BL"].dt.normalize() != df["Contractual Date_U02"].dt.normalize()
     )
     changed = df.loc[df["Contract Date Changed"], "Activity ID"].tolist()
     expected_legacy_ist = {f"IST.{n}" for n in (1200, 1300, 1400, 1500, 1600)}
