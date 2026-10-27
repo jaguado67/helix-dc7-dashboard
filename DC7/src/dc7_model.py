@@ -1056,24 +1056,32 @@ def build_dc7_model(data_dir: Path) -> DC7Model:
     unmatched = audit_reports["active"].loc[
         audit_reports["active"]["Audit"].eq("NO BASELINE MATCH"), "Activity ID"
     ].astype(str).tolist()
-    if len(current) != 2519 or matched_count + len(unmatched) != len(current):
+    # Do not pin an earlier UP08 activity count: revised XER exports can
+    # legitimately add, reclassify or remove HELIX-coded construction IDs.
+    # Preserve the strict reconciliation, while reporting all unmatched IDs.
+    if matched_count + len(unmatched) != len(current):
         raise ValueError(
             f"Invalid UP08 Suffolk baseline reconciliation: total={len(current)}, "
             f"matched={matched_count}, unmatched={unmatched}"
         )
     previous_report = audit_reports["summary"].set_index("Metric")["Value"]
-    if (int(previous_report["Previous HELIX construction"]) != 2545
-            or int(previous_report["Former HELIX construction no longer active"]) != 27
-            or int(previous_report["New active HELIX IDs not in Previous"]) != 1):
-        raise ValueError("Unexpected Suffolk Current-C → UP08 activity ID churn")
+    previous_count = int(previous_report["Previous HELIX construction"])
+    exited_count = int(previous_report["Former HELIX construction no longer active"])
+    added_count = int(previous_report["New active HELIX IDs not in Previous"])
+    if previous_count - exited_count + added_count != len(current):
+        raise ValueError(
+            "Suffolk Current-C → UP08 ID reconciliation failed: "
+            f"previous={previous_count}, exited={exited_count}, "
+            f"added={added_count}, current={len(current)}"
+        )
     audit_reports["up08_baseline_unmatched"] = audit_reports["active"].loc[
         audit_reports["active"]["Audit"].eq("NO BASELINE MATCH")
     ].copy()
     audit_reports["up08_current_c_to_up08"] = pd.DataFrame([
-        {"Metric": "Previous Current-C HELIX Construction", "Value": 2545},
-        {"Metric": "UP08 HELIX Construction", "Value": 2519},
-        {"Metric": "Exited construction scope", "Value": 27},
-        {"Metric": "New construction Activity IDs", "Value": 1},
+        {"Metric": "Previous Current-C HELIX Construction", "Value": previous_count},
+        {"Metric": "UP08 HELIX Construction", "Value": len(current)},
+        {"Metric": "Exited construction scope", "Value": exited_count},
+        {"Metric": "New construction Activity IDs", "Value": added_count},
         {"Metric": "UP08 matched to approved BL", "Value": matched_count},
         {"Metric": "UP08 without BL counterpart", "Value": len(unmatched)},
     ])
