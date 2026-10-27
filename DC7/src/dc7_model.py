@@ -712,7 +712,7 @@ class DC7Model:
         )
 
     def independent_helix_update(self) -> Optional[dict[str, pd.DataFrame]]:
-        """Official independent HELIX U01. Never substitute Suffolk Current-C."""
+        """Official independent HELIX U02. Never substitute Suffolk Current-C."""
         if self.auxiliary_update_path is None or self.auxiliary_update_tables is None:
             return None
         if self.auxiliary_update_path.name != "226021-HE.U02.xer":
@@ -1011,10 +1011,10 @@ def build_dc7_model(data_dir: Path) -> DC7Model:
         aux_tasks["Area"] = aux_tasks["task_id"].astype(str).map(a_area_map).fillna("Unclassified")
         aux_tasks["Subarea"] = "Other HELIX Electrical Scope"
 
-    # Authorized HELIX U01 is independent of Suffolk's current schedule.
+    # Authorized HELIX U02 is independent of Suffolk's current schedule.
     current_helix_files = sorted(Path(data_dir).rglob("226021-HE.U02.xer"))
     if len(current_helix_files) != 1:
-        raise ValueError("Exactly one official independent HELIX U01 is required")
+        raise ValueError("Exactly one official independent HELIX U02 is required")
     auxiliary_update_path = current_helix_files[0]
     auxiliary_update_tables = parse_xer(auxiliary_update_path, WANTED)
     current_projects = auxiliary_update_tables["PROJECT"]
@@ -1022,10 +1022,10 @@ def build_dc7_model(data_dir: Path) -> DC7Model:
         current_projects["proj_short_name"].fillna("").astype(str).str.strip().eq("226021-HE.C")
     ]
     if len(current_rows) != 1:
-        raise ValueError("Incorrect independent HELIX U01 project ID")
+        raise ValueError("Incorrect independent HELIX U02 project ID")
     auxiliary_update_project = current_rows.iloc[0]
     if pd.Timestamp(auxiliary_update_project["last_recalc_date"]).normalize() != pd.Timestamp("2026-10-19"):
-        raise ValueError("Unexpected independent HELIX U01 Data Date")
+        raise ValueError("Unexpected independent HELIX U02 Data Date")
 
     historical_helix_tables = None
     historical_helix_project = None
