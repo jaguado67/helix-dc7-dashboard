@@ -167,7 +167,7 @@ def render_helix_kpis(m: DC7Model):
     bl, cur = m.independent_helix_baseline(), m.independent_helix_update()
     st.markdown('<div class="section-caption">PROJECT STATUS SUMMARY</div>', unsafe_allow_html=True)
     if bl is None or cur is None:
-        st.warning("Independent HELIX BL and U01 are both required.")
+        st.warning("Independent HELIX BL and U02 are both required.")
         return
     info, _ = helix_bl_current_overview(
         bl, cur, m.auxiliary_update_project["last_recalc_date"]
@@ -203,12 +203,12 @@ def render_helix_kpis(m: DC7Model):
 
 
 def render_helix_baseline_scurve_and_status(m: DC7Model):
-    """HELIX BL vs independent U01 forecast and actual activity completions."""
+    """HELIX BL vs independent U02 forecast and actual activity completions."""
     from src.helix_baseline import helix_bl_current_overview
     bl, cur = m.independent_helix_baseline(), m.independent_helix_update()
     st.markdown('<div class="section-caption">SCHEDULE PERFORMANCE</div>', unsafe_allow_html=True)
     if bl is None or cur is None:
-        st.warning("Independent HELIX BL and U01 are both required for progress S-curve.")
+        st.warning("Independent HELIX BL and U02 are both required for progress S-curve.")
         return
     info, curve = helix_bl_current_overview(bl, cur, m.auxiliary_update_project["last_recalc_date"])
     count = info["Counts"]
@@ -694,7 +694,7 @@ def render_helix_lineup_stats(m: DC7Model):
             textposition="outside",
             textfont=dict(size=13, color=TEXT),
             marker=dict(color="#1f6d8a"),
-            hovertemplate="%{y}<br>U01 completed: %{x:.3f}%<extra></extra>",
+            hovertemplate="%{y}<br>U02 completed: %{x:.3f}%<extra></extra>",
         ))
         highest = float(df["Activity Completion %"].max()) if not df.empty else 0.0
         fig.update_layout(
@@ -812,7 +812,7 @@ def render_helix_lineups(m: DC7Model):
 
 
 def render_helix_contract_milestones(m: DC7Model):
-    """P6 HELIX BL vs U01 milestone Finish changes, US federal working days.
+    """P6 HELIX BL vs U02 milestone Finish changes, US federal working days.
 
     Includes HELIX-coded M./IST. activity IDs. Contractual dates in
     Activity Names are displayed separately; five IST names have been
@@ -826,7 +826,7 @@ def render_helix_contract_milestones(m: DC7Model):
         unsafe_allow_html=True,
     )
     if baseline is None or current is None:
-        st.warning("HELIX BL and U01 are required for milestone comparison.")
+        st.warning("HELIX BL and U02 are required for milestone comparison.")
         return
     bdf = baseline["_contract_milestones"].copy()
     udf = current["_contract_milestones"].copy()
@@ -918,7 +918,7 @@ def render_helix_contract_milestones(m: DC7Model):
             y=labels, x=values, orientation="h",
             marker_color=[RED if v > 0 else GREEN if v < 0 else BLUE for v in values],
             text=[f"{v:+d}" for v in values], textposition="outside",
-            hovertemplate="%{y}<br>BL → U01 Finish shift: %{x:+d} working days<extra></extra>",
+            hovertemplate="%{y}<br>BL → U02 Finish shift: %{x:+d} working days<extra></extra>",
         ))
         lo, hi = min(0, *values), max(0, *values)
         margin = max(12, int(max(1, hi-lo) * .18))
