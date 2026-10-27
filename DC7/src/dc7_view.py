@@ -930,6 +930,13 @@ def render_suffolk_l3_milestones(m: DC7Model):
         '<div class="section-caption">SUFFOLK · MILESTONES</div>',
         unsafe_allow_html=True,
     )
+    update_label = m.update_path.stem.split(".")[-1]
+    data_date_label = _fmt_date(m.data_date)
+    forecast_heading = (
+        f"Forecast · {_safe(update_label)}"
+        f'<small style="display:block;font-size:11px;font-weight:500;margin-top:2px">'
+        f'Data Date: {_safe(data_date_label)}</small>'
+    )
     task = m.update_tables["TASK"]
     task = task[task["proj_id"].astype(str).eq(str(m.update_project["proj_id"]))]
     # Fixed baseline/reference/name snapshot from user-approved MILESTONES list (30 activities).
@@ -1080,7 +1087,7 @@ def render_suffolk_l3_milestones(m: DC7Model):
             '<colgroup><col style="width:13%"><col style="width:43%">'
             '<col style="width:16%"><col style="width:16%"><col style="width:12%"></colgroup>'
             '<thead><tr><th>Reference</th><th>Milestones</th><th>Baseline</th>'
-            '<th>Forecast</th><th>Variance</th></tr></thead><tbody>'
+            f'<th>{forecast_heading}</th><th>Variance</th></tr></thead><tbody>'
             f'<tr class="suffolk-milestone-group"><td colspan="5">{_safe(selected_area)}</td></tr>'
         )
         for _, row in subset.iterrows():
