@@ -457,7 +457,20 @@ def render_progress_detail(m: DC7Model, view: str):
             showlegend=False, title=chart_title, yaxis_title="Activity Completion %"
         )
         fig.update_yaxes(range=[0, ymax], ticksuffix="%", gridcolor=GRID)
-        fig.update_xaxes(tickangle=-28 if dh_p6_wbs else -25)
+        # Horizontal category labels with line wrapping to avoid collisions.
+        labels = df["Area"].astype(str).tolist()
+        wrapped_labels = [
+            "Commissioning &<br>Start Up" if x == "Commissioning & Start Up" else
+            "Energization, Start-up<br>& Commissioning" if x == "Energization, Start-up & Commissioning" else
+            "Electrical<br>Rooms" if x == "Electrical Rooms" else
+            "Mechanical<br>Yard" if x == "Mechanical Yard" else
+            "Electrical<br>Yard" if x == "Electrical Yard" else
+            "Priority<br>Rooms" if x == "Priority Rooms" else
+            "Other<br>Rooms" if x == "Other Rooms" else x
+            for x in labels
+        ]
+        fig.update_xaxes(tickangle=0, tickmode="array", tickvals=labels,
+                         ticktext=wrapped_labels, automargin=True)
         st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
     # Original WBS and out-of-scope audit remain verified internally.
 
