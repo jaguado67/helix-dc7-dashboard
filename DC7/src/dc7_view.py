@@ -902,7 +902,7 @@ def render_suffolk_l3_milestones(m: DC7Model):
     they are HELIX-coded or create baseline comparisons for IDs missing in BL.
     """
     st.markdown(
-        '<div class="section-caption">DATA HALL · L3 & HANDOVER MILESTONES</div>',
+        '<div class="section-caption">DATA HALL · PROJECT MILESTONES</div>',
         unsafe_allow_html=True,
     )
     task = m.update_tables["TASK"].copy()
@@ -944,7 +944,25 @@ def render_suffolk_l3_milestones(m: DC7Model):
                 "Activity ID": code,
                 "Current Date": _fmt_date(finish),
             })
-    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True, height="content")
+    milestones = pd.DataFrame(rows)
+    l3_names = ["L3 Start", "L3 Cx Complete"]
+    handover_names = ["Early Access", "Substantial Completion", "Final Completion"]
+    st.markdown(
+        '<div class="section-caption">LEVEL 1 · L3 COMMISSIONING MILESTONES</div>',
+        unsafe_allow_html=True,
+    )
+    st.dataframe(
+        milestones[milestones["Milestone"].isin(l3_names)],
+        use_container_width=True, hide_index=True, height="content",
+    )
+    st.markdown(
+        '<div class="section-caption">LEVEL 2 · HANDOVER MILESTONES</div>',
+        unsafe_allow_html=True,
+    )
+    st.dataframe(
+        milestones[milestones["Milestone"].isin(handover_names)],
+        use_container_width=True, hide_index=True, height="content",
+    )
 
 
 def render_dashboard(helix: DC7Model, suffolk: DC7Model):
