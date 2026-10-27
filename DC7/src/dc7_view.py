@@ -996,7 +996,7 @@ def render_suffolk_l3_milestones(m: DC7Model):
     milestones["_order"] = milestones["Milestone"].map(milestone_order)
     milestones = milestones.sort_values(["Data Hall", "_order"], kind="stable").drop(columns="_order")
     l3_names = ["L3 Start", "L3 Cx Complete", "L3 Start-Up", "L4 Cx", "L5 Cx"]
-    handover_names = ["Clean & Punch", "Early Access", "Substantial Completion", "Final Completion"]
+    handover_names = ["Substantial Completion", "Final Completion"]
     st.markdown(
         '<div class="section-caption">LEVEL 1 · COMMISSIONING MILESTONES</div>',
         unsafe_allow_html=True,
