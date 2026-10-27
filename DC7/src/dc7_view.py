@@ -1035,7 +1035,7 @@ def render_suffolk_l3_milestones(m: DC7Model):
     l3_names = ["L3 Start", "L3 Cx Complete", "L3 Start-Up"]
     handover_names = ["Substantial Completion", "Final Completion"]
     st.markdown(
-        '<div class="section-caption">LEVEL 1 · COMMISSIONING MILESTONES</div>',
+        '<div class="section-caption">COMMISSIONING MILESTONES</div>',
         unsafe_allow_html=True,
     )
     st.dataframe(
@@ -1043,7 +1043,7 @@ def render_suffolk_l3_milestones(m: DC7Model):
         use_container_width=True, hide_index=True, height="content",
     )
     st.markdown(
-        '<div class="section-caption">LEVEL 2 · HANDOVER MILESTONES</div>',
+        '<div class="section-caption">HANDOVER MILESTONES</div>',
         unsafe_allow_html=True,
     )
     st.dataframe(
