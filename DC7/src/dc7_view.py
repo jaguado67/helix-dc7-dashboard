@@ -878,7 +878,7 @@ def render_helix_contract_milestones(m: DC7Model):
         fig = go.Figure(go.Bar(
             y=labels, x=values, orientation="h",
             marker_color=[RED if v > 0 else GREEN if v < 0 else BLUE for v in values],
-            text=[f"{v:+d} wd" for v in values], textposition="outside",
+            text=[f"{v:+d}" for v in values], textposition="outside",
             hovertemplate="%{y}<br>BL → U01 Finish shift: %{x:+d} working days<extra></extra>",
         ))
         lo, hi = min(0, *values), max(0, *values)
