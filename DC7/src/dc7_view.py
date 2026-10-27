@@ -19,6 +19,16 @@ CSS=f"""
 [data-testid="stToolbar"]{{display:none!important}} [data-testid="stSidebar"]{{display:none!important}} [data-testid="collapsedControl"]{{display:none!important}}
 .block-container{{padding-top:.6rem;padding-bottom:2rem;max-width:1680px}} [data-testid="stAppViewContainer"]{{background:#fff}}
 html,body,[class*="css"]{{font-family:Arial,Helvetica,sans-serif;color:{TEXT}}} [data-testid="stVerticalBlock"]{{gap:.55rem}}
+.suffolk-milestone-wrap{{width:100%;max-width:1120px;margin:4px auto 18px;overflow-x:auto;border:1px solid {BORDER};border-radius:8px}}
+.suffolk-milestone-table{{width:100%;border-collapse:collapse;table-layout:fixed;font-size:13px;color:{TEXT}}}
+.suffolk-milestone-table th{{background:#f5f7fa;color:{MUTED};text-align:left;font-weight:650;padding:10px 12px;border-bottom:1px solid {BORDER}}}
+.suffolk-milestone-table td{{padding:8px 12px;border-bottom:1px solid #e6ebf0;line-height:1.3;overflow-wrap:anywhere}}
+.suffolk-milestone-table td+td,.suffolk-milestone-table th+th{{border-left:1px solid #e6ebf0}}
+.suffolk-milestone-table tbody tr:last-child td{{border-bottom:none}}
+.suffolk-milestone-table .suffolk-milestone-group td{{background:{NAVY2};color:#fff;font-weight:800;padding:9px 12px;border-left:0}}
+.suffolk-milestone-table .var-late{{color:{RED};font-weight:750}}
+.suffolk-milestone-table .var-early{{color:{EARLY};font-weight:750}}
+@media(max-width:700px){{.suffolk-milestone-table{{min-width:760px}}}}
 .helix-header{{display:grid;grid-template-columns:minmax(170px,0.9fr) minmax(0,5fr) minmax(170px,0.9fr);gap:12px;align-items:stretch;background:#fff;color:{TEXT};min-height:108px;width:100%}}
 .helix-header .logo-card{{background:#fff;border:1px solid {BORDER};border-radius:7px;padding:10px 12px;min-width:0;min-height:108px;display:flex;align-items:center;justify-content:center}}
 .helix-header .logo-card img{{display:block;width:100%;height:80px;max-height:80px;object-fit:contain}}
@@ -1037,9 +1047,34 @@ def render_suffolk_l3_milestones(m: DC7Model):
         })
     # Keep the Excel grouping and row order, including readiness and delivery.
     df = pd.DataFrame(results)
-    st.dataframe(
-        df, use_container_width=True, hide_index=True, height="content",
+    # Compact executive table with fully styled area separator rows.
+    # HTML rather than st.dataframe: the latter cannot style whole group rows.
+    table = ['<div class="suffolk-milestone-wrap"><table class="suffolk-milestone-table">']
+    table.append(
+        '<colgroup><col style="width:13%"><col style="width:43%">'
+        '<col style="width:16%"><col style="width:16%"><col style="width:12%"></colgroup>'
+        '<thead><tr><th>Reference</th><th>Milestones</th><th>Baseline</th>'
+        '<th>Forecast</th><th>Variance</th></tr></thead><tbody>'
     )
+    for _, row in df.iterrows():
+        group = not str(row["Reference"]).strip()
+        if group:
+            table.append(
+                f'<tr class="suffolk-milestone-group"><td colspan="5">'
+                f'{_safe(row["Milestones"])}</td></tr>'
+            )
+        else:
+            cells = [row[col] for col in ("Reference", "Milestones", "Baseline", "Forecast", "Variance")]
+            variance = str(row["Variance"])
+            cls = "var-late" if variance.startswith("-") else ("var-early" if variance.startswith("+") else "")
+            table.append(
+                '<tr>' + ''.join(
+                    f'<td class="{cls if idx == 4 else ""}">{_safe(value)}</td>'
+                    for idx, value in enumerate(cells)
+                ) + '</tr>'
+            )
+    table.append("</tbody></table></div>")
+    st.markdown("".join(table), unsafe_allow_html=True)
 
 
 def render_dashboard(helix: DC7Model, suffolk: DC7Model):
