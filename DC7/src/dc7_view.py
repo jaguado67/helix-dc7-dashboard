@@ -281,7 +281,10 @@ def render_helix_baseline_scurve_and_status(m: DC7Model):
         h += ('</div><div class="scope-note">'
               f'Completed: <b>{ratio("Completed")}</b><br>'
               f'In Progress: <b>{ratio("In Progress")}</b><br>'
-              f'Not Started: <b>{ratio("Not Started")}</b>'
+              f'Not Started: <b>{ratio("Not Started")}</b><br>'
+              '<span style="display:block;margin-top:8px">Scope: 4,153 HELIX Electrical Line-Ups &amp; MOH activities; '
+              'excludes 44 other HELIX-coded activities and 492 non-HELIX activities in the full 4,689-task XER. '
+              'The 77 completed activities in the full XER are not the HELIX scope count.</span>'
               '</div></div>')
         st.markdown(h, unsafe_allow_html=True)
 
