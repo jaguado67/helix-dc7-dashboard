@@ -222,7 +222,7 @@ def render_helix_baseline_scurve_and_status(m: DC7Model):
             '</div>', unsafe_allow_html=True,
         )
         historical = m.independent_helix_u01()
-        show_u01 = st.toggle("U01 forecast", value=True, key="dc7_helix_u01_overlay") if historical is not None else False
+        show_u01 = historical is not None
         fig = go.Figure()
         for field, color in (
             ("Baseline Planned Activities", "#456FA6"),
