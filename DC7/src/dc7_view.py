@@ -4,6 +4,7 @@ import base64
 import html
 from pathlib import Path
 import pandas as pd
+import numpy as np
 import plotly.graph_objects as go
 import streamlit as st
 
@@ -1024,8 +1025,22 @@ def render_suffolk_l3_milestones(m: DC7Model):
                         finish_dates.append(date)
                 if len(finish_dates) == len(candidates):
                     current = max(finish_dates)
-        # This is a calendar-day difference, not a P6 calendar calculation.
-        shift = (baseline.normalize() - current.normalize()).days if pd.notna(current) else None
+        # Excel MILESTONES reference: NETWORKDAYS.INTL(..., 11, HOLIDAYS).
+        # Code 11 = Sunday-only weekend; NETWORKDAYS counts BOTH endpoints.
+        # HOLIDAYS in the supplied workbook is an external reference, not an
+        # embedded worksheet. No undocumented holiday dates are invented here.
+        # This computes the verified six-day workweek component of the rule;
+        # it must not be described as an exact P6-calendar reconciliation.
+        shift = None
+        if pd.notna(current):
+            first = min(baseline.normalize(), current.normalize())
+            last = max(baseline.normalize(), current.normalize())
+            business_days = int(np.busday_count(
+                first.date(),
+                (last + pd.Timedelta(days=1)).date(),
+                weekmask="1111110",
+            ))
+            shift = (1 if baseline > current else -1 if baseline < current else 0) * business_days
         results.append({
             "Reference": reference,
             "Milestones": name,
