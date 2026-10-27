@@ -940,8 +940,8 @@ def render_suffolk_l3_milestones(m: DC7Model):
                 raise ValueError(f"Missing Suffolk milestone date: {code}")
             rows.append({
                 "Data Hall": hall,
-                "Milestone": label,
-                "Activity ID": code,
+                "Milestone": f"{str(r['task_name']).strip()} ({label})",
+                "Milestone Type": label,
                 "Current Date": _fmt_date(finish),
             })
 
@@ -979,8 +979,10 @@ def render_suffolk_l3_milestones(m: DC7Model):
             if pd.isna(finish):
                 raise ValueError(f"Missing Suffolk UP-08 milestone date: {code}")
             rows.append({
-                "Data Hall": area, "Milestone": label,
-                "Activity ID": code, "Current Date": _fmt_date(finish),
+                "Data Hall": area,
+                "Milestone": f"{str(record['task_name']).strip()} ({label})",
+                "Milestone Type": label,
+                "Current Date": _fmt_date(finish),
             })
     milestones = pd.DataFrame(rows)
     milestones["Data Hall"] = pd.Categorical(
@@ -993,7 +995,7 @@ def render_suffolk_l3_milestones(m: DC7Model):
         "L5 Cx": 2, "Clean & Punch": 3, "Early Access": 4,
         "Substantial Completion": 5, "Final Completion": 6,
     }
-    milestones["_order"] = milestones["Milestone"].map(milestone_order)
+    milestones["_order"] = milestones["Milestone Type"].map(milestone_order)
     milestones = milestones.sort_values(["Data Hall", "_order"], kind="stable").drop(columns="_order")
     l3_names = ["L3 Start", "L3 Cx Complete", "L3 Start-Up"]
     handover_names = ["Substantial Completion", "Final Completion"]
@@ -1002,7 +1004,7 @@ def render_suffolk_l3_milestones(m: DC7Model):
         unsafe_allow_html=True,
     )
     st.dataframe(
-        milestones[milestones["Milestone"].isin(l3_names)],
+        milestones.loc[milestones["Milestone Type"].isin(l3_names), ["Data Hall", "Milestone", "Current Date"]],
         use_container_width=True, hide_index=True, height="content",
     )
     st.markdown(
@@ -1010,7 +1012,7 @@ def render_suffolk_l3_milestones(m: DC7Model):
         unsafe_allow_html=True,
     )
     st.dataframe(
-        milestones[milestones["Milestone"].isin(handover_names)],
+        milestones.loc[milestones["Milestone Type"].isin(handover_names), ["Data Hall", "Milestone", "Current Date"]],
         use_container_width=True, hide_index=True, height="content",
     )
 
