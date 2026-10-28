@@ -328,24 +328,32 @@ def render_scurve_and_status(m: DC7Model):
             if len(running) != counts["In Progress"]:
                 st.error("UP08 / UP09 status reconciliation mismatch.")
             else:
-                st.markdown("**UP08 → UP09 · In Progress transitions**")
-                values = [("Started since UP08", started), ("Continuing", continued), ("Other / new scope", other)]
-                chart = go.Figure(go.Bar(
-                    x=[v for _, v in values if v > 0],
-                    y=["In Progress"] * sum(v > 0 for _, v in values),
-                    orientation="h",
-                    marker_color=[c for c, (_, v) in zip(["#2c76b9", "#259978", "#d28b39"], values) if v > 0],
-                    hovertemplate="%{x} activities<extra></extra>",
-                    name="",
-                ))
-                for trace in chart.data:
-                    trace.showlegend = False
-                chart.update_layout(height=45, margin=dict(l=0,r=0,t=0,b=0), barmode="stack",
-                    bargap=0.78,
-                    xaxis=dict(visible=False), yaxis=dict(visible=False), showlegend=False)
-                st.plotly_chart(chart, use_container_width=True, config={"displayModeBar": False})
-                st.caption("  |  ".join(f"{label}: {value}" for label, value in values if value > 0))
-
+                values = [
+                    (started, "#2c76b9", "Started since UP08"),
+                    (continued, "#259978", "Continuing In Progress"),
+                    (other, "#d28b39", "Other / new scope"),
+                ]
+                total_running = len(running)
+                segments = "".join(
+                    f'<span style="display:block;flex:{value};background:{color};height:100%;"></span>'
+                    for value, color, _ in values if value > 0
+                )
+                labels = "".join(
+                    f'<span style="display:inline-flex;align-items:center;gap:5px;">'
+                    f'<span style="color:{color};font-size:13px;">&#9679;</span>'
+                    f'{value:,} {_safe(label)}</span>'
+                    for value, color, label in values if value > 0
+                )
+                st.markdown(
+                    f'<div style="font-size:13px;font-weight:650;margin:4px 0 8px;">'
+                    f'Composition of {total_running:,} In Progress activities · UP09</div>'
+                    f'<div style="display:flex;width:100%;height:15px;overflow:hidden;'
+                    f'border-radius:8px;background:#e6eaf0;">{segments}</div>'
+                    f'<div style="display:flex;justify-content:space-between;'
+                    f'flex-wrap:wrap;gap:6px;margin-top:8px;font-size:12px;">'
+                    f'{labels}</div>',
+                    unsafe_allow_html=True,
+                )
 
 
 def render_windows(m: DC7Model):
