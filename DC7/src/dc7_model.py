@@ -481,9 +481,9 @@ class DC7Model:
                     else:
                         bf = pd.NaT
                 else:
-                    # A gate absent from the approved baseline must not be
-                    # compared with an unrelated construction-area maximum.
-                    bf = pd.NaT
+                    # Retain the original baseline construction-area window for
+                    # context. It is NOT an equivalent L3 gate, so no variance.
+                    pass
             if (pd.notna(bf) and bs > bf) or cs > cf:
                 raise ValueError(f"Invalid HELIX area window in {area}")
 
@@ -494,7 +494,7 @@ class DC7Model:
                 "Current Start": cs,
                 "Current Forecast Finish": cf,
                 "Start Date Shift (d)": (bs.normalize() - cs.normalize()).days,
-                "Finish Date Shift (d)": (bf.normalize() - cf.normalize()).days if pd.notna(bf) else float("nan"),
+                "Finish Date Shift (d)": (bf.normalize() - cf.normalize()).days if (pd.notna(bf) and (not area.startswith("DH") or len(baseline_matches) == 1)) else float("nan"),
                 "Duration Change (d)": ((bf - bs) - (cf - cs)).days if pd.notna(bf) else float("nan"),
                 "Activity Completion %": _activity_completion_pct(c_all),
                 "Start Anchor ID": str(b_all.loc[baseline_start.idxmin(), "task_code"]),
@@ -504,6 +504,7 @@ class DC7Model:
                 "Current Finish Anchor Name": finish_anchor_name,
                 "Current Finish Anchor Field": finish_anchor_field,
                 "Finish Reference": finish_reference,
+                "Comparable L3 Baseline": (not area.startswith("DH")) or len(baseline_matches) == 1 if area.startswith("DH") else True,
             })
         return pd.DataFrame(rows)
 
