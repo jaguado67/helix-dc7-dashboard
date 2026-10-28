@@ -407,6 +407,7 @@ def render_windows(m: DC7Model):
         dates += [x for x in [bs, bf, cs, cf] if pd.notna(x)]
         if pd.notna(bs) and pd.notna(bf):
             fig.add_trace(go.Scatter(x=[bs, bf], y=[base_y, base_y], mode="lines+markers", line=dict(color=BASELINE, width=8), marker=dict(size=8, color=BASELINE), showlegend=False, hovertemplate=f"<b>{r.Area} · Baseline</b><br>Start: {_fmt_date(bs)}<br>Finish: {_fmt_date(bf)}<extra></extra>"))
+            fig.add_annotation(x=bf, y=base_y, text=_fmt_date(bf), showarrow=False, xanchor="left", xshift=8, font=dict(size=11, color="#74889e"))
         if pd.notna(cs) and pd.notna(cf):
             v = r["Finish Date Shift (d)"]; col = _timeline_color(v)
             details = (f"<b>{r.Area} · Suffolk UP09</b><br>"
@@ -418,7 +419,7 @@ def render_windows(m: DC7Model):
             if r.Area.startswith("DH"):
                 fig.add_trace(go.Scatter(x=[cs, cf], y=[cur_y, cur_y], mode="lines+markers",
                     line=dict(color="#2f80ed", width=8),
-                    marker=dict(symbol=["circle", "diamond"], size=[7, 14], color="#2f80ed"),
+                    marker=dict(symbol="circle", size=5, color="#2f80ed"),
                     showlegend=False, hovertemplate=details+"<br>Baseline L3 gate: not available<extra></extra>"))
                 fig.add_annotation(x=cf, y=cur_y, text=f"L3 · {_fmt_date(cf)}",
                     showarrow=False, xanchor="left", xshift=13,
