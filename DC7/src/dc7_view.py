@@ -325,7 +325,7 @@ def render_scurve_and_status(m: DC7Model):
 def render_windows(m: DC7Model):
     st.markdown('<div class="section-caption">SCHEDULE SUMMARY · BASELINE VS CURRENT UPDATE</div>', unsafe_allow_html=True)
     df = m.area_windows()
-    st.caption("Suffolk UP08 · HELIX-coded Construction scope. Each current bar ends at the latest activity Finish in its area (not a contractual FTE milestone). Hover to inspect the driving Activity ID and source XER field. Baseline vs current shifts shown here are calendar-day differences.")
+    st.caption("Suffolk UP09 · HELIX-coded Construction scope. Each current bar ends at the latest activity Finish in its area (not a contractual FTE milestone). Hover to inspect the driving Activity ID and source XER field. Baseline vs current shifts shown here are calendar-day differences.")
     if df.empty:
         st.info("No QTS - AREA assignments found for HELIX scope.")
         return
@@ -943,7 +943,7 @@ def render_suffolk_l3_milestones(m: DC7Model):
     """Reproduce the approved 30-row MILESTONES control list using fixed baseline dates.
 
     The sheet is the immutable baseline reference. Forecast is sourced from
-    Suffolk UP-08 only when an unambiguous P6 activity can be identified.
+    Suffolk UP-09 only when an unambiguous P6 activity can be identified.
     Do not substitute old Excel forecasts or infer readiness/FTE rollups.
     """
     st.markdown(
