@@ -393,9 +393,9 @@ def render_scurve_and_status(m: DC7Model):
 
 
 def render_windows(m: DC7Model):
-    st.markdown('<div class="section-caption">SCHEDULE SUMMARY · AREA FINISH & L3 CONTROL</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-caption">SCHEDULE SUMMARY · BASELINE CONTEXT & L3 CONTROL</div>', unsafe_allow_html=True)
     df = m.area_windows()
-    st.caption("Suffolk UP09 · Data Hall markers indicate the L3 Start control milestone, not the final construction activity. No equivalent milestone was found in the approved Suffolk baseline, so no baseline variance is asserted for those halls. FOH/BOH retain Baseline vs Current construction-area bars; their shifts are calendar-day differences. L3 milestones do not enter HELIX activity totals.")
+    st.caption("Suffolk UP09 · Gray = baseline HELIX construction-area window; blue = current HELIX construction start through the L3 Start control milestone. These are different scope references, so no DH finish variance is calculated. FOH/BOH remain comparable construction-area windows. L3 milestones are excluded from HELIX activity counts.")
     if df.empty:
         st.info("No QTS - AREA assignments found for HELIX scope.")
         return
@@ -415,11 +415,12 @@ def render_windows(m: DC7Model):
                        f"Activity ID: {_safe(r['Current Finish Anchor ID'])}<br>"
                        f"Activity: {_safe(r['Current Finish Anchor Name'])}<br>"
                        f"XER field: {_safe(r['Current Finish Anchor Field'])}")
-            if r.Area.startswith("DH") and pd.isna(bf):
-                fig.add_trace(go.Scatter(x=[cf], y=[cur_y], mode="markers",
-                    marker=dict(symbol="diamond", size=15, color="#2f80ed"),
+            if r.Area.startswith("DH"):
+                fig.add_trace(go.Scatter(x=[cs, cf], y=[cur_y, cur_y], mode="lines+markers",
+                    line=dict(color="#2f80ed", width=8),
+                    marker=dict(symbol=["circle", "diamond"], size=[7, 14], color="#2f80ed"),
                     showlegend=False, hovertemplate=details+"<br>Baseline L3 gate: not available<extra></extra>"))
-                fig.add_annotation(x=cf, y=cur_y, text=f"L3 Start · {_fmt_date(cf)}",
+                fig.add_annotation(x=cf, y=cur_y, text=f"L3 · {_fmt_date(cf)}",
                     showarrow=False, xanchor="left", xshift=13,
                     font=dict(size=11, color="#2f80ed"))
             else:
