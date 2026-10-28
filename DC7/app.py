@@ -163,7 +163,7 @@ if not source_data_dir.exists():
 
 data_dir = _materialize_cloud_xers(source_data_dir)
 
-MODEL_VERSION = "dc7-2026-10-28-l3-optional-baseline-v043"
+MODEL_VERSION = "dc7-2026-10-28-l3-baseline-context-v044"
 
 @st.cache_resource(show_spinner="Reading DC7 baseline/update XER and building HELIX scope…")
 def load_model(path_text: str, model_version: str):
