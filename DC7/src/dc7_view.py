@@ -345,12 +345,12 @@ def render_scurve_and_status(m: DC7Model):
                     for value, color, label in values if value > 0
                 )
                 st.markdown(
-                    f'<div style="font-size:13px;font-weight:650;margin:4px 0 8px;">'
+                    f'<div style="font-size:13px;font-weight:650;margin:18px 0 12px;padding-top:4px;">'
                     f'Composition of {total_running:,} In Progress activities · UP09</div>'
                     f'<div style="display:flex;width:100%;height:15px;overflow:hidden;'
                     f'border-radius:8px;background:#e6eaf0;">{segments}</div>'
                     f'<div style="display:flex;justify-content:space-between;'
-                    f'flex-wrap:wrap;gap:6px;margin-top:8px;font-size:12px;">'
+                    f'flex-wrap:wrap;gap:8px 12px;margin-top:11px;padding-bottom:8px;font-size:12px;">'
                     f'{labels}</div>',
                     unsafe_allow_html=True,
                 )
