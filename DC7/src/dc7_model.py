@@ -426,6 +426,54 @@ class DC7Model:
 
             bs, bf = baseline_start.min(), baseline_finish.max()
             cs, cf = current_start.min(), current_finish.max()
+            finish_anchor_id = str(c_all.loc[current_finish.idxmax(), "task_code"])
+            finish_anchor_name = str(c_all.loc[current_finish.idxmax(), "task_name"])
+            finish_anchor_field = ("act_end_date" if bool(completed.loc[current_finish.idxmax()])
+                else "reend_date" if pd.notna(pd.to_datetime(c_all.loc[current_finish.idxmax(), "reend_date"], errors="coerce"))
+                else "early_end_date")
+            finish_reference = "Latest HELIX Construction Finish"
+            # The L3 Start gate is a Suffolk project milestone, not necessarily
+            # subcontractor-coded HELIX. Use it for the Data Hall control boundary
+            # without adding the milestone to HELIX activity counts.
+            if area.startswith("DH"):
+                code = {"DH1100": "DH1100.L3CX.000",
+                        "DH1200": "DH1200.L3CX.39",
+                        "DH1300": "DH1300.L3CX.59",
+                        "DH1400": "DH1400.L3CX.79",
+                        "DH1500": "DH1500.L3CX.99",
+                        "DH1600": "DH1600.L3CX.19"}[area]
+                def gate_row(tables):
+                    tasks = tables["TASK"]
+                    projects = tables["PROJECT"]
+                    # Search by Activity ID; reject nonunique matches.
+                    matches = tasks[tasks["task_code"].astype(str).eq(code)]
+                    if len(matches) != 1:
+                        raise ValueError(f"Expected exactly one Suffolk L3 Start milestone: {code}; got {len(matches)}")
+                    return matches.iloc[0]
+                current_gate = gate_row(self.update_tables)
+                if not str(current_gate["task_name"]).strip().lower().endswith("l3 start"):
+                    raise ValueError(f"Unexpected L3 Start activity identity: {code}")
+                gate_actual = pd.to_datetime(current_gate.get("act_end_date"), errors="coerce")
+                gate_finish = pd.to_datetime(current_gate.get("reend_date"), errors="coerce")
+                if pd.isna(gate_finish):
+                    gate_finish = pd.to_datetime(current_gate.get("early_end_date"), errors="coerce")
+                if str(current_gate["status_code"]).upper() == "TK_COMPLETE" and pd.notna(gate_actual):
+                    gate_finish = gate_actual
+                if pd.isna(gate_finish):
+                    raise ValueError(f"Missing current L3 Start date for {code}")
+                cf = gate_finish
+                finish_anchor_id = code
+                finish_anchor_name = str(current_gate["task_name"])
+                finish_anchor_field = "act_end_date" if str(current_gate["status_code"]).upper() == "TK_COMPLETE" else "reend_date / early_end_date"
+                finish_reference = "L3 Start Control Milestone"
+                # Do not conflate a baseline area maximum with a baseline L3 gate.
+                baseline_gate = gate_row(self.baseline_tables)
+                gate_bl = pd.to_datetime(baseline_gate.get("target_end_date"), errors="coerce")
+                if pd.isna(gate_bl):
+                    gate_bl = pd.to_datetime(baseline_gate.get("early_end_date"), errors="coerce")
+                if pd.isna(gate_bl):
+                    raise ValueError(f"Missing baseline L3 Start date for {code}")
+                bf = gate_bl
             if bs > bf or cs > cf:
                 raise ValueError(f"Invalid HELIX area window in {area}")
 
@@ -442,13 +490,10 @@ class DC7Model:
                 "Start Anchor ID": str(b_all.loc[baseline_start.idxmin(), "task_code"]),
                 "Start Anchor": str(b_all.loc[baseline_start.idxmin(), "task_name"]),
                 # The source activity driving the area maximum is auditable.
-                "Current Finish Anchor ID": str(c_all.loc[current_finish.idxmax(), "task_code"]),
-                "Current Finish Anchor Name": str(c_all.loc[current_finish.idxmax(), "task_name"]),
-                "Current Finish Anchor Field": (
-                    "act_end_date" if bool(completed.loc[current_finish.idxmax()])
-                    else "reend_date" if pd.notna(pd.to_datetime(c_all.loc[current_finish.idxmax(), "reend_date"], errors="coerce"))
-                    else "early_end_date"
-                ),
+                "Current Finish Anchor ID": finish_anchor_id,
+                "Current Finish Anchor Name": finish_anchor_name,
+                "Current Finish Anchor Field": finish_anchor_field,
+                "Finish Reference": finish_reference,
             })
         return pd.DataFrame(rows)
 
