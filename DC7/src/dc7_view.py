@@ -429,10 +429,14 @@ def render_windows(m: DC7Model):
                     line=dict(color=col, width=9), marker=dict(size=9, color=col),
                     showlegend=False,
                     hovertemplate=details+f"<br>Start Date Shift: {_fmt_days(r['Start Date Shift (d)'])}<br>Finish Date Shift: {_fmt_days(v)}<extra></extra>"))
+                # Show current finish and variance together for FOH/BOH.
+                # The baseline finish remains labelled at the gray bar endpoint.
+                current_label = _fmt_date(cf)
                 if pd.notna(v):
-                    fig.add_annotation(x=cf, y=cur_y, text=_fmt_days(v),
-                        showarrow=False, xanchor="left", xshift=8,
-                        font=dict(size=12, color=col))
+                    current_label += f" · {_fmt_days(v)}"
+                fig.add_annotation(x=cf, y=cur_y, text=current_label,
+                    showarrow=False, xanchor="left", xshift=8,
+                    font=dict(size=11, color=col))
     if dates:
         lo = min(dates) - pd.Timedelta(days=25); hi = max(dates) + pd.Timedelta(days=45)
         fig.update_xaxes(type="date", range=[lo, hi], dtick="M2", tickformat="%b\n%Y", gridcolor=GRID, title="Date")
