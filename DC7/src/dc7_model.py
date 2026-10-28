@@ -467,14 +467,24 @@ class DC7Model:
                 finish_anchor_field = "act_end_date" if str(current_gate["status_code"]).upper() == "TK_COMPLETE" else "reend_date / early_end_date"
                 finish_reference = "L3 Start Control Milestone"
                 # Do not conflate a baseline area maximum with a baseline L3 gate.
-                baseline_gate = gate_row(self.baseline_tables)
-                gate_bl = pd.to_datetime(baseline_gate.get("target_end_date"), errors="coerce")
-                if pd.isna(gate_bl):
-                    gate_bl = pd.to_datetime(baseline_gate.get("early_end_date"), errors="coerce")
-                if pd.isna(gate_bl):
-                    raise ValueError(f"Missing baseline L3 Start date for {code}")
-                bf = gate_bl
-            if bs > bf or cs > cf:
+                baseline_matches = self.baseline_tables["TASK"]
+                baseline_matches = baseline_matches[
+                    baseline_matches["task_code"].astype(str).eq(code)
+                ]
+                if len(baseline_matches) == 1:
+                    baseline_gate = baseline_matches.iloc[0]
+                    gate_bl = pd.to_datetime(baseline_gate.get("target_end_date"), errors="coerce")
+                    if pd.isna(gate_bl):
+                        gate_bl = pd.to_datetime(baseline_gate.get("early_end_date"), errors="coerce")
+                    if pd.notna(gate_bl):
+                        bf = gate_bl
+                    else:
+                        bf = pd.NaT
+                else:
+                    # A gate absent from the approved baseline must not be
+                    # compared with an unrelated construction-area maximum.
+                    bf = pd.NaT
+            if (pd.notna(bf) and bs > bf) or cs > cf:
                 raise ValueError(f"Invalid HELIX area window in {area}")
 
             rows.append({
@@ -484,8 +494,8 @@ class DC7Model:
                 "Current Start": cs,
                 "Current Forecast Finish": cf,
                 "Start Date Shift (d)": (bs.normalize() - cs.normalize()).days,
-                "Finish Date Shift (d)": (bf.normalize() - cf.normalize()).days,
-                "Duration Change (d)": ((bf - bs) - (cf - cs)).days,
+                "Finish Date Shift (d)": (bf.normalize() - cf.normalize()).days if pd.notna(bf) else float("nan"),
+                "Duration Change (d)": ((bf - bs) - (cf - cs)).days if pd.notna(bf) else float("nan"),
                 "Activity Completion %": _activity_completion_pct(c_all),
                 "Start Anchor ID": str(b_all.loc[baseline_start.idxmin(), "task_code"]),
                 "Start Anchor": str(b_all.loc[baseline_start.idxmin(), "task_name"]),
