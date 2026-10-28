@@ -417,9 +417,13 @@ def render_windows(m: DC7Model):
                        f"Activity: {_safe(r['Current Finish Anchor Name'])}<br>"
                        f"XER field: {_safe(r['Current Finish Anchor Field'])}")
             if r.Area.startswith("DH"):
+                dh_delta = int((bf.normalize() - cf.normalize()).days) if pd.notna(bf) else None
+                dh_color = (RED if dh_delta is not None and dh_delta < 0
+                            else GREEN if dh_delta is not None and dh_delta > 0
+                            else BLUE)
                 fig.add_trace(go.Scatter(x=[cs, cf], y=[cur_y, cur_y], mode="lines+markers",
-                    line=dict(color="#2f80ed", width=8),
-                    marker=dict(symbol="circle", size=5, color="#2f80ed"),
+                    line=dict(color=dh_color, width=8),
+                    marker=dict(symbol="circle", size=5, color=dh_color),
                     showlegend=False, hovertemplate=details+"<br>Baseline L3 gate: not available<extra></extra>"))
                 # Informational displacement between different reference types.
                 # Baseline: last HELIX construction finish; Current: Suffolk L3 Start.
@@ -429,7 +433,7 @@ def render_windows(m: DC7Model):
                     dh_label += f" · {dh_delta:+d} days*"
                 fig.add_annotation(x=cf, y=cur_y, text=dh_label,
                     showarrow=False, xanchor="left", xshift=13,
-                    font=dict(size=11, color="#2f80ed"))
+                    font=dict(size=11, color=dh_color))
             else:
                 fig.add_trace(go.Scatter(x=[cs, cf], y=[cur_y, cur_y], mode="lines+markers",
                     line=dict(color=col, width=9), marker=dict(size=9, color=col),
