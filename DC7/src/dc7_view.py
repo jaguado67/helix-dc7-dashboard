@@ -320,6 +320,33 @@ def render_scurve_and_status(m: DC7Model):
         p = m.status_percentages()
         h += f'</div><div class="scope-note">Completed: <b>{p["Completed %"]:.1f}%</b><br>In Progress: <b>{p["In Progress %"]:.1f}%</b><br>Not Started: <b>{p["Not Started %"]:.1f}%</b></div></div>'
         st.markdown(h, unsafe_allow_html=True)
+        audit = (m.audit_reports or {}).get("active", pd.DataFrame())
+        if not audit.empty:
+            running = audit.loc[audit["Status Current"].eq("In Progress")]
+            started = int(running["Status Previous"].eq("Not Started").sum())
+            continued = int(running["Status Previous"].eq("In Progress").sum())
+            other = len(running) - started - continued
+            if len(running) != counts["In Progress"]:
+                st.error("UP08 / UP09 status reconciliation mismatch.")
+            else:
+                st.markdown("**UP08 → UP09 · In Progress transitions**")
+                values = [("Started since UP08", started), ("Continuing", continued), ("Other / new scope", other)]
+                chart = go.Figure(go.Bar(
+                    x=[v for _, v in values if v > 0],
+                    y=["In Progress"] * sum(v > 0 for _, v in values),
+                    orientation="h",
+                    marker_color=[c for c, (_, v) in zip(["#2c76b9", "#259978", "#d28b39"], values) if v > 0],
+                    text=[str(v) for _, v in values if v > 0],
+                    textposition="inside",
+                    name="",
+                ))
+                for trace in chart.data:
+                    trace.showlegend = False
+                chart.update_layout(height=105, margin=dict(l=5,r=5,t=5,b=20), barmode="stack",
+                    xaxis=dict(visible=False), yaxis=dict(visible=False), showlegend=False)
+                st.plotly_chart(chart, use_container_width=True, config={"displayModeBar": False})
+                st.caption(" · ".join(f"{label}: {value}" for label, value in values if value > 0))
+
 
 
 def render_windows(m: DC7Model):
