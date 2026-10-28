@@ -317,8 +317,7 @@ def render_scurve_and_status(m: DC7Model):
         h = '<div class="activity-wrap">'
         for lab, val in [("Total", counts['Total']), ("Completed", counts['Completed']), ("In Progress", counts['In Progress']), ("Not Started", counts['Not Started'])]:
             h += f'<div class="activity-card"><div class="num">{val:,}</div><div class="lab">{lab}</div></div>'
-        p = m.status_percentages()
-        h += f'</div><div class="scope-note">Completed: <b>{p["Completed %"]:.1f}%</b><br>In Progress: <b>{p["In Progress %"]:.1f}%</b><br>Not Started: <b>{p["Not Started %"]:.1f}%</b></div></div>'
+        h += "</div></div>"
         st.markdown(h, unsafe_allow_html=True)
         audit = (m.audit_reports or {}).get("active", pd.DataFrame())
         if not audit.empty:
@@ -336,16 +335,16 @@ def render_scurve_and_status(m: DC7Model):
                     y=["In Progress"] * sum(v > 0 for _, v in values),
                     orientation="h",
                     marker_color=[c for c, (_, v) in zip(["#2c76b9", "#259978", "#d28b39"], values) if v > 0],
-                    text=[str(v) for _, v in values if v > 0],
-                    textposition="inside",
+                    hovertemplate="%{x} activities<extra></extra>",
                     name="",
                 ))
                 for trace in chart.data:
                     trace.showlegend = False
-                chart.update_layout(height=105, margin=dict(l=5,r=5,t=5,b=20), barmode="stack",
+                chart.update_layout(height=45, margin=dict(l=0,r=0,t=0,b=0), barmode="stack",
+                    bargap=0.78,
                     xaxis=dict(visible=False), yaxis=dict(visible=False), showlegend=False)
                 st.plotly_chart(chart, use_container_width=True, config={"displayModeBar": False})
-                st.caption(" · ".join(f"{label}: {value}" for label, value in values if value > 0))
+                st.caption("  |  ".join(f"{label}: {value}" for label, value in values if value > 0))
 
 
 
