@@ -45,14 +45,14 @@ def _find_files(data_dir: Path) -> tuple[Path, Path]:
     """Strict official Suffolk BL + UP08 pair. No Current-C fallback."""
     source = Path(data_dir)
     files = sorted(source.rglob("226021.005.MO-BL.xer"))
-    updates = sorted(source.rglob("226021.022.MO-UP-08.xer"))
+    updates = sorted(source.rglob("226021.025.MO-UP-09.xer"))
     if len(files) != 1 or len(updates) != 1:
         raise FileNotFoundError(
             "Expected one 226021.005.MO-BL.xer and one "
-            "226021.022.MO-UP-08.xer in DC7 data; no older-current fallback"
+            "226021.025.MO-UP-09.xer in DC7 data; no older-current fallback"
         )
     if files[0].parent != updates[0].parent:
-        raise ValueError("Suffolk BL and official UP08 must share the same source directory")
+        raise ValueError("Suffolk BL and official UP09 must share the same source directory")
     return files[0], updates[0]
 
 
@@ -344,7 +344,7 @@ class DC7Model:
         return pd.DataFrame(rows)
 
     def area_windows(self) -> pd.DataFrame:
-        """HELIX-only Suffolk Construction area windows from independent BL/UP08 XER.
+        """HELIX-only Suffolk Construction area windows from independent BL/UP09 XER.
 
         Use all qualifying activity dates for each area, not a chosen current
         activity as the start anchor. Baseline matches retain the original P6
@@ -954,7 +954,7 @@ class DC7Model:
             "Areas": ", ".join(self.areas()),
             "Line-Up / MOH Source": self.auxiliary_path.name if self.auxiliary_path is not None else "Not loaded: official 226021-HE.B.xer pending",
             "MOH HELIX Activities": int((self.auxiliary_tasks["Area"].eq("MOH")).sum()) if self.auxiliary_tasks is not None and not self.auxiliary_tasks.empty else 0,
-            "Scope Rule": "SUFFOLK BL/UP08 drives audited HELIX-coded construction; HELIX 226021-HE.B/U02 independently drives Line-Ups/MOH",
+            "Scope Rule": "SUFFOLK BL/UP09 drives audited HELIX-coded construction; HELIX 226021-HE.B/U02 independently drives Line-Ups/MOH",
         }
 
 
@@ -1048,7 +1048,7 @@ def build_dc7_model(data_dir: Path) -> DC7Model:
 
     # Trace the exact source activities, including the previous active update.
     previous_active = None
-    previous_path = next(iter(sorted(Path(data_dir).rglob("226021.010.MO-UP-C.xer"))), None)
+    previous_path = next(iter(sorted(Path(data_dir).rglob("226021.022.MO-UP-08.xer"))), None)
     if previous_path is not None:
         pt = parse_xer(previous_path, WANTED)
         pp = _project_row(pt, previous_path)
@@ -1056,7 +1056,7 @@ def build_dc7_model(data_dir: Path) -> DC7Model:
         previous_active = scoped_helix_construction(pt, previous_pid, _helix_task_ids(pt, previous_pid))
     audit_reports = build_activity_audit(cur_all, helix_ids, current, baseline, previous_active)
     # The re-exported Suffolk BL contains additional subcontractor-code data.
-    # BL/UP08 Activity-ID matches are observed values, not fixed historical
+    # BL/UP09 Activity-ID matches are observed values, not fixed historical
     # counts. Keep all genuine unmatched IDs visible to the internal audit.
     matched_count = int(audit_reports["summary"].loc[
         audit_reports["summary"]["Metric"].eq("Matched to Baseline by Activity ID"), "Value"
@@ -1069,7 +1069,7 @@ def build_dc7_model(data_dir: Path) -> DC7Model:
     # Preserve the strict reconciliation, while reporting all unmatched IDs.
     if matched_count + len(unmatched) != len(current):
         raise ValueError(
-            f"Invalid UP08 Suffolk baseline reconciliation: total={len(current)}, "
+            f"Invalid UP09 Suffolk baseline reconciliation: total={len(current)}, "
             f"matched={matched_count}, unmatched={unmatched}"
         )
     previous_report = audit_reports["summary"].set_index("Metric")["Value"]
@@ -1078,20 +1078,20 @@ def build_dc7_model(data_dir: Path) -> DC7Model:
     added_count = int(previous_report["New active HELIX IDs not in Previous"])
     if previous_count - exited_count + added_count != len(current):
         raise ValueError(
-            "Suffolk Current-C → UP08 ID reconciliation failed: "
+            "Suffolk UP08 → UP09 ID reconciliation failed: "
             f"previous={previous_count}, exited={exited_count}, "
             f"added={added_count}, current={len(current)}"
         )
-    audit_reports["up08_baseline_unmatched"] = audit_reports["active"].loc[
+    audit_reports["up09_baseline_unmatched"] = audit_reports["active"].loc[
         audit_reports["active"]["Audit"].eq("NO BASELINE MATCH")
     ].copy()
-    audit_reports["up08_current_c_to_up08"] = pd.DataFrame([
-        {"Metric": "Previous Current-C HELIX Construction", "Value": previous_count},
-        {"Metric": "UP08 HELIX Construction", "Value": len(current)},
+    audit_reports["up08_to_up09"] = pd.DataFrame([
+        {"Metric": "Previous UP08 HELIX Construction", "Value": previous_count},
+        {"Metric": "UP09 HELIX Construction", "Value": len(current)},
         {"Metric": "Exited construction scope", "Value": exited_count},
         {"Metric": "New construction Activity IDs", "Value": added_count},
-        {"Metric": "UP08 matched to approved BL", "Value": matched_count},
-        {"Metric": "UP08 without BL counterpart", "Value": len(unmatched)},
+        {"Metric": "UP09 matched to approved BL", "Value": matched_count},
+        {"Metric": "UP09 without BL counterpart", "Value": len(unmatched)},
     ])
 
     # Updates may add, split, replace, or recode activities.
@@ -1163,7 +1163,7 @@ def build_dc7_model(data_dir: Path) -> DC7Model:
             })
     dh_exceptions = pd.DataFrame(dh_parts)
     if dh_exceptions["Activity ID"].nunique() != len(dh_exceptions):
-        raise ValueError("Duplicate Data Hall WBS exceptions in Suffolk UP08")
+        raise ValueError("Duplicate Data Hall WBS exceptions in Suffolk UP09")
     if dh_exceptions["Activity ID"].isin(wbs_exceptions["Activity ID"]).any():
         raise ValueError("Duplicate FOH/BOH and Data Hall WBS exceptions")
     audit_reports["dh_wbs_exceptions"] = dh_exceptions
