@@ -278,16 +278,52 @@ def render_helix_baseline_scurve_and_status(m: DC7Model):
         h = '<div class="activity-wrap">'
         for label in ("Total", "Completed", "In Progress", "Not Started"):
             h += f'<div class="activity-card"><div class="num">{count[label]:,}</div><div class="lab">{label}</div></div>'
-        ratio = lambda k: f'{100 * count[k] / total:.2f}%'
-        h += ('</div><div class="scope-note">'
-              f'Completed: <b>{ratio("Completed")}</b><br>'
-              f'In Progress: <b>{ratio("In Progress")}</b><br>'
-              f'Not Started: <b>{ratio("Not Started")}</b><br>'
-              '<span style="display:block;margin-top:8px">Scope: 4,153 HELIX Electrical Line-Ups &amp; MOH activities; '
-              'excludes 44 other HELIX-coded activities and 492 non-HELIX activities in the full 4,689-task XER. '
-              'The 77 completed activities in the full XER are not the HELIX scope count.</span>'
-              '</div></div>')
+        h += '</div></div>'
         st.markdown(h, unsafe_allow_html=True)
+        # Independent HELIX P6 updates only; match exactly the 4,153 Line-Ups & MOH IDs.
+        prior = m.independent_helix_u01()
+        if prior is not None:
+            previous = prior["_audit"][["Activity ID", "Status"]].rename(
+                columns={"Status": "Previous Status"}
+            )
+            current = cur["_audit"][["Activity ID", "Status"]].rename(
+                columns={"Status": "Current Status"}
+            )
+            if previous["Activity ID"].duplicated().any() or current["Activity ID"].duplicated().any():
+                st.error("HELIX U01/U02 duplicate Activity IDs in transition analysis.")
+            else:
+                comparison = current.merge(previous, on="Activity ID", how="left", validate="one_to_one")
+                running = comparison.loc[comparison["Current Status"].eq("In Progress")]
+                started = int(running["Previous Status"].eq("Not Started").sum())
+                continued = int(running["Previous Status"].eq("In Progress").sum())
+                other = int(len(running) - started - continued)
+                if len(running) != count["In Progress"] or len(comparison) != total:
+                    st.error("HELIX U01/U02 transition totals do not reconcile with the status cards.")
+                else:
+                    values = [(started, "#2c76b9", "Started since U01"),
+                              (continued, "#259978", "Continuing In Progress"),
+                              (other, "#d28b39", "Other / new scope")]
+                    segments = "".join(
+                        f'<span style="display:block;flex:{value};background:{color};height:100%;"></span>'
+                        for value, color, _ in values if value > 0
+                    )
+                    labels = "".join(
+                        f'<span style="display:inline-flex;align-items:center;gap:5px;">'
+                        f'<span style="color:{color};font-size:13px;">&#9679;</span>'
+                        f'{value:,} {_safe(label)}</span>'
+                        for value, color, label in values if value > 0
+                    )
+                    st.markdown(
+                        f'<div style="font-size:13px;font-weight:650;margin:18px 0 12px;padding-top:4px;">'
+                        f'Composition of {len(running):,} In Progress activities · U02</div>'
+                        f'<div style="display:flex;width:100%;height:15px;overflow:hidden;'
+                        f'border-radius:8px;background:#e6eaf0;">{segments}</div>'
+                        f'<div style="display:flex;justify-content:space-between;'
+                        f'flex-wrap:wrap;gap:8px 12px;margin-top:11px;padding-bottom:8px;font-size:12px;">'
+                        f'{labels}</div>',
+                        unsafe_allow_html=True,
+                    )
+
 
 
 def render_scurve_and_status(m: DC7Model):
