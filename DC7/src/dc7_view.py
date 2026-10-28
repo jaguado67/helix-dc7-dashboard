@@ -395,7 +395,7 @@ def render_scurve_and_status(m: DC7Model):
 def render_windows(m: DC7Model):
     st.markdown('<div class="section-caption">SCHEDULE SUMMARY · BASELINE VS CURRENT UPDATE</div>', unsafe_allow_html=True)
     df = m.area_windows()
-    st.caption("Suffolk UP09 · HELIX-coded Construction scope. Each current bar ends at the latest activity Finish in its area (not a contractual FTE milestone). Hover to inspect the driving Activity ID and source XER field. Baseline vs current shifts shown here are calendar-day differences.")
+    st.caption("Suffolk UP09 · Data Hall bars end at the L3 Start control milestone from the Suffolk XER (not at the latest HELIX construction activity). FOH/BOH retain their construction-area finish. The L3 gate is not added to HELIX activity counts. Date shifts shown here are calendar-day differences.")
     if df.empty:
         st.info("No QTS - AREA assignments found for HELIX scope.")
         return
@@ -409,7 +409,7 @@ def render_windows(m: DC7Model):
             fig.add_trace(go.Scatter(x=[bs, bf], y=[base_y, base_y], mode="lines+markers", line=dict(color=BASELINE, width=8), marker=dict(size=8, color=BASELINE), showlegend=False, hovertemplate=f"<b>{r.Area} · Baseline</b><br>Start: {_fmt_date(bs)}<br>Finish: {_fmt_date(bf)}<extra></extra>"))
         if pd.notna(cs) and pd.notna(cf):
             v = r["Finish Date Shift (d)"]; col = _timeline_color(v)
-            fig.add_trace(go.Scatter(x=[cs, cf], y=[cur_y, cur_y], mode="lines+markers", line=dict(color=col, width=9), marker=dict(size=9, color=col), showlegend=False, hovertemplate=f"<b>{r.Area} · Current</b><br>Earliest HELIX Start: {_fmt_date(cs)}<br>Latest HELIX Finish (scope maximum): {_fmt_date(cf)}<br>Driving Activity ID: {_safe(r["Current Finish Anchor ID"])}<br>Driving Activity: {_safe(r["Current Finish Anchor Name"])}<br>XER field: {_safe(r["Current Finish Anchor Field"])}<br>Start Date Shift: {_fmt_days(r['Start Date Shift (d)'])}<br>Finish Date Shift: {_fmt_days(v)}<extra></extra>"))
+            fig.add_trace(go.Scatter(x=[cs, cf], y=[cur_y, cur_y], mode="lines+markers", line=dict(color=col, width=9), marker=dict(size=9, color=col), showlegend=False, hovertemplate=f"<b>{r.Area} · Current</b><br>Earliest HELIX Start: {_fmt_date(cs)}<br>Control Finish / L3 Start: {_fmt_date(cf)}<br>Reference: {_safe(r["Finish Reference"])}<br>Driving Activity ID: {_safe(r["Current Finish Anchor ID"])}<br>Driving Activity: {_safe(r["Current Finish Anchor Name"])}<br>XER field: {_safe(r["Current Finish Anchor Field"])}<br>Start Date Shift: {_fmt_days(r['Start Date Shift (d)'])}<br>Finish Date Shift: {_fmt_days(v)}<extra></extra>"))
             fig.add_annotation(x=cf, y=cur_y, text=_fmt_days(v), showarrow=False, xanchor="left", xshift=8, font=dict(size=12, color=col))
     if dates:
         lo = min(dates) - pd.Timedelta(days=25); hi = max(dates) + pd.Timedelta(days=45)
