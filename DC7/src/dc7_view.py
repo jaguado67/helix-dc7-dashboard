@@ -395,7 +395,7 @@ def render_scurve_and_status(m: DC7Model):
 def render_windows(m: DC7Model):
     st.markdown('<div class="section-caption">SCHEDULE SUMMARY · BASELINE CONTEXT & L3 CONTROL</div>', unsafe_allow_html=True)
     df = m.area_windows()
-    st.caption("Suffolk UP09 · Gray = baseline HELIX construction-area window; blue = current HELIX construction start through the L3 Start control milestone. These are different scope references, so no DH finish variance is calculated. FOH/BOH remain comparable construction-area windows. L3 milestones are excluded from HELIX activity counts.")
+    st.caption("Suffolk UP09 · Gray = baseline HELIX construction-area window; blue = current HELIX construction start through the L3 Start control milestone. For Data Halls the signed day difference compares the gray baseline construction-area Finish with the UP09 L3 Start gate (calendar days); it is NOT a like-for-like L3 milestone variance. FOH/BOH remain comparable construction-area windows. L3 milestones are excluded from HELIX activity counts. *Informational difference only, not a contractual variance.")
     if df.empty:
         st.info("No QTS - AREA assignments found for HELIX scope.")
         return
@@ -421,7 +421,13 @@ def render_windows(m: DC7Model):
                     line=dict(color="#2f80ed", width=8),
                     marker=dict(symbol="circle", size=5, color="#2f80ed"),
                     showlegend=False, hovertemplate=details+"<br>Baseline L3 gate: not available<extra></extra>"))
-                fig.add_annotation(x=cf, y=cur_y, text=f"L3 · {_fmt_date(cf)}",
+                # Informational displacement between different reference types.
+                # Baseline: last HELIX construction finish; Current: Suffolk L3 Start.
+                dh_delta = int((bf.normalize() - cf.normalize()).days) if pd.notna(bf) else None
+                dh_label = f"L3 · {_fmt_date(cf)}"
+                if dh_delta is not None:
+                    dh_label += f" · {dh_delta:+d} days*"
+                fig.add_annotation(x=cf, y=cur_y, text=dh_label,
                     showarrow=False, xanchor="left", xshift=13,
                     font=dict(size=11, color="#2f80ed"))
             else:
